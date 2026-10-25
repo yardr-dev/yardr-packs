@@ -1,0 +1,31 @@
+#!/bin/sh
+# yardr-packs' tests: the depot's test command. A builder and a reviewer run
+# it in their worktree before they hand on, and a bead lands only when it
+# exits 0 on what lands.
+#
+# Every directory at the top with a pack.yaml is a pack. For each, yardr pack
+# check reads the pack and refuses a broken one; and a pack that has an
+# executable program named test beside its pack.yaml has that run, in
+# whatever language it is written: the gate knows nothing of languages. A
+# pack's test must need no network and no secret, and must exit 0 in seconds.
+# An empty repository passes: there is nothing to check.
+set -e
+cd "$(dirname "$0")/.."
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+rc=0 n=0
+for p in */pack.yaml; do
+  [ -e "$p" ] || continue
+  d=${p%/pack.yaml}
+  n=$((n + 1))
+  if "$YARDR" pack check "$d" >/dev/null 2>"$d/.check.err"; then
+    echo "test: $d: pack check ok"
+  else
+    echo "test: $d: pack check failed:"; sed 's/^/  /' "$d/.check.err"; rc=1
+  fi
+  rm -f "$d/.check.err"
+  if [ -x "$d/test" ]; then
+    if (cd "$d" && ./test); then echo "test: $d/test ok"; else echo "test: $d/test failed"; rc=1; fi
+  fi
+done
+if [ "$rc" = 0 ]; then echo "test: sh .yardr/test: pass, $n packs"; else echo "test: sh .yardr/test: FAIL, $n packs"; fi
+exit $rc
