@@ -17,7 +17,9 @@ for p in */pack.yaml; do
   [ -e "$p" ] || continue
   d=${p%/pack.yaml}
   n=$((n + 1))
-  if "$YARDR" pack check "$d" >/dev/null 2>"$d/.check.err"; then
+  # A bare word is a pack's name, never tried as a directory: the
+  # directory is named with its separator (pack check --help).
+  if "$YARDR" pack check "./$d" >/dev/null 2>"$d/.check.err"; then
     echo "test: $d: pack check ok"
   else
     echo "test: $d: pack check failed:"; sed 's/^/  /' "$d/.check.err"; rc=1
