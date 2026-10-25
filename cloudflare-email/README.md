@@ -1,13 +1,13 @@
-# Email
+# Cloudflare Email
 
-Mail as a pack of kind source: mail sent to yardmaster@yardr.dev reaches
-the yard as a hook event and the yardmaster's inbox, through Cloudflare
-Email Routing and a Worker, as the declared source `email`. Inbound
-only: the yard never answers from the address. Nothing here is compiled
-into yardr; apply it with:
+Mail to one address through Cloudflare Email Routing and a Worker,
+inbound only: mail sent to yardmaster@yardr.dev reaches the yard as a
+hook event and the yardmaster's inbox, as the declared source
+`cloudflare-email`. The yard never answers from the address. Nothing
+here is compiled into yardr; apply it with:
 
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/email
+yardr pack apply /Users/mckean/projects/repos/yardr-packs/cloudflare-email
 ```
 
 from main of this repository. SETUP.md is the operator's steps.
@@ -30,8 +30,9 @@ no prefix in `X-Email-Signature`, and puts the mail's Message-ID in
 so the sending MTA retries later; a message over 1 MiB raw is rejected
 (`message.setReject`), never posted.
 
-The hook (`email.yaml`) verifies that signature, dedupes bodies
-(`bodies: unique`), and `email/normalize` turns each verified body into
+The hook (`cloudflare-email.yaml`) verifies that signature, dedupes
+bodies (`bodies: unique`), and `cloudflare-email/normalize` turns each
+verified body into
 the envelope: `type: message`, `action: received`, the sender's
 lowercased address as actor id and `fields.sender`, the References root
 (else In-Reply-To, else the Message-ID) as the thread, the subject as
@@ -67,8 +68,8 @@ only addresses whose owners you know, as the mapping card asks.
 
 ## Files
 
-- `pack.yaml`, `email.yaml`: the pack and its hook-only declaration.
-- `email/normalize`: POSIX sh + jq, the verified body to the envelope.
+- `pack.yaml`, `cloudflare-email.yaml`: the pack and its hook-only declaration.
+- `cloudflare-email/normalize`: POSIX sh + jq, the verified body to the envelope.
 - `worker/`: the Cloudflare Worker (`worker.js`, `wrangler.toml`,
   `package.json` with postal-mime as the one dependency), its tests
   (`worker.test.js`, `node --test`) and their fixtures

@@ -1,6 +1,7 @@
-# Setting up Email
+# Setting up Cloudflare Email
 
-The pack wires mail into the yard as the declared source `email`: mail
+The pack wires mail into the yard as the declared source
+`cloudflare-email`: mail
 sent to yardmaster@yardr.dev reaches the yard as a hook event and the
 yardmaster's inbox, through Cloudflare Email Routing and a Worker. What
 the operator writes to the address reaches the yardmaster's inbox, after
@@ -12,10 +13,10 @@ to deploy, and the yard cannot reach Cloudflare: every step below at
 Cloudflare's side is typed by a person, not by a crew member.
 
 1. **Apply the pack.** From main of the yardr-packs repository, as an
-   operator. The source is named `email`: yardr knows mail as this pack
-   alone.
+   operator. The source is named `cloudflare-email`: a pack is named
+   after the service it talks to.
    ```sh
-   yardr pack apply /Users/mckean/projects/repos/yardr-packs/email
+   yardr pack apply /Users/mckean/projects/repos/yardr-packs/cloudflare-email
    ```
 2. **The secret and the hook.** The Worker signs each message with this
    secret, and the hook verifies it. The secret lives in a file, mode
@@ -27,13 +28,13 @@ Cloudflare's side is typed by a person, not by a crew member.
    umask 077
    ```
    ```sh
-   openssl rand -hex 32 | tr -d '\n' > ~/.yardr/email.secret
+   openssl rand -hex 32 | tr -d '\n' > ~/.yardr/cloudflare-email.secret
    ```
    ```sh
-   chmod 600 ~/.yardr/email.secret
+   chmod 600 ~/.yardr/cloudflare-email.secret
    ```
    ```sh
-   yardr hook add email --source email --secret-file ~/.yardr/email.secret --unknown unknown
+   yardr hook add cloudflare-email --source cloudflare-email --secret-file ~/.yardr/cloudflare-email.secret --unknown unknown
    ```
    The file holds 64 hex characters, no trailing newline; the same
    value goes to the Worker in step 5, byte for byte. `--unknown
@@ -42,7 +43,7 @@ Cloudflare's side is typed by a person, not by a crew member.
    ignored. `yardr hook list` shows the hook with STATE `ok`.
 3. **Who hears.** The yardmaster hears every mail to the address:
    ```sh
-   yardr subscribe yardmaster email --scope all --where type=message
+   yardr subscribe yardmaster cloudflare-email --scope all --where type=message
    ```
    `all` is needed, not `mentions`: every mail to the address is
    addressed to the yard, and mail mentions nobody, so `mentions`
@@ -59,11 +60,11 @@ Cloudflare's side is typed by a person, not by a crew member.
    wrangler secret put EMAIL_HOOK_SECRET
    ```
    The second is the hook's public address: the URL the edge serves
-   this yard's hooks at, with `/email` for the hook's name.
+   this yard's hooks at, with `/cloudflare-email` for the hook's name.
    ```sh
    wrangler secret put YARD_HOOK_URL
    ```
-   On this yard that address is `https://my.yardr.dev/hooks/mckean/mac/email`.
+   On this yard that address is `https://my.yardr.dev/hooks/mckean/mac/cloudflare-email`.
    Then deploy:
    ```sh
    wrangler deploy
@@ -82,23 +83,24 @@ Cloudflare's side is typed by a person, not by a crew member.
    sender: who the sender is, and at most the first 80 characters
    beside it. Its picks are the yard's users, each naming the identity
    it writes, someone new, and nobody, who is ignored. Pick the
-   operator's own user: the pick writes their `email` identity in the
+   operator's own user: the pick writes their `cloudflare-email`
+   identity in the
    answering write. By hand it is the operator's instead:
    ```sh
-   yardr user identity <user> --source email --id <the sender's address, lowercased>
+   yardr user identity <user> --source cloudflare-email --id <the sender's address, lowercased>
    ```
    The next mail from that address is their word in the yardmaster's
    inbox:
    ```text
-   4211 10-25 11:40  hook (all) email message received by mckean (mckean@example.com) on "Can the shed land on Monday?": Can the shed land on Monday?
+   4211 10-25 11:40  hook (all) cloudflare-email message received by mckean (mckean@example.com) on "Can the shed land on Monday?": Can the shed land on Monday?
    ```
    The ignored senders of the source are listed by `yardr source show
-   email` and `yardr source ignore email`, and removed by `yardr
-   source ignore email --rm <id>`, which hears them again with a fresh
-   card.
+   cloudflare-email` and `yardr source ignore cloudflare-email`, and
+   removed by `yardr source ignore cloudflare-email --rm <id>`, which
+   hears them again with a fresh card.
 7. **Ending hearing.** Delete the Email Routing rule of step 5, and
    remove the hook:
    ```sh
-   yardr hook rm email
+   yardr hook rm cloudflare-email
    ```
    Events the hook accepted are kept.

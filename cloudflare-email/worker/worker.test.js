@@ -17,7 +17,7 @@ const eml = (name) => readFileSync(join(dir, name));
 
 const env = {
   EMAIL_HOOK_SECRET: 'test-secret',
-  YARD_HOOK_URL: 'https://hooks.example.test/email',
+  YARD_HOOK_URL: 'https://hooks.example.test/cloudflare-email',
 };
 
 // A ForwardableEmailMessage stand-in: the fields the Worker reads.
@@ -66,7 +66,7 @@ describe('email', () => {
     await assert.rejects(
       handler.email(message(eml('plain.eml')), {
         ...env,
-        YARD_HOOK_URL: 'http://hooks.example.test/email',
+        YARD_HOOK_URL: 'http://hooks.example.test/cloudflare-email',
       }, {}),
       /YARD_HOOK_URL must use HTTPS/,
     );

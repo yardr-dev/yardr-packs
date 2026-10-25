@@ -53,7 +53,7 @@ export default {
   },
 };
 
-// The hook's body: what email.yaml's normalize reads. Attachments are
+// The hook's body: what cloudflare-email.yaml's normalize reads. Attachments are
 // listed, never carried: names, sizes and types cross; the bytes stay
 // in the mail.
 function toHookBody(mail, message) {

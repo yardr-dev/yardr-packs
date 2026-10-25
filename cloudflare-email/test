@@ -1,5 +1,5 @@
 #!/bin/sh
-# The email pack's tests: what the gate runs beside yardr pack check.
+# The cloudflare-email pack's tests: what the gate runs beside yardr pack check.
 # Needs no network and no secret, done in seconds.
 #
 # normalize turns each Worker body in testdata/ into the yard's envelope;
@@ -12,7 +12,7 @@ cd "$(dirname "$0")"
 fail=0
 for f in testdata/plain.json testdata/html.json testdata/reply.json; do
   g=${f%.json}.golden
-  if ./email/normalize < "$f" | cmp -s - "$g"; then
+  if ./cloudflare-email/normalize < "$f" | cmp -s - "$g"; then
     echo "test: normalize $f ok"
   else
     echo "test: normalize $f differs from $g"

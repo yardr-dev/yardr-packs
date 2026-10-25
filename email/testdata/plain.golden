@@ -1,1 +1,0 @@
-{"source":"email","type":"message","action":"received","actor":{"id":"ada@example.com","name":"Ada"},"thread":{"id":"<plain-1@example.com>","title":"Can the shed land on Monday?"},"text":"Hi, Can the shed land on Monday?","mentions":[],"fields":{"sender":["ada@example.com"],"to":["yardmaster@yardr.dev"],"subject":["Can the shed land on Monday?"]}}

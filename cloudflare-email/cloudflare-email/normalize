@@ -24,7 +24,7 @@ def trunc: (gsub("^[[:space:]]+|[[:space:]]+$"; "") | gsub("[[:space:]]+"; " "))
 | (str($b.from.name)) as $name
 | (($b.references // []) | map(select(type == "string" and . != ""))) as $refs
 | (if ($refs | length) > 0 then $refs[0] elif str($b.in_reply_to) != "" then str($b.in_reply_to) else str($b.message_id) end) as $thread
-| {source: "email", type: "message", action: "received",
+| {source: "cloudflare-email", type: "message", action: "received",
    actor: {id: $sender, name: (if $name != "" then $name else $sender end)},
    thread: {id: $thread, title: str($b.subject)},
    text: (str($b.text) | trunc), mentions: [],
