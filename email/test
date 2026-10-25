@@ -1,0 +1,36 @@
+#!/bin/sh
+# The email pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds.
+#
+# normalize turns each Worker body in testdata/ into the yard's envelope;
+# its output must match the golden beside it byte for byte. Then the
+# Worker's own tests, where node and its one dependency are present: the
+# Worker is the operator's to deploy (SETUP.md), so a machine without
+# them still passes.
+set -u
+cd "$(dirname "$0")"
+fail=0
+for f in testdata/plain.json testdata/html.json testdata/reply.json; do
+  g=${f%.json}.golden
+  if ./email/normalize < "$f" | cmp -s - "$g"; then
+    echo "test: normalize $f ok"
+  else
+    echo "test: normalize $f differs from $g"
+    fail=1
+  fi
+done
+if command -v node >/dev/null 2>&1; then
+  if [ -d worker/node_modules/postal-mime ]; then
+    if (cd worker && node --test 2>&1); then
+      echo "test: worker ok"
+    else
+      echo "test: worker failed"
+      fail=1
+    fi
+  else
+    echo "test: worker skipped: postal-mime is not installed (cd worker && npm install)"
+  fi
+else
+  echo "test: worker skipped: node is not on PATH"
+fi
+exit $fail

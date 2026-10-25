@@ -1,0 +1,60 @@
+# Mail as a declared source: the messages sent to yardmaster@yardr.dev,
+# heard through a Cloudflare Email Worker that POSTs one JSON object
+# per message to the yard's hook. The Worker is the operator's to
+# deploy (SETUP.md); the yard hears only what it posts.
+#
+# The Worker signs the exact bytes it sends with HMAC-SHA256 under the
+# hook's secret, hex in X-Email-Signature, and puts the mail's
+# Message-ID in X-Email-Delivery, by which a retry is told. The body
+# is the Worker's object: {message_id, from: {address, name}, to: [],
+# subject, date, in_reply_to, references: [], text, attachments: []}.
+# Attachments are listed, never carried: the yard keeps the names, and
+# fetching them into the blob store is a later bead.
+#
+# Inbound only: no calls, no notify, no thread keys. Who may be heard
+# is decided by identity, as Slack's is: an unmapped sender gets the
+# operator a mapping card under the hook's --unknown word.
+name: email
+about: Mail sent to yardmaster@yardr.dev, heard through a Cloudflare Email Worker.
+
+# ---- what it sends us ----------------------------------------------------
+
+hook:
+  # Adapter.Verify stays data, checked by the core: the hook's secret is
+  # handed to no command, and an unverified body reaches none. The
+  # Worker signs the raw body alone, hex with no prefix.
+  verify:
+    scheme: hmac-sha256
+    signed: body
+    signature: { header: X-Email-Signature, encoding: hex }
+    delivery: { header: X-Email-Delivery }   # the mail's Message-ID: a retry repeats it
+  bodies: unique
+
+  # Adapter.Normalize. stdin {"headers":{…},"body":{…}}, stdout the
+  # envelope. The core sets source and delivery itself.
+  normalize: [email/normalize]
+
+  # The keys its events' fields may carry: a subscription's --where may
+  # name them beside type, action, team, project, repo and label.
+  keys: [sender, to, subject]
+
+# ---- who is heard ---------------------------------------------------------
+# A delivery is kept when its sender is a user of the yard, matched by
+# identity: fields.sender holds the sender's address, lowercased, which
+# normalize also sets as actor.id. The core adds fields.speaker for a
+# kept delivery (the yard user's name, or outside where the hook's
+# --unknown word allows an unmapped sender); speaker is the derived
+# filter key for this hear, and stands in no hook.keys above, which
+# names only what normalize may set.
+
+hear:
+  field: sender
+  by: identity
+
+# ---- who a crew member is in it -------------------------------------------
+# A sender's address is the same in any case: normalize carries it
+# lowercased, and a stored identity key is kept folded the same way, so
+# one spelling is stored however it was typed.
+
+identity:
+  fold: lower

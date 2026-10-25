@@ -1,0 +1,6 @@
+# The mail hook's Worker: bound by an Email Routing rule, not by a route,
+# so this file names no routes. yardmaster@yardr.dev -> this Worker, in
+# the Cloudflare dashboard (SETUP.md); everything else of the zone untouched.
+name = "yardr-email"
+main = "worker.js"
+compatibility_date = "2026-10-01"

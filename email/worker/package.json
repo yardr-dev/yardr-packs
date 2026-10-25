@@ -1,0 +1,13 @@
+{
+  "name": "yardr-email",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Forwards mail sent to yardmaster@yardr.dev to the yard's hook, signed.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "postal-mime": "^2.7.6"
+  }
+}
