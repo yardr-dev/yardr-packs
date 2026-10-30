@@ -4,9 +4,9 @@
 #
 # normalize turns each Worker body in testdata/ into the yard's envelope;
 # its output must match the golden beside it byte for byte. Then the
-# Worker's own tests, where node and its one dependency are present: the
-# Worker is the operator's to deploy (SETUP.md), so a machine without
-# them still passes.
+# Worker's own tests and the freshness of its committed bundle, where
+# node and its one dependency are present: the Worker is the operator's
+# to deploy (SETUP.md), so a machine without them still passes.
 set -u
 cd "$(dirname "$0")"
 fail=0
@@ -27,6 +27,21 @@ if command -v node >/dev/null 2>&1; then
       echo "test: worker failed"
       fail=1
     fi
+    # The committed bundle is what the yard uploads: rebuild it aside
+    # and fail when it differs, so a stale dist never ships.
+    tmp=$(mktemp)
+    if (cd worker && node build.mjs "$tmp" >/dev/null 2>&1); then
+      if cmp -s "$tmp" worker/dist/worker.js; then
+        echo "test: worker dist ok"
+      else
+        echo "test: worker dist is stale: rebuild it (cd worker && npm run build)"
+        fail=1
+      fi
+    else
+      echo "test: worker dist failed to build"
+      fail=1
+    fi
+    rm -f "$tmp"
   else
     echo "test: worker skipped: postal-mime is not installed (cd worker && npm install)"
   fi

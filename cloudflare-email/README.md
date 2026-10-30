@@ -73,7 +73,9 @@ only addresses whose owners you know, as the mapping card asks.
 - `worker/`: the Cloudflare Worker (`worker.js`, `wrangler.toml`,
   `package.json` with postal-mime as the one dependency), its tests
   (`worker.test.js`, `node --test`) and their fixtures
-  (`testdata/*.eml`).
+  (`testdata/*.eml`); and the bundle the yard uploads,
+  `dist/worker.js`, built from `worker.js` and postal-mime by
+  `build.mjs` (`npm run build`) and committed with the pack.
 - `testdata/`: three Worker bodies and their envelopes, goldens beside
   them. `test` feeds each body to normalize and compares byte for byte,
   then runs the Worker's tests where node and postal-mime are present.
@@ -82,9 +84,11 @@ only addresses whose owners you know, as the mapping card asks.
 
 - normalize wants POSIX sh and jq, as `packs/webhook`'s does. The gate
   knows no language; this is the pack's word for what its program needs.
-- The Worker runs on Cloudflare (`wrangler deploy`); its tests want
-  node 18 or later (Response, fetch and WebCrypto globals) and
-  postal-mime installed (`npm install` in `worker/`).
+- The Worker runs on Cloudflare: the yard uploads `dist/worker.js`
+  on a card, or the operator deploys `worker.js` with wrangler
+  (SETUP.md). Its tests and its build want node 18 or later
+  (Response, fetch and WebCrypto globals) and postal-mime installed
+  (`npm install` in `worker/`); the build wants nothing else.
 
 ## Testing
 
@@ -93,9 +97,10 @@ only addresses whose owners you know, as the mapping card asks.
 ```
 
 in this directory: the normalize goldens, then `node --test` in
-`worker/` where node and postal-mime are present, else a line saying
-which is missing, and a pass. The depot's gate runs `yardr pack check`
-on this directory first.
+`worker/` and a rebuild of `dist/worker.js` compared against the
+committed copy (a stale dist fails), where node and postal-mime are
+present, else a line saying which is missing, and a pass. The depot's
+gate runs `yardr pack check` on this directory first.
 
 ## Left out
 

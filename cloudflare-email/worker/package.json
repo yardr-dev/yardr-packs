@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Forwards mail sent to yardmaster@yardr.dev to the yard's hook, signed.",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node build.mjs"
   },
   "dependencies": {
     "postal-mime": "^2.7.6"

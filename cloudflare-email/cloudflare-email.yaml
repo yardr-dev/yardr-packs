@@ -1,7 +1,7 @@
 # Mail as a declared source: the messages sent to yardmaster@yardr.dev,
 # heard through a Cloudflare Email Worker that POSTs one JSON object
-# per message to the yard's hook. The Worker is the operator's to
-# deploy (SETUP.md); the yard hears only what it posts.
+# per message to the yard's hook. The Worker is deployed from this
+# pack (SETUP.md); the yard hears only what it posts.
 #
 # The Worker signs the exact bytes it sends with HMAC-SHA256 under the
 # hook's secret, hex in X-Email-Signature, and puts the mail's
