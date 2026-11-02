@@ -1,0 +1,8 @@
+=== args
+merge_request
+project=acme/platform/shed
+iid=99
+=== answer
+{"message":"404 Not found"}
+=== status
+404

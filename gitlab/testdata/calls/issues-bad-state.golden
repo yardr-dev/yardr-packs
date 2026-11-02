@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source gitlab, call issues: parameter state is one of opened, closed, all"
+}
+--- stderr

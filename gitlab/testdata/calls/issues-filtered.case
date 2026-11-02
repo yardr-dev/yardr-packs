@@ -1,0 +1,11 @@
+=== args
+issues
+project=acme/platform/shed
+state=all
+labels=bug,roof
+author=Bob
+search=leaky gutter
+limit=50
+=== answer
+[{"id": 41, "iid": 7, "project_id": 14, "title": "The gutter leaks", "description": "Water comes through when it rains.", "state": "opened", "created_at": "2026-10-30T08:00:00.000Z", "updated_at": "2026-11-01T08:00:00.000Z", "closed_at": null, "labels": ["bug", "roof"], "milestone": null, "assignees": [{"id": 51, "username": "Ada", "name": "Ada Lovelace", "state": "active"}], "author": {"id": 52, "username": "Bob", "name": "Bob Builder", "state": "active"}, "type": "ISSUE", "user_notes_count": 2, "merge_requests_count": 1, "upvotes": 0, "downvotes": 0, "due_date": null, "confidential": false, "web_url": "https://gitlab.com/acme/platform/shed/-/issues/7", "references": {"short": "#7", "relative": "#7", "full": "acme/platform/shed#7"}, "time_stats": {"time_estimate": 0, "total_time_spent": 0}, "issue_type": "issue", "_links": {"self": "https://gitlab.com/api/v4/projects/14/issues/7"}},
+ {"id": 40, "iid": 6, "project_id": 14, "title": "Paint the door", "description": "Red.", "state": "opened", "created_at": "2026-10-29T08:00:00.000Z", "updated_at": "2026-10-29T08:00:00.000Z", "closed_at": null, "labels": [], "milestone": null, "assignees": [], "author": {"id": 51, "username": "Ada", "name": "Ada Lovelace", "state": "active"}, "type": "ISSUE", "user_notes_count": 0, "merge_requests_count": 0, "upvotes": 0, "downvotes": 0, "due_date": null, "confidential": false, "web_url": "https://gitlab.com/acme/platform/shed/-/issues/6", "references": {"short": "#6", "relative": "#6", "full": "acme/platform/shed#6"}, "time_stats": {"time_estimate": 0, "total_time_spent": 0}, "issue_type": "issue", "_links": {"self": "https://gitlab.com/api/v4/projects/14/issues/6"}}]

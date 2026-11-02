@@ -1,20 +1,24 @@
 # GitLab as a declared source, in the shape of yardr's GitHub: how the core
 # verifies a GitLab delivery, and the command that turns a verified body
 # into the envelope; what the yard does in a GitLab thread, by one command
-# per thing; GitLab's issue and merge request URLs as a bead's link.
+# per thing; how it reads a merge request and its CI back; GitLab's issue
+# and merge request URLs as a bead's link; and what an agent may ask of it.
 #
-# This is the first slice: hearing and speaking, issues and merge requests
-# alike. Reading a merge request and its pipelines back (the `events` key)
-# and the calls an agent makes (`calls`, presets) are the second slice.
-# What is not here either: git hosting for a depot whose origin is on
-# gitlab.com (a `git` credential helper, as GitHub's), and group webhooks.
+# Two slices made it. The first is hearing and speaking, issues and merge
+# requests alike. The second is reading a merge request and its pipelines
+# back (the `events` key) and the calls an agent makes (`calls`, and the
+# pack's presets). What is not here: git hosting for a depot whose origin is
+# on gitlab.com (a `git` credential helper, as GitHub's), and group
+# webhooks.
 #
 # Checked against GitLab's own docs on 2 November 2026 (docs.gitlab.com,
 # master): user/project/integrations/webhooks.md and webhook_events.md for
-# the headers and the issue, merge request and comment payloads;
+# the headers and the issue, merge request, comment and pipeline payloads;
 # api/notes.md, api/issues.md, api/merge_requests.md and api/rest/_index.md
-# for what the thread commands send; user/profile/personal_access_tokens.md
-# and security/tokens/access_token_scopes.md for the credential.
+# for what the thread commands send; api/merge_requests.md, api/pipelines.md,
+# api/jobs.md, api/projects.md and api/issues.md for what the merge request
+# reads and the calls send; user/profile/personal_access_tokens.md and
+# security/tokens/access_token_scopes.md for the credential.
 #
 # A command is a list, run without a shell. A path that does not start
 # with / is a file beside this one, which `yardr source add` copies into
@@ -62,8 +66,29 @@ hook:
   # name them beside type, action, team, project, repo and label. sender is
   # the lowercased username of whoever caused the event, which hear below
   # matches by identity; noteable is what a comment is on (issue,
-  # merge_request, commit or snippet).
-  keys: [number, state, noteable, head_branch, head_sha, head_repo, base, train, sender]
+  # merge_request, commit or snippet); conclusion is how a pipeline ended,
+  # in the words the core judges CI by (success, failure, cancelled or
+  # skipped), and is none while it runs.
+  keys: [number, state, noteable, conclusion, head_branch, head_sha, head_repo, base, train, sender]
+
+# ---- what it sends about merge requests and CI ----------------------------
+# Which envelopes are CI runs, which tell the merge request's head commit,
+# and the commands that read the merge request and its CI back. The daemon
+# judges a run against the head the last head_from event carried, or the
+# head the pr command reads live, and reads CI as state for a train whose
+# hook's table has an event=ci line for it; a train's brief carries the ci
+# command's snapshot. Both run as a thread command does, with the
+# credential under GITLAB_TOKEN. gitlab/mr is the script, with the two as
+# its commands. The shapes are in docs/integrations.md.
+#
+# A pipeline is GitLab's run of CI, and the merge request's own events tell
+# its head (last_commit). The known gap below holds here as for `says` lines:
+# an event for merge request !7 may find the bead that tracks issue #7.
+events:
+  runs: [pipeline]            # the types that are CI runs, whatever became of them
+  head_from: [merge_request]  # the types that tell the merge request's head
+  pr: [gitlab/mr, pr]         # in  {repo, number, url}  out {head, base, state}
+  ci: [gitlab/mr, ci]         # in  {repo, number, sha}  out {head, base, state, required, checks}
 
 # ---- who is heard ---------------------------------------------------------
 # A delivery is kept when its sender is a user of the yard, matched by
@@ -137,16 +162,29 @@ link:
     thread: "{1}!{2}"
   repos: '(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*'
 
-# ---- (today) what an agent may ask of it, through `yardr call` ------------
-# Who the credential acts as, and nothing else: the reader keeps a file's
-# base and credential for its calls alone (a file with none has neither,
-# and `pack check` says so), and one read call is what that takes. The
-# agent's own calls wait for the second slice. It names no check call on
-# purpose: `yardr source check` looks at the credential and at the thread
-# commands above, and sends nothing. The call is granted to no one until
-# the operator grants it.
+# ---- what an agent may ask of it, through `yardr call` -------------------
+# Reads of GitLab's REST API as the account of the credential, and nothing
+# written: each is a GET, granted to no one until the operator grants it
+# (SETUP.md; the pack's `read` preset names them all). The credential
+# needs the scope read_api for them, and has api for the thread commands.
 #
-# base is the REST API every thread command sends to, as
+# project is a project as GitLab names it in a path: group/project, with
+# subgroups to any depth, or its number. It is one segment of the request's
+# path, so the slashes go as %2F. The pattern lets no two dots stand
+# together: the core refuses a segment that is only "..", and not one that
+# holds it among escaped slashes. iid is the number of an issue or merge
+# request in its project, its internal id. GitLab numbers issues and merge
+# requests apart, so the two calls are told apart by name, not by the number.
+#
+# The lists ask for 20 of the newest by default, and for any page after
+# (GitLab answers at most 100 to a page). The answers keep the fields an
+# agent reads and leave out the many a call returns that it does not; a
+# list leaves out descriptions, which the call for one has.
+#
+# It names no check call on purpose: `yardr source check` looks at the
+# credential and at the thread commands above, and sends nothing.
+#
+# base is the REST API every thread command and every call sends to, as
 # YARDR_SOURCE_BASE.
 
 base: https://gitlab.com/api/v4
@@ -156,3 +194,58 @@ calls:
     about: Who the credential acts as.
     request: { method: GET, path: /user }
     answer: { select: [username, name] }
+  project:
+    kind: read
+    about: Read a project, its default branch and merge settings.
+    params:
+      project: { type: string, pattern: '^(?:[0-9]+|(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*)+)$', max: 255, log: true }
+    request: { method: GET, path: "/projects/{project}" }
+    answer: { select: [id, name, path_with_namespace, description, default_branch, visibility, web_url, archived, created_at, last_activity_at, open_issues_count, issues_enabled, merge_requests_enabled, only_allow_merge_if_pipeline_succeeds, allow_merge_on_skipped_pipeline, only_allow_merge_if_all_discussions_are_resolved, merge_method, topics] }
+  merge_request:
+    kind: read
+    about: Read a merge request by its number, with its branches, head commit, head pipeline and merge status.
+    params:
+      project: { type: string, pattern: '^(?:[0-9]+|(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*)+)$', max: 255, log: true }
+      iid: { type: string, pattern: "^[1-9][0-9]{0,9}$", log: true }
+    request: { method: GET, path: "/projects/{project}/merge_requests/{iid}" }
+    # The description is read whole, up to what a call may raise its bound to.
+    answer: { select: [iid, title, description, state, draft, source_branch, target_branch, source_project_id, target_project_id, sha, author, assignees, reviewers, labels, milestone, created_at, updated_at, merged_at, closed_at, detailed_merge_status, has_conflicts, blocking_discussions_resolved, user_notes_count, merge_when_pipeline_succeeds, squash, head_pipeline, references, web_url], max: 262144 }
+  pipelines:
+    kind: read
+    about: List a project's pipelines, newest first, of a branch or a commit or in a status.
+    params:
+      project: { type: string, pattern: '^(?:[0-9]+|(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*)+)$', max: 255, log: true }
+      ref: { type: string, max: 255, optional: true }
+      sha: { type: string, pattern: "^[0-9a-fA-F]{7,64}$", optional: true }
+      status: { type: enum, values: [created, waiting_for_resource, preparing, waiting_for_callback, pending, running, success, failed, canceling, canceled, skipped, manual, scheduled], optional: true }
+      limit: { type: int, default: 20 }
+      page: { type: int, default: 1 }
+    request:
+      method: GET
+      path: "/projects/{project}/pipelines"
+      query: { ref: "{ref}", sha: "{sha}", status: "{status}", order_by: id, sort: desc, per_page: "{limit}", page: "{page}" }
+    answer: { select: [id, iid, project_id, status, source, ref, sha, name, web_url, created_at, updated_at], max: 262144 }
+  issues:
+    kind: read
+    about: List a project's issues, newest first, by state, labels, author or words in the title and description.
+    params:
+      project: { type: string, pattern: '^(?:[0-9]+|(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*)+)$', max: 255, log: true }
+      state: { type: enum, values: [opened, closed, all], default: opened }
+      labels: { type: string, max: 255, optional: true }    # comma-separated: the issue has all of them
+      author: { type: string, pattern: "^[A-Za-z0-9_.-]{1,255}$", optional: true }
+      search: { type: string, max: 255, optional: true }
+      limit: { type: int, default: 20 }
+      page: { type: int, default: 1 }
+    request:
+      method: GET
+      path: "/projects/{project}/issues"
+      query: { state: "{state}", labels: "{labels}", author_username: "{author}", search: "{search}", order_by: created_at, sort: desc, per_page: "{limit}", page: "{page}" }
+    answer: { select: [iid, title, state, labels, author, assignees, milestone, created_at, updated_at, closed_at, due_date, confidential, issue_type, user_notes_count, merge_requests_count, web_url, references], max: 262144 }
+  issue:
+    kind: read
+    about: Read an issue by its number, with its description.
+    params:
+      project: { type: string, pattern: '^(?:[0-9]+|(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\.[A-Za-z0-9_-])*)+)$', max: 255, log: true }
+      iid: { type: string, pattern: "^[1-9][0-9]{0,9}$", log: true }
+    request: { method: GET, path: "/projects/{project}/issues/{iid}" }
+    answer: { select: [iid, title, description, state, labels, author, assignees, milestone, created_at, updated_at, closed_at, due_date, confidential, issue_type, user_notes_count, merge_requests_count, web_url, references], max: 262144 }

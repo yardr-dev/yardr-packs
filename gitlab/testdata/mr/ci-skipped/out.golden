@@ -1,0 +1,1 @@
+{"head":"e59094b8de0f2f91abbe4760a52d9137260252d8","base":"main","state":"open","required":["pipeline"],"checks":[{"name":"pipeline","status":"skipped","conclusion":"","url":"https://gitlab.com/acme/platform/shed/-/pipelines/538317940"}]}

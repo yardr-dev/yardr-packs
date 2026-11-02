@@ -1,0 +1,9 @@
+GET https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/16
+  config: header = "PRIVATE-TOKEN: <token>"
+
+GET https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed
+  config: header = "PRIVATE-TOKEN: <token>"
+
+GET https://gitlab.com/api/v4/projects/14/pipelines/538317940/jobs?include_retried=false&per_page=100&page=1
+  config: header = "PRIVATE-TOKEN: <token>"
+

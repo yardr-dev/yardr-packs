@@ -4,13 +4,14 @@
 #
 # Issue, merge request and comment (note) deliveries are read: the issue or
 # merge request is the thread, its description or the comment the text.
-# Any other delivery (a push, a pipeline, a work item that is no issue) is
-# recorded with its type, action, repo and sender and no thread, so nobody
-# is mentioned by it: GitLab disables a webhook after four failed answers
-# in a row, so an event this does not read is never refused. A body that
-# is no JSON object is refused: a non-zero exit is answered 400, and the
-# delivery reaches no subscription. Nothing of the body is ever printed to
-# stderr.
+# A pipeline is read as a run of CI: its head, its result and, when it ran
+# for a merge request, that merge request as the thread. Any other delivery
+# (a push, a work item that is no issue) is recorded with its type, action,
+# repo and sender and no thread, so nobody is mentioned by it: GitLab
+# disables a webhook after four failed answers in a row, so an event this
+# does not read is never refused. A body that is no JSON object is refused:
+# a non-zero exit is answered 400, and the delivery reaches no
+# subscription. Nothing of the body is ever printed to stderr.
 #
 # The thread of an issue is <project path>#<number> and of a merge request
 # <project path>!<number>, GitLab's own references: the two are numbered
@@ -101,6 +102,48 @@ def assignee_of($p; $item): ((($p.assignees // [])[0] // $p.assignee // ($item /
               . + {message: ($said.id | tostring), entity: ("note-" + ($said.id | tostring))}
             else . + {entity: $thread} end)
        end)
+  elif $kind == "pipeline" then
+    # A pipeline is a run of CI, whatever became of it (events.runs).
+    # GitLab sends one at each change of its status. conclusion is the word
+    # of the tongue the core judges (the checks of the ci command speak it
+    # too) once the pipeline has ended, and none while it runs.
+    str($o.status) as $status
+    | (({success: "success", failed: "failure", canceled: "cancelled", skipped: "skipped"} | .[$status]) // "") as $conclusion
+    | str($o.ref) as $ref
+    # A merged results or merge train pipeline runs on a commit GitLab made
+    # of the merge request and its target, which is not the head: it has no
+    # head_sha, so the core leaves it alone as a run it cannot place.
+    | ($ref | test("^refs/merge-requests/[0-9]+/(merge|train)$")) as $made
+    | (if ($p.merge_request | type) == "object" and (($p.merge_request.iid // 0) | type) == "number" and $p.merge_request.iid > 0 then $p.merge_request else null end) as $mr
+    # The merge request belongs to the target project, and the pipeline of a
+    # fork may run in the fork: the thread is read from the URL of the merge
+    # request itself (its site and project path), not from the project the
+    # pipeline ran in.
+    | (if $mr == null then null
+       else ([str($mr.url) | sub("#.*$"; "") | capture("^(?<site>https?://[^/]+)/(?<path>.+?)/(?:-/)?merge_requests/[0-9]+(?:/.*)?$")] | .[0]) end) as $at
+    | (if $mr != null then str($mr.source_branch) elif $o.tag == true or $made then "" else $ref end) as $branch
+    # Where the head is: in the project the pipeline ran in, unless a merge
+    # request from a fork was run in the target project, and the payload does
+    # not give the path of the fork.
+    | (if $mr == null or $mr.source_project_id == $mr.target_project_id or ($proj.id != null and $proj.id == $mr.source_project_id) then $repo else "" end) as $head_repo
+    # A pipeline may run in the source fork, but its merge request repo is the
+    # target project. Keep those identities separate so the core can match
+    # the merge request by repo and number, then check the source in head_repo.
+    | (($base | (if $at == null then . else . + {repo: [$at.path]} end))
+       | field(.; "number"; (if $mr == null then "" else ($mr.iid | tostring) end))
+             | field(.; "conclusion"; $conclusion)
+             | field(.; "head_branch"; $branch)
+             | field(.; "head_sha"; (if $made then "" else str($o.sha) end))
+             | field(.; "head_repo"; $head_repo)
+             | field(.; "base"; (if $mr == null then "" else str($mr.target_branch) end))) as $f
+    | . + {url: (if str($o.url) != "" then str($o.url)
+                 elif $web != "" and ($o.id // 0) != 0 then $web + "/-/pipelines/" + ($o.id | tostring)
+                 else "" end),
+           text: (["pipeline", $status] + (if $branch == "" then [] else ["on", $branch] end) | map(select(. != "")) | join(" ") | trunc),
+           fields: $f}
+    | (if $at == null then .
+       else . + {thread: {id: ($at.path + "!" + ($mr.iid | tostring)), title: str($mr.title),
+                          url: ($at.site + "/" + $at.path + "/-/merge_requests/" + ($mr.iid | tostring))}} end)
   else . + {fields: $base}
   end
 '

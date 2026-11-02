@@ -1,0 +1,4 @@
+=== args
+project
+project=acme/platform/shed
+extra=1

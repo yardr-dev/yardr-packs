@@ -1,0 +1,35 @@
+--- requests
+GET /api/v4/projects/acme%2Fplatform%2Fshed/pipelines?order_by=id&page=1&per_page=20&sort=desc
+  auth: ok
+--- status
+0
+--- stdout
+[
+  {
+    "created_at": "2026-11-02T10:00:10.000Z",
+    "id": 538317940,
+    "iid": 1877,
+    "name": "Pipeline for merge request !16",
+    "project_id": 14,
+    "ref": "yard/roof-mend",
+    "sha": "e59094b8de0f2f91abbe4760a52d9137260252d8",
+    "source": "merge_request_event",
+    "status": "success",
+    "updated_at": "2026-11-02T10:03:12.000Z",
+    "web_url": "https://gitlab.com/acme/platform/shed/-/pipelines/538317940"
+  },
+  {
+    "created_at": "2026-11-02T09:00:10.000Z",
+    "id": 538310000,
+    "iid": 1876,
+    "name": "Pipeline for branch: main",
+    "project_id": 14,
+    "ref": "main",
+    "sha": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+    "source": "push",
+    "status": "failed",
+    "updated_at": "2026-11-02T09:01:12.000Z",
+    "web_url": "https://gitlab.com/acme/platform/shed/-/pipelines/538310000"
+  }
+]
+--- stderr

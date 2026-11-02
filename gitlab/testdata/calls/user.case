@@ -1,0 +1,4 @@
+=== args
+user
+=== answer
+{"id": 52, "username": "Bob", "name": "Bob Builder", "state": "active", "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/52/avatar.png", "web_url": "https://gitlab.com/Bob", "email": "bob@example.com", "is_admin": false, "bio": "Builds things", "can_create_project": true}

@@ -1,0 +1,10 @@
+--- requests
+GET /api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/99
+  auth: ok
+--- status
+1
+--- stdout
+{
+  "error": "source gitlab, call merge_request: the service answered 404"
+}
+--- stderr

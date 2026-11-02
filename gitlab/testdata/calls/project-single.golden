@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source gitlab, call project: parameter project does not match its pattern ^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$"
+}
+--- stderr

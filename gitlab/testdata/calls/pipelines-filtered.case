@@ -1,0 +1,11 @@
+=== args
+pipelines
+project=acme/platform/shed
+ref=yard/roof-mend
+sha=e59094b
+status=failed
+limit=5
+page=2
+=== answer
+[{"id": 538317940, "iid": 1877, "project_id": 14, "status": "success", "source": "merge_request_event", "ref": "yard/roof-mend", "sha": "e59094b8de0f2f91abbe4760a52d9137260252d8", "name": "Pipeline for merge request !16", "web_url": "https://gitlab.com/acme/platform/shed/-/pipelines/538317940", "created_at": "2026-11-02T10:00:10.000Z", "updated_at": "2026-11-02T10:03:12.000Z", "yaml_errors": null},
+ {"id": 538310000, "iid": 1876, "project_id": 14, "status": "failed", "source": "push", "ref": "main", "sha": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7", "name": "Pipeline for branch: main", "web_url": "https://gitlab.com/acme/platform/shed/-/pipelines/538310000", "created_at": "2026-11-02T09:00:10.000Z", "updated_at": "2026-11-02T09:01:12.000Z", "yaml_errors": null}]

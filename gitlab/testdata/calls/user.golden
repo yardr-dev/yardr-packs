@@ -1,0 +1,11 @@
+--- requests
+GET /api/v4/user
+  auth: ok
+--- status
+0
+--- stdout
+{
+  "name": "Bob Builder",
+  "username": "Bob"
+}
+--- stderr

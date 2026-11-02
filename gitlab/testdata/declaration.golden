@@ -1,0 +1,497 @@
+{
+  "about": "GitLab issues and merge requests. Hears its webhooks and speaks in its threads.",
+  "base": "https://gitlab.com/api/v4",
+  "calls": [
+    {
+      "about": "Who the credential acts as.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "username",
+          "name"
+        ]
+      },
+      "kind": "read",
+      "name": "user",
+      "request": {
+        "method": "GET",
+        "path": "/user"
+      }
+    },
+    {
+      "about": "Read a project, its default branch and merge settings.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "id",
+          "name",
+          "path_with_namespace",
+          "description",
+          "default_branch",
+          "visibility",
+          "web_url",
+          "archived",
+          "created_at",
+          "last_activity_at",
+          "open_issues_count",
+          "issues_enabled",
+          "merge_requests_enabled",
+          "only_allow_merge_if_pipeline_succeeds",
+          "allow_merge_on_skipped_pipeline",
+          "only_allow_merge_if_all_discussions_are_resolved",
+          "merge_method",
+          "topics"
+        ]
+      },
+      "kind": "read",
+      "name": "project",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "project",
+          "pattern": "^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/{project}"
+      }
+    },
+    {
+      "about": "Read a merge request by its number, with its branches, head commit, head pipeline and merge status.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "iid",
+          "title",
+          "description",
+          "state",
+          "draft",
+          "source_branch",
+          "target_branch",
+          "source_project_id",
+          "target_project_id",
+          "sha",
+          "author",
+          "assignees",
+          "reviewers",
+          "labels",
+          "milestone",
+          "created_at",
+          "updated_at",
+          "merged_at",
+          "closed_at",
+          "detailed_merge_status",
+          "has_conflicts",
+          "blocking_discussions_resolved",
+          "user_notes_count",
+          "merge_when_pipeline_succeeds",
+          "squash",
+          "head_pipeline",
+          "references",
+          "web_url"
+        ]
+      },
+      "kind": "read",
+      "name": "merge_request",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "project",
+          "pattern": "^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "name": "iid",
+          "pattern": "^[1-9][0-9]{0,9}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/{project}/merge_requests/{iid}"
+      }
+    },
+    {
+      "about": "List a project's pipelines, newest first, of a branch or a commit or in a status.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "id",
+          "iid",
+          "project_id",
+          "status",
+          "source",
+          "ref",
+          "sha",
+          "name",
+          "web_url",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "kind": "read",
+      "name": "pipelines",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "project",
+          "pattern": "^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$",
+          "type": "string"
+        },
+        {
+          "max": 255,
+          "name": "ref",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "sha",
+          "optional": true,
+          "pattern": "^[0-9a-fA-F]{7,64}$",
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "created",
+            "waiting_for_resource",
+            "preparing",
+            "waiting_for_callback",
+            "pending",
+            "running",
+            "success",
+            "failed",
+            "canceling",
+            "canceled",
+            "skipped",
+            "manual",
+            "scheduled"
+          ]
+        },
+        {
+          "default": 20,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "name": "page",
+          "optional": true,
+          "type": "int"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/{project}/pipelines",
+        "query": [
+          {
+            "key": "ref",
+            "value": "{ref}"
+          },
+          {
+            "key": "sha",
+            "value": "{sha}"
+          },
+          {
+            "key": "status",
+            "value": "{status}"
+          },
+          {
+            "key": "order_by",
+            "value": "id"
+          },
+          {
+            "key": "sort",
+            "value": "desc"
+          },
+          {
+            "key": "per_page",
+            "value": "{limit}"
+          },
+          {
+            "key": "page",
+            "value": "{page}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List a project's issues, newest first, by state, labels, author or words in the title and description.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "iid",
+          "title",
+          "state",
+          "labels",
+          "author",
+          "assignees",
+          "milestone",
+          "created_at",
+          "updated_at",
+          "closed_at",
+          "due_date",
+          "confidential",
+          "issue_type",
+          "user_notes_count",
+          "merge_requests_count",
+          "web_url",
+          "references"
+        ]
+      },
+      "kind": "read",
+      "name": "issues",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "project",
+          "pattern": "^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$",
+          "type": "string"
+        },
+        {
+          "default": "opened",
+          "name": "state",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "opened",
+            "closed",
+            "all"
+          ]
+        },
+        {
+          "max": 255,
+          "name": "labels",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "author",
+          "optional": true,
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$",
+          "type": "string"
+        },
+        {
+          "max": 255,
+          "name": "search",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "default": 20,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "name": "page",
+          "optional": true,
+          "type": "int"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/{project}/issues",
+        "query": [
+          {
+            "key": "state",
+            "value": "{state}"
+          },
+          {
+            "key": "labels",
+            "value": "{labels}"
+          },
+          {
+            "key": "author_username",
+            "value": "{author}"
+          },
+          {
+            "key": "search",
+            "value": "{search}"
+          },
+          {
+            "key": "order_by",
+            "value": "created_at"
+          },
+          {
+            "key": "sort",
+            "value": "desc"
+          },
+          {
+            "key": "per_page",
+            "value": "{limit}"
+          },
+          {
+            "key": "page",
+            "value": "{page}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Read an issue by its number, with its description.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "iid",
+          "title",
+          "description",
+          "state",
+          "labels",
+          "author",
+          "assignees",
+          "milestone",
+          "created_at",
+          "updated_at",
+          "closed_at",
+          "due_date",
+          "confidential",
+          "issue_type",
+          "user_notes_count",
+          "merge_requests_count",
+          "web_url",
+          "references"
+        ]
+      },
+      "kind": "read",
+      "name": "issue",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "project",
+          "pattern": "^(?:[0-9]+|(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*(?:/(?:[A-Za-z0-9_]|\\.[A-Za-z0-9_-])(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])*)+)$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "name": "iid",
+          "pattern": "^[1-9][0-9]{0,9}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/{project}/issues/{iid}"
+      }
+    }
+  ],
+  "credential": {
+    "env": "GITLAB_TOKEN",
+    "header": "PRIVATE-TOKEN: {credential}"
+  },
+  "events": {
+    "ci": [
+      "gitlab/mr",
+      "ci"
+    ],
+    "head_from": [
+      "merge_request"
+    ],
+    "pr": [
+      "gitlab/mr",
+      "pr"
+    ],
+    "runs": [
+      "pipeline"
+    ]
+  },
+  "hear": {
+    "address": {
+      "env": ""
+    },
+    "by": "identity",
+    "field": "sender"
+  },
+  "hook": {
+    "bodies": "unique-per-hook",
+    "keys": [
+      "number",
+      "state",
+      "noteable",
+      "conclusion",
+      "head_branch",
+      "head_sha",
+      "head_repo",
+      "base",
+      "train",
+      "sender"
+    ],
+    "normalize": [
+      "gitlab/normalize"
+    ],
+    "untimed": true,
+    "verify": {
+      "delivery": {
+        "header": "Idempotency-Key"
+      },
+      "scheme": "secret",
+      "signature": {
+        "encoding": "",
+        "header": "X-Gitlab-Token"
+      },
+      "signed": ""
+    }
+  },
+  "identity": {
+    "fold": "lower"
+  },
+  "link": {
+    "fixed": "https://gitlab.com/{1}/-/issues/{2}",
+    "fold": "lower",
+    "host": "gitlab.com",
+    "issue": "^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?issues/([1-9][0-9]*)(?:/.*)?$",
+    "pull": {
+      "fixed": "https://gitlab.com/{1}/-/merge_requests/{2}",
+      "issue": "^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?merge_requests/([1-9][0-9]*)(?:/.*)?$",
+      "thread": "{1}!{2}"
+    },
+    "repos": "(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*",
+    "thread": "{1}#{2}"
+  },
+  "name": "gitlab",
+  "thread": {
+    "assignee": "key",
+    "labels": true,
+    "open": [
+      "gitlab/thread",
+      "open"
+    ],
+    "opened": [
+      "gitlab/thread",
+      "opened"
+    ],
+    "place": "project",
+    "posted": [
+      "gitlab/thread",
+      "posted"
+    ],
+    "read": [
+      "gitlab/thread",
+      "read"
+    ],
+    "reply": [
+      "gitlab/thread",
+      "reply"
+    ],
+    "state": [
+      "gitlab/thread",
+      "state"
+    ],
+    "states": [
+      "started",
+      "done"
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+--- requests
+GET /api/v4/projects/acme%2Fplatform%2Fshed/issues?order_by=created_at&page=1&per_page=20&sort=desc&state=opened
+  auth: ok
+--- status
+0
+--- stdout
+[
+  {
+    "assignees": [
+      {
+        "id": 51,
+        "name": "Ada Lovelace",
+        "state": "active",
+        "username": "Ada"
+      }
+    ],
+    "author": {
+      "id": 52,
+      "name": "Bob Builder",
+      "state": "active",
+      "username": "Bob"
+    },
+    "closed_at": null,
+    "confidential": false,
+    "created_at": "2026-10-30T08:00:00.000Z",
+    "due_date": null,
+    "iid": 7,
+    "issue_type": "issue",
+    "labels": [
+      "bug",
+      "roof"
+    ],
+    "merge_requests_count": 1,
+    "milestone": null,
+    "references": {
+      "full": "acme/platform/shed#7",
+      "relative": "#7",
+      "short": "#7"
+    },
+    "state": "opened",
+    "title": "The gutter leaks",
+    "updated_at": "2026-11-01T08:00:00.000Z",
+    "user_notes_count": 2,
+    "web_url": "https://gitlab.com/acme/platform/shed/-/issues/7"
+  },
+  {
+    "assignees": [],
+    "author": {
+      "id": 51,
+      "name": "Ada Lovelace",
+      "state": "active",
+      "username": "Ada"
+    },
+    "closed_at": null,
+    "confidential": false,
+    "created_at": "2026-10-29T08:00:00.000Z",
+    "due_date": null,
+    "iid": 6,
+    "issue_type": "issue",
+    "labels": [],
+    "merge_requests_count": 0,
+    "milestone": null,
+    "references": {
+      "full": "acme/platform/shed#6",
+      "relative": "#6",
+      "short": "#6"
+    },
+    "state": "opened",
+    "title": "Paint the door",
+    "updated_at": "2026-10-29T08:00:00.000Z",
+    "user_notes_count": 0,
+    "web_url": "https://gitlab.com/acme/platform/shed/-/issues/6"
+  }
+]
+--- stderr

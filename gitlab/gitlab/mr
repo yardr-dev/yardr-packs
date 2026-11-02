@@ -1,0 +1,204 @@
+#!/bin/bash
+# mr: a merge request live, and its CI: the pr and ci commands of the
+# declaration's events key. One JSON object on stdin, one on stdout:
+#
+#   pr  in {repo, number, url}       out {head, base, state}
+#   ci  in {repo, number, sha}       out {head, base, state, required, checks}
+#
+# The daemon reads pr for the head of a merge request that no event has
+# told, and ci as the state of a train's CI; the train's brief carries the
+# same snapshot. GITLAB_TOKEN (a personal access token, sent in a
+# PRIVATE-TOKEN header) and YARDR_SOURCE_BASE, the declaration's base, are in
+# the environment. Needs curl and jq. It only reads: every request is a GET.
+#
+# state is GitLab's, but for open: GitLab says opened, and the core asks
+# whether the state is open. closed, merged and locked stay as they are.
+#
+# ci. GitLab keeps no list of the checks a branch requires. Its gate is the
+# head pipeline of the merge request: where the project requires pipelines to
+# succeed, the merge request cannot be merged until that one pipeline has.
+# So the pipeline is one check, named pipeline, which is required when the
+# project requires it; the jobs of the pipeline (the latest attempt of each)
+# are checks beside it, with the names they have in GitLab. Checks speak the
+# tongue the core judges: completed or not, and a completed one concluded
+# success, neutral, skipped, failure or cancelled. A job that failed where
+# GitLab lets it fail is neutral, a canceled one is cancelled (the core reads
+# that as not yet run), and a skipped pipeline passes only where the project
+# lets a skipped pipeline merge. The checks are those of the head pipeline,
+# and only when the merge request's head is the commit asked about and the
+# pipeline ran on it: a merged results pipeline runs on a commit GitLab made
+# of the merge request and its target, and is the head pipeline all the same.
+# For any other commit there are no checks, and the core waits.
+set -euo pipefail
+in=$(cat)
+arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+base=${YARDR_SOURCE_BASE%/}
+
+# The token goes to curl as a config line on its stdin, written by the shell
+# itself: an argument can be read by every process on the machine while
+# curl runs. A token that holds a character a GitLab token never has (a
+# quote, a backslash, a line break) would end the config line early, so it
+# is refused, without saying what it held.
+case ${GITLAB_TOKEN-} in
+'' | *[!A-Za-z0-9_.~-]*)
+  echo "GITLAB_TOKEN is not set, or holds a character a GitLab token has none of" >&2
+  exit 1
+  ;;
+esac
+
+# scrub <text>: the text with the token cut out of it, in case an answer
+# repeats what it was sent.
+scrub() { printf '%s' "${1//"$GITLAB_TOKEN"/<token>}"; }
+
+# api <url>: the answer's body of a GET, or the failure on stderr.
+api() {
+  local u code
+  u=$1
+  code=$(printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN" \
+    | curl -sS -o "$tmp/out" -w '%{http_code}' -K - -X GET "$u") || {
+    echo "could not reach $u (curl exit $?)" >&2
+    return 1
+  }
+  if [ "${code:0:1}" != 2 ]; then
+    # GitLab says why in message (a string, or an object of lists), or in
+    # error and error_description for a token it refuses.
+    local why
+    why=$(jq -r '(.message // .error_description // .error // "no answer") | if type == "string" then . else tojson end | .[0:300]' "$tmp/out" 2>/dev/null || head -c 200 "$tmp/out")
+    echo "$u: HTTP $code: $(scrub "$why")" >&2
+    return 1
+  fi
+  cat "$tmp/out"
+}
+
+# pages <url with ?> <file>: every page of a list endpoint as one array in
+# the file. GitLab lists 20 to a page; ask for 100 and stop on a short page,
+# since gitlab.com may leave out the headers that count the pages.
+pages() {
+  local u page n
+  u=$1
+  page=1
+  : >"$tmp/pages"
+  while :; do
+    api "$u&per_page=100&page=$page" >"$tmp/page" || return 1
+    n=$(jq 'length' "$tmp/page") || return 1
+    cat "$tmp/page" >>"$tmp/pages"
+    printf '\n' >>"$tmp/pages"
+    [ "$n" -lt 100 ] && break
+    page=$((page + 1))
+  done
+  jq -c -s 'add // []' "$tmp/pages" >"$2"
+}
+
+# A project as {repo} gives it: a namespace (which may nest) and a project,
+# each segment as GitLab writes a path. Nothing that would reach another
+# endpoint, and no two dots in a row.
+valid_project() { [[ $1 =~ ^[A-Za-z0-9_.][A-Za-z0-9_.-]*(/[A-Za-z0-9_.][A-Za-z0-9_.-]*)+$ ]] && [[ $1 != *..* ]]; }
+
+# standing is jq's state of the merge request, in the core's word for open.
+standing='def standing: if . == "opened" then "open" else . end;'
+
+# The merge request: by {repo, number}, else by the address of a merge
+# request in {url}: https://<site>/<project path>/-/merge_requests/<n>, with
+# or without the -/ GitLab writes now.
+repo=$(arg repo)
+n=$(arg number)
+if [ -z "$repo" ] || [ -z "$n" ]; then
+  url=$(arg url)
+  if [[ $url =~ ^https?://[^/]+/(([A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(-/)?merge_requests/([0-9]+)(/.*)?$ ]]; then
+    repo=${BASH_REMATCH[1]}
+    n=${BASH_REMATCH[4]}
+  else
+    echo "the merge request is named by neither {repo, number} nor {url}" >&2
+    exit 1
+  fi
+fi
+valid_project "$repo" || {
+  echo "{repo} $repo: want group/project" >&2
+  exit 1
+}
+[[ $n =~ ^[1-9][0-9]*$ ]] || {
+  echo "{number} $n: want the merge request's number" >&2
+  exit 1
+}
+pid=${repo//\//%2F}
+
+# read_mr: the merge request as GitLab answers it, in mr, held to the head and
+# the base the core asks for.
+read_mr() {
+  mr=$(api "$base/projects/$pid/merge_requests/$n") || exit 1
+  printf '%s' "$mr" >"$tmp/mr.json"
+  [ "$(jq -r '(.sha // "") != "" and (.target_branch // "") != ""' <<<"$mr")" = true ] || {
+    echo "the answer holds no head or base" >&2
+    exit 1
+  }
+}
+
+case "${1-}" in
+pr)
+  read_mr
+  jq -c "$standing"'{head: .sha, base: .target_branch, state: ((.state // "") | standing)}' <<<"$mr"
+  ;;
+
+ci)
+  sha=$(arg sha)
+  [[ $sha =~ ^[0-9a-fA-F]+$ ]] || {
+    echo "{sha} $sha: want the commit's SHA" >&2
+    exit 1
+  }
+  read_mr
+  # What the project says of the gate: whether merging waits for a pipeline
+  # that succeeded, and whether a skipped pipeline counts as one.
+  api "$base/projects/$pid" >"$tmp/project.json" || exit 1
+  # The head pipeline is the gate, and its jobs the checks beside it; they
+  # are asked for only where it is the pipeline of the commit asked about.
+  # The pipeline may live in another project than the merge request: a
+  # fork's runs in the fork, and GitLab names that project in the pipeline.
+  ours=$(jq -r --arg sha "$sha" --arg n "$n" '
+    (.sha // "" | ascii_downcase) as $head | (.head_pipeline // null) as $hp
+    | ($hp | type) == "object" and $head == ($sha | ascii_downcase)
+      and ((($hp.sha // "" | ascii_downcase) == $head) or ($hp.ref // "") == "refs/merge-requests/\($n)/merge")' <<<"$mr")
+  echo '[]' >"$tmp/jobs.json"
+  if [ "$ours" = true ]; then
+    hp_id=$(jq -r '.head_pipeline.id // "" | tostring' <<<"$mr")
+    hp_project=$(jq -r '.head_pipeline.project_id // "" | tostring' <<<"$mr")
+    [[ $hp_id =~ ^[1-9][0-9]*$ ]] || {
+      echo "the answer's head pipeline has no number" >&2
+      exit 1
+    }
+    # A pipeline that names no project of its own is the merge request's.
+    if [[ $hp_project =~ ^[1-9][0-9]*$ ]]; then hp_at=$hp_project; else hp_at=$pid; fi
+    # The latest attempt of each job, which is what GitLab lists unless asked
+    # for the retried ones too.
+    pages "$base/projects/$hp_at/pipelines/$hp_id/jobs?include_retried=false" "$tmp/jobs.json" || exit 1
+  fi
+  # The answers go in as files: a merge request with a long description, or a
+  # pipeline of a hundred jobs, is more than a single argument may hold.
+  jq -n -c --slurpfile mr "$tmp/mr.json" --slurpfile project "$tmp/project.json" --slurpfile jobs "$tmp/jobs.json" --arg ours "$ours" "$standing"'
+    $mr[0] as $mr | $project[0] as $project | $jobs[0] as $jobs |
+    # A check in the tongue the core judges. status is what GitLab says of
+    # the job or pipeline until it has ended, and completed after.
+    def check($name; $url; $status; $allow_failure; $skipped_passes):
+      {name: $name}
+      + (if $status == "success" then {status: "completed", conclusion: "success"}
+         elif $status == "failed" then {status: "completed", conclusion: (if $allow_failure then "neutral" else "failure" end)}
+         elif $status == "canceled" then {status: "completed", conclusion: "cancelled"}
+         elif $status == "skipped" then (if $skipped_passes then {status: "completed", conclusion: "skipped"} else {status: "skipped", conclusion: ""} end)
+         else {status: $status, conclusion: ""} end)
+      + {url: $url};
+    ($mr.head_pipeline // {}) as $hp
+    | {head: $mr.sha, base: $mr.target_branch, state: (($mr.state // "") | standing),
+       required: (if ($project.only_allow_merge_if_pipeline_succeeds // false) == true then ["pipeline"] else [] end),
+       checks: (if $ours != "true" then []
+                else [check("pipeline"; ($hp.web_url // ""); ($hp.status // ""); false; ($project.allow_merge_on_skipped_pipeline // false) == true)]
+                     + [$jobs[] | check((.name // ""); (.web_url // ""); (.status // ""); (.allow_failure // false) == true; true)]
+                end)}'
+  ;;
+
+*)
+  echo "unknown: ${1-}" >&2
+  exit 2
+  ;;
+esac

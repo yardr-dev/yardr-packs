@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source gitlab, call pipelines: parameter sha does not match its pattern ^[0-9a-fA-F]{7,64}$"
+}
+--- stderr

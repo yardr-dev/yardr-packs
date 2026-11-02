@@ -1,9 +1,9 @@
 # GitLab as a pack of kind source: the integration, imported into the
 # yard and into no depot. What GitLab is: how its webhooks are verified
-# and read (issues, merge requests, comments) and how the yard speaks in
-# those threads: replies, opens an issue, closes and reopens an issue or
-# a merge request. The first slice of the pack; reading merge requests
-# and CI back, and the calls an agent makes, are the next.
+# and read (issues, merge requests, comments, pipelines), how the yard
+# speaks in those threads (replies, opens an issue, closes and reopens an
+# issue or a merge request), how it reads a merge request and its CI back,
+# and the reads an agent may ask for through `yardr call`.
 #
 #   yardr pack apply /Users/mckean/projects/repos/yardr-packs/gitlab
 #
@@ -16,3 +16,12 @@ setup: SETUP.md
 sources:
   gitlab:
     declaration: gitlab.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them.
+presets:
+  read:
+    about: Read a project, a merge request, pipelines and issues, and who the token is; change nothing
+    grants:
+      gitlab: [read]

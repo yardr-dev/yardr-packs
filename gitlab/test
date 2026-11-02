@@ -1,22 +1,34 @@
 #!/bin/sh
 # The gitlab pack's tests: what the gate runs beside yardr pack check.
 # Needs no network and no secret, done in seconds; needs jq and bash, which
-# the pack's programs need.
+# the pack's programs need, and python3 and yardr for the last part, which
+# fails without them since a skipped part would leave the calls unpinned.
 #
 # normalize turns each webhook body in testdata/hook/ into the yard's
 # envelope; its output must match the golden beside it byte for byte. The
 # fields those envelopes carry and hook.keys must agree both ways. The
-# thread commands run against a stand-in curl (testdata/bin/curl) that
-# makes no request: it records what the real one would have been asked,
-# and answers from the case's fixtures, so a changed request fails a case.
-# The token is a canary, looked for in every argument, output and record
-# the commands make. The link patterns of gitlab.yaml are run on the paths
-# in testdata/link.txt.
+# thread commands and the merge request reads (gitlab/mr: pr and ci) run
+# against a stand-in curl (testdata/bin/curl) that makes no request: it
+# records what the real one would have been asked, and answers from the
+# case's fixtures, so a changed request fails a case. The token is a canary,
+# looked for in every argument, output and record the commands make. The
+# link patterns of gitlab.yaml are run on the paths in testdata/link.txt.
+#
+# The core part (testdata/core.sh) runs the real yardr in a scratch yard of
+# its own: the declaration as the yard reads it, held to a golden; the
+# grants SETUP.md teaches, run as written; and each testdata/calls/*.case,
+# one `yardr call` of the pack's source against a stand-in for GitLab on a
+# loopback port (testdata/standin.py). A case's golden holds the requests
+# the stand-in saw (method, path and query as sent, whether the credential
+# was the right one), the exit status, what the call kept of the answer and
+# what it said on stderr. A parameter the call should refuse shows as no
+# request at all.
 #
 # UPDATE=1 ./test writes the goldens again from what the programs print;
 # read the diff before keeping it.
 set -u
 cd "$(dirname "$0")" || exit 1
+here=$(pwd)
 fail=0
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -28,8 +40,23 @@ if ! command -v bash >/dev/null 2>&1; then
   exit 1
 fi
 
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+# The core part's scratch yard and stand-in (below) are made when its turn
+# comes, and the yard's server, which its first command starts, would
+# outlive the directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${work:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 
 # differ <label> <golden> <actual>: succeeds, after saying how, when actual
 # differs from the golden; fails when they are the same. Under UPDATE it
@@ -42,8 +69,26 @@ differ() {
   return 0
 }
 
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ ! -e "$3" ] && [ -z "${UPDATE-}" ]; then
+    echo "test: $1 has no golden $3 (UPDATE=1 ./test writes it)"
+    fail=1
+  elif differ "$1" "$3" "$2"; then
+    fail=1
+  elif [ -z "${UPDATE-}" ]; then
+    echo "test: $1 ok"
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
 # ---- normalize ------------------------------------------------------------
 
+# The fork pipeline fixture keeps the target repo in `repo` and its fork in
+# `head_repo`, so the core can match the run to the right merge request.
 for f in testdata/hook/*.json; do
   g=${f%.json}.golden
   case ${f##*/} in not-an-object.json) continue ;; esac
@@ -76,6 +121,51 @@ else
   echo "test: normalize testdata/hook/not-an-object.json refused ok"
 fi
 
+# A pipeline's status becomes the word the core judges CI by once it has
+# ended, and none while it runs. The statuses are the thirteen GitLab's
+# pipelines API lists; the body is the successful pipeline above with each.
+for pair in success:success failed:failure canceled:cancelled skipped:skipped \
+  created: waiting_for_resource: preparing: waiting_for_callback: pending: running: canceling: manual: scheduled:; do
+  st=${pair%%:*}
+  want=${pair#*:}
+  jq -c --arg s "$st" '.body.object_attributes.status = $s' testdata/hook/pipeline-mr-success.json |
+    ./gitlab/normalize >"$work/env" 2>"$work/err"
+  got=$(jq -r '.fields.conclusion[0] // ""' "$work/env" 2>/dev/null)
+  if [ "$got" = "$want" ]; then
+    echo "test: normalize a pipeline $st has the conclusion '$want' ok"
+  else
+    echo "test: normalize a pipeline $st has the conclusion '$got', want '$want'"
+    fail=1
+  fi
+done
+
+# A pipeline that ran for no merge request, or for one the payload does not
+# give whole, has no thread, and is still recorded with its head. Each edit
+# is made to the successful pipeline above.
+while IFS='@' read -r label edit want; do
+  [ -n "$label" ] || continue
+  jq -c "$edit" testdata/hook/pipeline-mr-success.json | ./gitlab/normalize >"$work/env" 2>"$work/err"
+  rc=$?
+  if [ "$rc" = 0 ] && [ "$(jq -c "$want" "$work/env" 2>/dev/null)" = true ]; then
+    echo "test: normalize a pipeline with $label ok"
+  else
+    echo "test: normalize a pipeline with $label ($rc): $(head -c 300 "$work/err") $(head -c 300 "$work/env")"
+    fail=1
+  fi
+done <<'EOF'
+no merge_request key@del(.body.merge_request)@.thread == {} and (.fields | has("number") | not)
+a null merge_request@.body.merge_request = null@.thread == {}
+an empty merge_request@.body.merge_request = {}@.thread == {}
+a merge_request that is a string@.body.merge_request = "16"@.thread == {}
+a merge_request without a number@.body.merge_request.iid = 0@.thread == {}
+a merge_request without a url@.body.merge_request.url = ""@.thread == {} and .fields.number == ["16"]
+a merge_request whose url is none of a merge request's@.body.merge_request.url = "https://gitlab.com/acme/platform/shed/-/issues/16"@.thread == {} and .fields.number == ["16"]
+a tag@.body.object_attributes.tag = true | del(.body.merge_request)@(.fields | has("head_branch") | not) and .fields.head_sha == ["e59094b8de0f2f91abbe4760a52d9137260252d8"]
+no user@del(.body.user)@(.actor == {}) and (.fields | has("sender") | not) and .fields.conclusion == ["success"]
+no status@del(.body.object_attributes.status)@(.fields | has("conclusion") | not) and .text == "pipeline on yard/roof-mend"
+no object_attributes@del(.body.object_attributes)@.type == "pipeline" and .url == "" and .thread.id == "acme/platform/shed!16"
+EOF
+
 # ---- the fields are the keys ---------------------------------------------
 # A field normalize sets is one a subscription may name only when
 # hook.keys lists it (or it is a common key), and a key the file lists
@@ -93,93 +183,127 @@ for k in $keys; do
 done
 if [ "$bad" = 0 ]; then echo "test: fields and hook.keys agree"; else fail=1; fi
 
-# ---- the thread commands --------------------------------------------------
+# ---- the thread commands, and the merge request reads --------------------
 
 stand=$PWD/testdata/bin
 canary=glpat-CANARYa1b2c3d4e5f6
 base=https://gitlab.com/api/v4
-# Prove the stand-in is what thread would run, before anything runs.
+# Prove the stand-in is what the commands would run, before anything runs.
 if [ "$(PATH="$stand:$PATH" command -v curl)" != "$stand/curl" ]; then
   echo "test: the stand-in curl is not the first curl on PATH"
   exit 1
 fi
 
-# run <cmd> <state dir> <case dir> <token>: gitlab/thread in a clean
-# environment: the stand-in first on PATH, a home and a temporary
-# directory of its own, the token and the base, and the yard's variables
-# not at all.
+# run <program> <cmd> <state dir> <case dir> <token>: gitlab/thread or
+# gitlab/mr (thread's six commands, mr's pr and ci) in a clean environment:
+# the stand-in first on PATH, a home and a temporary directory of its own,
+# the token and the base, and the yard's variables not at all.
 run() {
-  env -i PATH="$stand:$PATH" HOME="$2" TMPDIR="$2" GITLAB_TOKEN="$4" YARDR_SOURCE_BASE="$base" \
-    STANDIN_DIR="$3" STANDIN_LOG="$2/requests" STANDIN_ARGV="$2/argv" STANDIN_STATE="$2" \
-    ./gitlab/thread "$1" <"$3/in.json" >"$2/out" 2>"$2/err"
+  env -i PATH="$stand:$PATH" HOME="$3" TMPDIR="$3" GITLAB_TOKEN="$5" YARDR_SOURCE_BASE="$base" \
+    STANDIN_DIR="$4" STANDIN_LOG="$3/requests" STANDIN_ARGV="$3/argv" STANDIN_STATE="$3" \
+    "./gitlab/$1" "$2" <"$4/in.json" >"$3/out" 2>"$3/err"
 }
 
-for d in testdata/thread/*/; do
-  name=$(basename "$d")
-  case $name in _*) continue ;; esac
-  cmd=${name%%-*}
-  d=testdata/thread/$name
-  st=$work/$name
-  mkdir -p "$st"
-  : >"$st/requests"
-  : >"$st/argv"
-  run "$cmd" "$st" "$d" "$canary"
-  rc=$?
-  ok=1
-  if [ -n "${UPDATE-}" ]; then
-    if [ "$rc" = 0 ]; then rm -f "$d/err.golden"; else rm -f "$d/out.golden"; cp "$st/err" "$d/err.golden"; fi
-  fi
-  differ "thread $name requests" "$d/requests.golden" "$st/requests" && ok=0
-  if [ -e "$d/err.golden" ]; then
-    # A refusal: a non-zero exit, what it said on stderr, nothing on stdout.
-    [ "$rc" != 0 ] || { echo "test: thread $name: expected a failure, got exit 0"; ok=0; }
-    [ ! -s "$st/out" ] || { echo "test: thread $name: printed to stdout while failing: $(head -c 200 "$st/out")"; ok=0; }
-    differ "thread $name stderr" "$d/err.golden" "$st/err" && ok=0
-  else
-    [ "$rc" = 0 ] || { echo "test: thread $name: exit $rc: $(head -c 300 "$st/err")"; ok=0; }
-    [ ! -s "$st/err" ] || { echo "test: thread $name: printed to stderr: $(head -c 300 "$st/err")"; ok=0; }
-    if [ -e "$d/out.jq" ]; then
-      jq -c -f "$d/out.jq" "$st/out" >"$st/view" 2>/dev/null || cp "$st/out" "$st/view"
+# Each directory of testdata/thread and testdata/mr is one run of the
+# command its name starts with (thread's reply-issue is gitlab/thread reply).
+# The pagination answers intentionally lack trailing newlines: separate API
+# response bodies before combining them, regardless of how curl writes them.
+for prog in thread mr; do
+  for d in "testdata/$prog"/*/; do
+    name=$(basename "$d")
+    case $name in _*) continue ;; esac
+    cmd=${name%%-*}
+    d=testdata/$prog/$name
+    st=$work/$prog-$name
+    mkdir -p "$st"
+    : >"$st/requests"
+    : >"$st/argv"
+    run "$prog" "$cmd" "$st" "$d" "$canary"
+    rc=$?
+    ok=1
+    if [ -n "${UPDATE-}" ]; then
+      if [ "$rc" = 0 ]; then rm -f "$d/err.golden"; else rm -f "$d/out.golden"; cp "$st/err" "$d/err.golden"; fi
+    fi
+    differ "$prog $name requests" "$d/requests.golden" "$st/requests" && ok=0
+    if [ -e "$d/err.golden" ]; then
+      # A refusal: a non-zero exit, what it said on stderr, nothing on stdout.
+      [ "$rc" != 0 ] || { echo "test: $prog $name: expected a failure, got exit 0"; ok=0; }
+      [ ! -s "$st/out" ] || { echo "test: $prog $name: printed to stdout while failing: $(head -c 200 "$st/out")"; ok=0; }
+      differ "$prog $name stderr" "$d/err.golden" "$st/err" && ok=0
     else
-      cp "$st/out" "$st/view"
+      [ "$rc" = 0 ] || { echo "test: $prog $name: exit $rc: $(head -c 300 "$st/err")"; ok=0; }
+      [ ! -s "$st/err" ] || { echo "test: $prog $name: printed to stderr: $(head -c 300 "$st/err")"; ok=0; }
+      if [ -e "$d/out.jq" ]; then
+        jq -c -f "$d/out.jq" "$st/out" >"$st/view" 2>/dev/null || cp "$st/out" "$st/view"
+      else
+        cp "$st/out" "$st/view"
+      fi
+      differ "$prog $name stdout" "$d/out.golden" "$st/view" && ok=0
     fi
-    differ "thread $name stdout" "$d/out.golden" "$st/view" && ok=0
-  fi
-  # The token is on curl's stdin and nowhere else.
-  for f in argv out err requests; do
-    if grep -qF "$canary" "$st/$f"; then
-      echo "test: thread $name: the token is in $f"
-      ok=0
-    fi
+    # The token is on curl's stdin and nowhere else.
+    for f in argv out err requests; do
+      if grep -qF "$canary" "$st/$f"; then
+        echo "test: $prog $name: the token is in $f"
+        ok=0
+      fi
+    done
+    if [ "$ok" = 1 ]; then echo "test: $prog $name ok"; else fail=1; fi
   done
-  if [ "$ok" = 1 ]; then echo "test: thread $name ok"; else fail=1; fi
 done
+
+# A merge request with a description of over a megabyte, more than a command
+# may be given as an argument: ci reads it all the same, since it hands its
+# answers to jq as files. The case is made here and not kept.
+big=$work/big
+mkdir -p "$big/_answers" "$big/ci-big" "$big/run"
+head -c 1300000 /dev/zero | tr '\0' x >"$big/text"
+jq -c --rawfile d "$big/text" '.description = $d' testdata/mr/_answers/mr-green.json >"$big/_answers/mr-big.json"
+cp testdata/mr/_answers/project-gated.json testdata/mr/_answers/jobs-green.json "$big/_answers/"
+cp testdata/mr/ci-green/in.json "$big/ci-big/in.json"
+printf '%s\n' '200 _answers/mr-big.json' '200 _answers/project-gated.json' '200 _answers/jobs-green.json' >"$big/ci-big/answers"
+: >"$big/run/requests"
+: >"$big/run/argv"
+if run mr ci "$big/run" "$big/ci-big" "$canary" 2>/dev/null &&
+  [ "$(jq -c '[.head, .required, (.checks | length)]' "$big/run/out")" = '["e59094b8de0f2f91abbe4760a52d9137260252d8",["pipeline"],3]' ]; then
+  echo "test: mr ci reads a merge request too big for an argument ok"
+else
+  echo "test: mr ci on a merge request too big for an argument failed: $(head -c 300 "$big/run/err")"
+  fail=1
+fi
+
+# mr only reads: none of its cases made a request that is not a GET.
+writes=$(cat "$work"/mr-*/requests 2>/dev/null | grep -E '^[A-Z]+ ' | grep -v '^GET ' | head -3)
+if [ -z "$writes" ]; then echo "test: mr made no request but a GET"; else echo "test: mr made a request that is not a GET: $writes"; fail=1; fi
 
 # A token GitLab's has no characters like is refused before anything is
 # sent, and is not repeated.
-mkdir -p "$work/badtoken"
-cp testdata/thread/reply-issue/in.json "$work/badtoken/in.json"
-for t in '' 'bad"token' 'with space' 'back\slash'; do
-  st=$work/badtoken/run
-  rm -rf "$st"
-  mkdir -p "$st"
-  : >"$st/requests"
-  : >"$st/argv"
-  if run reply "$st" "$work/badtoken" "$t"; then
-    echo "test: thread with the token '$t' was not refused"
-    fail=1
-  elif [ -s "$st/requests" ]; then
-    echo "test: thread with the token '$t' sent a request"
-    fail=1
-  elif [ "$(cat "$st/err")" != "GITLAB_TOKEN is not set, or holds a character a GitLab token has none of" ]; then
-    echo "test: thread with the token '$t' said: $(head -c 300 "$st/err")"
-    fail=1
-  elif [ -n "$t" ] && grep -qF -- "$t" "$st/err"; then
-    echo "test: thread with the token '$t' repeated it"
-    fail=1
-  else
-    echo "test: thread with a bad token '$t' refused ok"
-  fi
+for target in "thread reply testdata/thread/reply-issue" "mr pr testdata/mr/pr-open" "mr ci testdata/mr/ci-green"; do
+  # shellcheck disable=SC2086 # three words, on purpose
+  set -- $target
+  mkdir -p "$work/badtoken"
+  cp "$3/in.json" "$work/badtoken/in.json"
+  for t in '' 'bad"token' 'with space' 'back\slash'; do
+    st=$work/badtoken/run
+    rm -rf "$st"
+    mkdir -p "$st"
+    : >"$st/requests"
+    : >"$st/argv"
+    if run "$1" "$2" "$st" "$work/badtoken" "$t"; then
+      echo "test: $1 $2 with the token '$t' was not refused"
+      fail=1
+    elif [ -s "$st/requests" ]; then
+      echo "test: $1 $2 with the token '$t' sent a request"
+      fail=1
+    elif [ "$(cat "$st/err")" != "GITLAB_TOKEN is not set, or holds a character a GitLab token has none of" ]; then
+      echo "test: $1 $2 with the token '$t' said: $(head -c 300 "$st/err")"
+      fail=1
+    elif [ -n "$t" ] && grep -qF -- "$t" "$st/err"; then
+      echo "test: $1 $2 with the token '$t' repeated it"
+      fail=1
+    else
+      echo "test: $1 $2 with a bad token '$t' refused ok"
+    fi
+  done
 done
 
 # ---- the link patterns ----------------------------------------------------
@@ -226,6 +350,18 @@ else
     fi
   done <testdata/link.txt
   echo "test: link patterns: $nl paths ok"
+fi
+
+# ---- the core: the declaration, the grants and the calls ----------------
+# Through the real yardr, in a scratch yard (testdata/core.sh).
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "test: core FAILED: needs python3 on PATH (the stand-in for GitLab is one)"
+  fail=1
+elif [ ! -x "$YARDR" ]; then
+  echo "test: core FAILED: needs yardr ($YARDR)"
+  fail=1
+else
+  . ./testdata/core.sh
 fi
 
 if [ "$fail" = 0 ]; then echo "test: gitlab ok"; fi
