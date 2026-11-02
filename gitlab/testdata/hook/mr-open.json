@@ -1,0 +1,31 @@
+{
+  "headers": {
+    "Idempotency-Key": ["9d6f1f1a-3b0c-4e68-a8d3-6f7a0c1e2b44"],
+    "X-Gitlab-Event": ["Merge Request Hook"]
+  },
+  "body": {
+    "object_kind": "merge_request",
+    "event_type": "merge_request",
+    "user": {"id": 52, "name": "Bob Builder", "username": "Bob"},
+    "project": {
+      "id": 14, "name": "Shed", "web_url": "https://gitlab.com/acme/platform/shed", "namespace": "Platform",
+      "path_with_namespace": "acme/platform/shed", "default_branch": "main"
+    },
+    "object_attributes": {
+      "id": 93, "iid": 16, "title": "Mend the roof",
+      "description": "Fixes the leak. @ada please review.",
+      "state": "opened", "action": "open", "draft": false,
+      "source_branch": "yard/roof-mend", "target_branch": "main",
+      "source_project_id": 15, "target_project_id": 14,
+      "last_commit": {"id": "e59094b8de0f2f91abbe4760a52d9137260252d8", "message": "Mend", "title": "Mend", "url": "https://gitlab.com/acme/platform/shed/-/commit/e59094b8de0f2f91abbe4760a52d9137260252d8"},
+      "source": {"id": 15, "name": "Shed", "path_with_namespace": "bob/shed", "web_url": "https://gitlab.com/bob/shed"},
+      "target": {"id": 14, "name": "Shed", "path_with_namespace": "acme/platform/shed", "web_url": "https://gitlab.com/acme/platform/shed"},
+      "url": "https://gitlab.com/acme/platform/shed/-/merge_requests/16",
+      "assignee_ids": [52], "reviewer_ids": [51]
+    },
+    "labels": [{"id": 19, "title": "roof", "color": "#adb21a", "type": "GroupLabel", "group_id": 24}],
+    "changes": {"updated_at": {"previous": "2026-11-02T10:00:00.000Z", "current": "2026-11-02T10:00:05.000Z"}},
+    "assignees": [{"id": 52, "name": "Bob Builder", "username": "Bob", "email": "[REDACTED]"}],
+    "reviewers": [{"id": 51, "name": "Ada Lovelace", "username": "Ada", "state": "unreviewed", "re_requested": false}]
+  }
+}

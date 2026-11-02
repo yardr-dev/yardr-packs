@@ -1,0 +1,18 @@
+# GitLab as a pack of kind source: the integration, imported into the
+# yard and into no depot. What GitLab is: how its webhooks are verified
+# and read (issues, merge requests, comments) and how the yard speaks in
+# those threads: replies, opens an issue, closes and reopens an issue or
+# a merge request. The first slice of the pack; reading merge requests
+# and CI back, and the calls an agent makes, are the next.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/gitlab
+#
+# The source is named gitlab: a pack is named after the service it
+# talks to.
+name: gitlab
+kind: source
+setup: SETUP.md
+
+sources:
+  gitlab:
+    declaration: gitlab.yaml

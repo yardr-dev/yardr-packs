@@ -1,0 +1,23 @@
+# The link patterns of gitlab.yaml on paths: the shape (issue, pull, repos), a
+# path, and what the core makes of it, after link.fold: the fixed URL and the
+# thread id, or - for a path the pattern does not read. Tab separated.
+issue	/Acme/Shed/-/issues/7	https://gitlab.com/acme/shed/-/issues/7 acme/shed#7
+issue	/acme/platform/shed/-/issues/12/designs	https://gitlab.com/acme/platform/shed/-/issues/12 acme/platform/shed#12
+issue	/acme/shed/issues/3	https://gitlab.com/acme/shed/-/issues/3 acme/shed#3
+issue	/a/b/-/issues/1	https://gitlab.com/a/b/-/issues/1 a/b#1
+issue	/acme/shed/-/issues/new	-
+issue	/acme/shed/-/issues/0	-
+issue	/acme/shed/-/issues/07	-
+issue	/acme/shed/-/merge_requests/3	-
+issue	/acme/-/issues/3	-
+issue	/-/issues/3	-
+issue	/acme/shed/-/work_items/3	-
+pull	/acme/shed/-/merge_requests/16	https://gitlab.com/acme/shed/-/merge_requests/16 acme/shed!16
+pull	/Acme/Platform/Shed/merge_requests/16/diffs	https://gitlab.com/acme/platform/shed/-/merge_requests/16 acme/platform/shed!16
+pull	/acme/shed/-/issues/16	-
+pull	/acme/shed/-/merge_requests/new	-
+repos	acme/shed	acme/shed
+repos	Acme/Platform/Shed	acme/platform/shed
+repos	shed	-
+repos	acme/shed/	-
+repos	acme/-/shed	-

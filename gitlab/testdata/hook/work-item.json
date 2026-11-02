@@ -1,0 +1,10 @@
+{
+  "headers": {"X-Gitlab-Event": ["Issue Hook"]},
+  "body": {
+    "object_kind": "work_item",
+    "event_type": "work_item",
+    "user": {"id": 51, "name": "Ada Lovelace", "username": "Ada"},
+    "project": {"id": 14, "name": "Shed", "web_url": "https://gitlab.com/Acme/Shed", "path_with_namespace": "Acme/Shed"},
+    "object_attributes": {"id": 400, "iid": 8, "title": "Check the gutters", "type": "Task", "state": "opened", "action": "open", "url": "https://gitlab.com/Acme/Shed/-/work_items/8"}
+  }
+}

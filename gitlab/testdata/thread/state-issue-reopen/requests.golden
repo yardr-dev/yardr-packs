@@ -1,0 +1,8 @@
+GET https://gitlab.com/api/v4/projects/Acme%2FShed/issues/7
+  config: header = "PRIVATE-TOKEN: <token>"
+
+PUT https://gitlab.com/api/v4/projects/Acme%2FShed/issues/7
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"state_event":"reopen"}
+

@@ -1,0 +1,158 @@
+# GitLab as a declared source, in the shape of yardr's GitHub: how the core
+# verifies a GitLab delivery, and the command that turns a verified body
+# into the envelope; what the yard does in a GitLab thread, by one command
+# per thing; GitLab's issue and merge request URLs as a bead's link.
+#
+# This is the first slice: hearing and speaking, issues and merge requests
+# alike. Reading a merge request and its pipelines back (the `events` key)
+# and the calls an agent makes (`calls`, presets) are the second slice.
+# What is not here either: git hosting for a depot whose origin is on
+# gitlab.com (a `git` credential helper, as GitHub's), and group webhooks.
+#
+# Checked against GitLab's own docs on 2 November 2026 (docs.gitlab.com,
+# master): user/project/integrations/webhooks.md and webhook_events.md for
+# the headers and the issue, merge request and comment payloads;
+# api/notes.md, api/issues.md, api/merge_requests.md and api/rest/_index.md
+# for what the thread commands send; user/profile/personal_access_tokens.md
+# and security/tokens/access_token_scopes.md for the credential.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: gitlab
+about: GitLab issues and merge requests. Hears its webhooks and speaks in its threads.
+
+# The name of the variable, never the value. A personal access token with
+# the scope api: a token that may only read (read_api) cannot reply, open
+# or close anything. A command gets it in its environment under this name,
+# and gets no other variable of the yard. hook.normalize is handed no
+# credential at all. GitLab takes a personal access token in a
+# PRIVATE-TOKEN header.
+credential:
+  env: GITLAB_TOKEN
+  header: "PRIVATE-TOKEN: {credential}"
+
+# ---- what it sends us ----------------------------------------------------
+
+hook:
+  # Adapter.Verify stays data, checked by the core: the secret is handed to
+  # no command, and an unverified body reaches none. GitLab's webhook has
+  # a secret token, which it sends as it is in X-Gitlab-Token, so the
+  # header is compared as it arrives. The delivery is told by
+  # Idempotency-Key, which GitLab keeps the same across a delivery's
+  # retries (GitLab 17.4 on; before, no id is sent and a retry is told by
+  # its body).
+  verify:
+    scheme: secret
+    signature: { header: X-Gitlab-Token }
+    delivery:  { header: Idempotency-Key }
+  # Per hook, not per source: GitLab sends an event's body to every webhook
+  # of the project, and each hook records its own.
+  bodies: unique-per-hook
+  # GitLab's deliveries follow activity, not a rhythm: an idle hour after
+  # the last comment is no break, so the quiet check does not time them.
+  untimed: true
+
+  # Adapter.Normalize. stdin {"headers":{…},"body":{…}}, stdout the
+  # envelope. The core sets source and delivery itself, and derives the
+  # envelope's train from its head_branch, which the command leaves out.
+  normalize: [gitlab/normalize]
+
+  # The keys its events' fields may carry: a subscription's --where may
+  # name them beside type, action, team, project, repo and label. sender is
+  # the lowercased username of whoever caused the event, which hear below
+  # matches by identity; noteable is what a comment is on (issue,
+  # merge_request, commit or snippet).
+  keys: [number, state, noteable, head_branch, head_sha, head_repo, base, train, sender]
+
+# ---- who is heard ---------------------------------------------------------
+# A delivery is kept when its sender is a user of the yard, matched by
+# identity: fields.sender holds the sender's username, lowercased, which
+# normalize also sets as actor.id. The core adds fields.speaker for a
+# kept delivery (the yard user's name, or outside where the hook's
+# --unknown word allows an unmapped sender); speaker is the derived
+# filter key for this hear, and stands in no hook.keys above, which
+# names only what normalize may set.
+
+hear:
+  field: sender
+  by: identity
+
+# ---- what the yard does in its threads ------------------------------------
+# One command per thing, each handed its object on stdin and the
+# credential under GITLAB_TOKEN, with YARDR_SOURCE_BASE from base below.
+# gitlab/thread is the script: reply posts a note on the issue or merge
+# request with the key in a marker comment, posted finds what a key left
+# ({} for none), read lists the thread's notes oldest first, open starts an
+# issue in the project in, opened finds what an open left ({} for none:
+# posted's sibling for open), and state moves to what the word means:
+# exactly, or never backwards with forward (a stage map's move). A thread
+# is GitLab's own reference to it: group/project#12 is an issue and
+# group/project!12 a merge request, and the one script serves both, told
+# apart by that character. The shapes are in docs/integrations.md.
+
+thread:
+  reply:  [gitlab/thread, reply]      # in  {thread, parent, body, key}      out {id, url}
+  posted: [gitlab/thread, posted]     # in  {thread, key}                    out {id, url} or {}
+  read:   [gitlab/thread, read]       # in  {thread}                         out {messages: [...]}
+  place:  project                     # what open's in names
+  open:   [gitlab/thread, open]       # in  {in, title, body, key, assignee?} out {id, title, url}
+  assignee: key                       # the assignee open takes: a username
+  opened: [gitlab/thread, opened]     # in  {in, key, since?}                out {id, title, url} or {}
+  state:  [gitlab/thread, state]      # in  {thread, state, forward?}        out {status, moved, was?}
+  states: [started, done]             # the words it has a status for: an issue or merge request is open or closed
+  labels: true                        # and a label:<name> adds the label, to any thread
+
+# ---- who a crew member is in it -------------------------------------------
+# GitLab usernames are the same in any case, and its deliveries carry them
+# as they are written: normalize lowercases them, and a key is kept
+# lowercase however it was typed.
+
+identity:
+  fold: lower
+
+# ---- its issues and merge requests as a bead's link -----------------------
+# The host its URLs are on, what reads an issue from a URL's path, and over
+# the groups: the whole project path (its namespace may nest to any depth)
+# and the number. The issue's one fixed form puts the /-/ GitLab writes now
+# before issues; the old form without it reads too. A merge request is the
+# second shape, over the same groups in the same order. Only gitlab.com is
+# named: a self-managed instance has a host of its own, which the file
+# cannot list (SETUP.md says what to change).
+#
+# GitLab numbers its issues and its merge requests apart: issue #7 and
+# merge request !7 are two things. The core reads the two shapes as one
+# numbered thread, so it takes either for the other (README.md, "A known
+# gap").
+
+link:
+  host: gitlab.com
+  issue: '^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?issues/([1-9][0-9]*)(?:/.*)?$'
+  fixed: "https://gitlab.com/{1}/-/issues/{2}"
+  thread: "{1}#{2}"
+  fold: lower
+  pull:
+    issue: '^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?merge_requests/([1-9][0-9]*)(?:/.*)?$'
+    fixed: "https://gitlab.com/{1}/-/merge_requests/{2}"
+    thread: "{1}!{2}"
+  repos: '(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*'
+
+# ---- (today) what an agent may ask of it, through `yardr call` ------------
+# Who the credential acts as, and nothing else: the reader keeps a file's
+# base and credential for its calls alone (a file with none has neither,
+# and `pack check` says so), and one read call is what that takes. The
+# agent's own calls wait for the second slice. It names no check call on
+# purpose: `yardr source check` looks at the credential and at the thread
+# commands above, and sends nothing. The call is granted to no one until
+# the operator grants it.
+#
+# base is the REST API every thread command sends to, as
+# YARDR_SOURCE_BASE.
+
+base: https://gitlab.com/api/v4
+calls:
+  user:
+    kind: read
+    about: Who the credential acts as.
+    request: { method: GET, path: /user }
+    answer: { select: [username, name] }

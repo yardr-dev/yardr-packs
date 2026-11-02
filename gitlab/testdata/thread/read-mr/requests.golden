@@ -1,0 +1,3 @@
+GET https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/16/notes?sort=asc&order_by=created_at&per_page=100&page=1
+  config: header = "PRIVATE-TOKEN: <token>"
+

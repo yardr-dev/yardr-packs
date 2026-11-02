@@ -1,0 +1,5 @@
+POST https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/issues
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"title":"Nested","description":"<!-- yardr-thread 6b3f9a20-7c14-4e85-9d02-5a8e1c4f7b33 -->"}
+

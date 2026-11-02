@@ -1,0 +1,1 @@
+jq: error (at <stdin>:1): issue was created, but GitLab did not assign bob; the account may not be allowed to assign in this project

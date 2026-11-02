@@ -1,0 +1,8 @@
+GET https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/16
+  config: header = "PRIVATE-TOKEN: <token>"
+
+PUT https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/16
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"add_labels":"roof"}
+

@@ -1,0 +1,19 @@
+{
+  "headers": {
+    "Idempotency-Key": ["4b1d9c0e-7c52-4a0e-8d7e-0a5bb3f1c2aa"],
+    "X-Gitlab-Event": ["Issue Hook"]
+  },
+  "body": {
+    "object_kind": "issue",
+    "event_type": "issue",
+    "user": {"id": 52, "name": "Bob Builder", "username": "Bob"},
+    "project": {"id": 14, "name": "Shed", "web_url": "https://gitlab.com/Acme/Shed", "path_with_namespace": "Acme/Shed"},
+    "object_attributes": {
+      "id": 301, "iid": 7, "title": "Roof leaks over the shed door", "description": "The roof leaks when it rains.",
+      "state": "closed", "action": "close", "url": "https://gitlab.com/Acme/Shed/-/issues/7"
+    },
+    "assignees": [],
+    "labels": [],
+    "changes": {"state_id": {"previous": 1, "current": 2}}
+  }
+}

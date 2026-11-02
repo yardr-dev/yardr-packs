@@ -1,0 +1,1 @@
+{"headers": {"X-Gitlab-Event": ["Issue Hook"]}, "body": "this is text, not JSON"}

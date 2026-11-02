@@ -1,0 +1,3 @@
+GET https://gitlab.com/api/v4/projects/Acme%2FShed/issues/99
+  config: header = "PRIVATE-TOKEN: <token>"
+

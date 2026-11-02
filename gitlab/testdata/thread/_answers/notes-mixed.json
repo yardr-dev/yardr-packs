@@ -1,0 +1,7 @@
+[
+  {"id": 1100, "body": "assigned to @Bob", "author": {"id": 51, "username": "Ada", "name": "Ada Lovelace"}, "created_at": "2026-11-02T09:15:44.000Z", "updated_at": "2026-11-02T09:15:44.000Z", "system": true, "noteable_type": "Issue", "noteable_iid": 7, "internal": false},
+  {"id": 1241, "body": "@Yardmaster can you look at this?", "author": {"id": 51, "username": "Ada", "name": "Ada Lovelace"}, "created_at": "2026-11-02T09:30:40.000Z", "updated_at": "2026-11-02T09:30:40.000Z", "system": false, "noteable_type": "Issue", "noteable_iid": 7, "internal": false},
+  {"id": 1242, "body": "closed", "author": {"id": 52, "username": "Bob", "name": "Bob Builder"}, "created_at": "2026-11-02T09:40:00.000Z", "updated_at": "2026-11-02T09:40:00.000Z", "system": true, "noteable_type": "Issue", "noteable_iid": 7, "internal": false},
+  {"id": 1250, "body": "On it.\n\n<!-- yardr-reply 0c9d3a52-6a0e-4a53-9f3e-0b1f4f2d8e11 -->", "author": {"id": 77, "username": "yardmaster", "name": "Yard Master"}, "created_at": "2026-11-02T10:05:00.000Z", "updated_at": "2026-11-02T10:05:00.000Z", "system": false, "noteable_type": "Issue", "noteable_iid": 7, "internal": false},
+  {"id": 1251, "body": "mentioned in merge request !16 <!-- yardr-reply 5d0a7c10-2b6e-4f43-8a61-7c2e9b9d1f22 -->", "author": {"id": 52, "username": "Bob", "name": "Bob Builder"}, "created_at": "2026-11-02T10:06:00.000Z", "updated_at": "2026-11-02T10:06:00.000Z", "system": true, "noteable_type": "Issue", "noteable_iid": 7, "internal": false}
+]

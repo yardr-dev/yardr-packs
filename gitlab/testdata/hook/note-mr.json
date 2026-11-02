@@ -1,0 +1,24 @@
+{
+  "headers": {"X-Gitlab-Event": ["Note Hook"]},
+  "body": {
+    "object_kind": "note",
+    "event_type": "note",
+    "user": {"id": 51, "name": "Ada Lovelace", "username": "Ada"},
+    "project_id": 14,
+    "project": {"id": 14, "name": "Shed", "web_url": "https://gitlab.com/acme/platform/shed", "path_with_namespace": "acme/platform/shed"},
+    "object_attributes": {
+      "id": 1244, "internal": false,
+      "note": "Looks right. Run `/merge @not-a-mention` and ask @acme/reviewers, @bob.smith.",
+      "noteable_type": "MergeRequest", "author_id": 51, "project_id": 14, "noteable_id": 93, "system": false,
+      "action": "update", "url": "https://gitlab.com/acme/platform/shed/-/merge_requests/16#note_1244"
+    },
+    "merge_request": {
+      "id": 93, "iid": 16, "title": "Mend the roof", "state": "opened",
+      "source_branch": "yard/roof-mend", "target_branch": "main", "source_project_id": 14, "target_project_id": 14,
+      "last_commit": {"id": "e59094b8de0f2f91abbe4760a52d9137260252d8"},
+      "source": {"path_with_namespace": "acme/platform/shed"},
+      "labels": [{"id": 19, "title": "roof"}],
+      "assignee": {"name": "Bob Builder", "username": "Bob"}
+    }
+  }
+}

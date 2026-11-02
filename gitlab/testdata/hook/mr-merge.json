@@ -1,0 +1,19 @@
+{
+  "headers": {"X-Gitlab-Event": ["Merge Request Hook"]},
+  "body": {
+    "object_kind": "merge_request",
+    "event_type": "merge_request",
+    "user": {"id": 51, "name": "Ada Lovelace", "username": "Ada"},
+    "project": {"id": 14, "name": "Shed", "web_url": "https://gitlab.com/acme/platform/shed", "path_with_namespace": "acme/platform/shed"},
+    "object_attributes": {
+      "id": 93, "iid": 16, "title": "Mend the roof", "description": "",
+      "state": "merged", "action": "merge",
+      "source_branch": "yard/roof-mend", "target_branch": "main",
+      "last_commit": {"id": "e59094b8de0f2f91abbe4760a52d9137260252d8"},
+      "source": {"path_with_namespace": "acme/platform/shed"},
+      "url": "https://gitlab.com/acme/platform/shed/-/merge_requests/16"
+    },
+    "labels": [],
+    "assignees": []
+  }
+}

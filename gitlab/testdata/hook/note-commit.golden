@@ -1,0 +1,1 @@
+{"source":"gitlab","type":"note","action":"create","actor":{"id":"ada","name":"Ada"},"thread":{},"mentions":["bob"],"text":"This is a commit comment. @Bob how does this work?","fields":{"repo":["Acme/Shed"],"sender":["ada"],"noteable":["commit"]}}

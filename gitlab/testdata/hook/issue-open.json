@@ -1,0 +1,39 @@
+{
+  "headers": {
+    "Content-Type": ["application/json"],
+    "Idempotency-Key": ["0e8f1b1c-5a3e-4f4d-9b6a-2a1c6f3d7e10"],
+    "User-Agent": ["GitLab/19.1.0"],
+    "X-Gitlab-Event": ["Issue Hook"],
+    "X-Gitlab-Event-UUID": ["13792a34-cac6-4fda-95a8-c58e00a3954e"],
+    "X-Gitlab-Instance": ["https://gitlab.com"],
+    "X-Gitlab-Webhook-UUID": ["02affd2d-2cba-4033-917d-ec22d5dc4b38"]
+  },
+  "body": {
+    "object_kind": "issue",
+    "event_type": "issue",
+    "user": {"id": 51, "name": "Ada Lovelace", "username": "Ada", "avatar_url": "https://secure.gravatar.com/avatar/1?s=80&d=identicon", "email": "[REDACTED]"},
+    "project": {
+      "id": 14, "name": "Shed", "description": "The shed.", "web_url": "https://gitlab.com/Acme/Shed", "avatar_url": null,
+      "git_ssh_url": "git@gitlab.com:Acme/Shed.git", "git_http_url": "https://gitlab.com/Acme/Shed.git",
+      "namespace": "Acme", "visibility_level": 20, "path_with_namespace": "Acme/Shed", "default_branch": "main",
+      "ci_config_path": null, "homepage": "https://gitlab.com/Acme/Shed", "url": "git@gitlab.com:Acme/Shed.git",
+      "ssh_url": "git@gitlab.com:Acme/Shed.git", "http_url": "https://gitlab.com/Acme/Shed.git"
+    },
+    "object_attributes": {
+      "id": 301, "iid": 7, "title": "Roof leaks over the shed door",
+      "description": "The roof leaks when it rains.\n\ncc @Bob, and the @Acme/builders group. Mail ada@example.com is not a mention.\n\n```\n@in-code stays text\n```\n",
+      "state": "opened", "action": "open", "url": "https://gitlab.com/Acme/Shed/-/issues/7",
+      "author_id": 51, "project_id": 14, "assignee_ids": [52], "assignee_id": 52,
+      "created_at": "2026-11-02T09:15:43.000Z", "updated_at": "2026-11-02T09:15:43.000Z",
+      "confidential": false, "type": "Issue"
+    },
+    "repository": {"name": "Shed", "url": "git@gitlab.com:Acme/Shed.git", "description": "The shed.", "homepage": "https://gitlab.com/Acme/Shed"},
+    "assignees": [{"name": "Bob Builder", "username": "Bob", "avatar_url": "https://secure.gravatar.com/avatar/2?s=80&d=identicon"}],
+    "assignee": {"name": "Bob Builder", "username": "Bob", "avatar_url": "https://secure.gravatar.com/avatar/2?s=80&d=identicon"},
+    "labels": [
+      {"id": 206, "title": "bug", "color": "#ff0000", "project_id": 14, "template": false, "description": null, "type": "ProjectLabel", "group_id": null},
+      {"id": 207, "title": "roof", "color": "#00ff00", "project_id": 14, "template": false, "description": null, "type": "ProjectLabel", "group_id": null}
+    ],
+    "changes": {}
+  }
+}

@@ -1,0 +1,8 @@
+GET https://gitlab.com/api/v4/users?username=bob
+  config: header = "PRIVATE-TOKEN: <token>"
+
+POST https://gitlab.com/api/v4/projects/Acme%2FShed/issues
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"title":"For Bob","description":"<!-- yardr-thread 8a2c6e41-0b7d-4d39-a5f2-1c3e9b7d6a05 -->","assignee_id":52}
+

@@ -1,0 +1,25 @@
+{
+  "headers": {
+    "Idempotency-Key": ["c4a2e7b0-1d3f-4b59-9c8e-5d6f7a8b9c01"],
+    "X-Gitlab-Event": ["Note Hook"]
+  },
+  "body": {
+    "object_kind": "note",
+    "event_type": "note",
+    "user": {"id": 51, "name": "Ada Lovelace", "username": "Ada"},
+    "project_id": 14,
+    "project": {"id": 14, "name": "Shed", "web_url": "https://gitlab.com/Acme/Shed", "path_with_namespace": "Acme/Shed"},
+    "object_attributes": {
+      "id": 1241, "internal": false,
+      "note": "@Yardmaster can you look at this?\n\nIt  leaks\non the door side.",
+      "noteable_type": "Issue", "author_id": 51, "project_id": 14, "noteable_id": 92, "system": false,
+      "action": "create", "created_at": "2026-11-02T09:30:40.000Z", "updated_at": "2026-11-02T09:30:40.000Z",
+      "url": "https://gitlab.com/Acme/Shed/-/issues/7#note_1241"
+    },
+    "issue": {
+      "id": 92, "iid": 7, "title": "Roof leaks over the shed door", "state": "opened", "description": "The roof leaks when it rains.",
+      "assignee_ids": [52], "assignee_id": 52,
+      "labels": [{"id": 206, "title": "bug"}, {"id": 207, "title": "roof"}]
+    }
+  }
+}

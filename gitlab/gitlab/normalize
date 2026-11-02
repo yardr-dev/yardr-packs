@@ -1,0 +1,106 @@
+#!/bin/sh
+# A verified GitLab webhook to the yard's envelope: stdin
+# {"headers":{…},"body":{…}}, stdout the envelope. Needs jq.
+#
+# Issue, merge request and comment (note) deliveries are read: the issue or
+# merge request is the thread, its description or the comment the text.
+# Any other delivery (a push, a pipeline, a work item that is no issue) is
+# recorded with its type, action, repo and sender and no thread, so nobody
+# is mentioned by it: GitLab disables a webhook after four failed answers
+# in a row, so an event this does not read is never refused. A body that
+# is no JSON object is refused: a non-zero exit is answered 400, and the
+# delivery reaches no subscription. Nothing of the body is ever printed to
+# stderr.
+#
+# The thread of an issue is <project path>#<number> and of a merge request
+# <project path>!<number>, GitLab's own references: the two are numbered
+# apart there, and the thread command tells them apart by the character.
+# The thread's URL is built from the project's web_url, the same for an
+# issue's own events and its comments' (a comment's payload carries the
+# comment's URL, not the issue's). The sender is carried lowercased, as
+# actor.id and as fields.sender, which hear matches by identity.
+exec jq -c '
+def str($v): if ($v | type) == "string" then $v elif $v == null then "" else "\($v)" end;
+# trunc is hooks.truncate: whitespace collapsed, at most 500 runes. The jq
+# POSIX space class includes the Unicode spaces split by Go strings.Fields.
+def trunc: (gsub("^[[:space:]]+|[[:space:]]+$"; "") | gsub("[[:space:]]+"; " ")) | if length > 500 then .[0:499] + "…" else . end;
+def ordered: reduce .[] as $x ([]; if index($x) then . else . + [$x] end);
+# mentions are the lowercase usernames a body mentions, once each, in
+# order. A username is letters, digits, _, - and . (GitLab: it starts with
+# none of - and ends with none of .). A group mention (@group/subgroup)
+# is left out: a group is not a crew member. An @name in code is text, not
+# a mention, and an email address (a@b) is none.
+def mentions($md):
+  ((($md // "") | gsub("(?s)```.*?(```|$)|`[^`\n]*`"; " "))
+   | [scan("(?:^|[^A-Za-z0-9_@./-])@([A-Za-z0-9_.][A-Za-z0-9_.-]*[A-Za-z0-9_-]|[A-Za-z0-9_])(/?)")
+      | select(.[1] != "/") | .[0] | ascii_downcase | select(length <= 255)]
+   | ordered);
+def header($in; $name): [$in.headers // {} | to_entries[] | select(.key | ascii_downcase == $name) | .value[]] | .[0] // "";
+def field($o; $k; $v): if ($v // "") == "" then $o else $o + {($k): [$v]} end;
+def labels($l): [$l[]? | .title | select(. != null and . != "")];
+# The username of the first assignee: the assignees list, else the single
+# assignee GitLab still sends (deprecated), else the one the item of a
+# comment carries (a merge request does; an issue gives ids alone).
+def assignee_of($p; $item): ((($p.assignees // [])[0] // $p.assignee // ($item // {}).assignee // {}).username // "") | ascii_downcase;
+
+. as $in
+| (.body | if . == null then {} elif type == "object" then . else error("gitlab payload is not JSON") end) as $p
+# The kind is what the body says it is. A body with none falls back to the
+# event named in the header ("Merge Request Hook" is merge_request).
+| (str($p.object_kind) | if . != "" then . else
+     (header($in; "x-gitlab-event") | ascii_downcase | sub(" hook$"; "") | gsub("[^a-z0-9]+"; "_") | sub("^_"; "") | sub("_$"; ""))
+   end | if . == "" then error("gitlab delivery has no object_kind and no X-Gitlab-Event") else . end) as $kind
+| ($p.user // {}) as $user
+| (str($user.username // $p.user_username)) as $named
+| ($named | ascii_downcase) as $login
+| ($p.project // {}) as $proj
+| str($proj.path_with_namespace) as $repo
+| str($proj.web_url) as $web
+| ($p.object_attributes // {}) as $o
+| ({} | field(.; "repo"; $repo) | field(.; "sender"; $login)) as $base
+| {source: "gitlab", type: $kind, action: str($o.action),
+   actor: (if $named == "" then {} else {id: $login, name: $named} end), thread: {}, mentions: []}
+| if $kind == "issue" or $kind == "merge_request" or $kind == "note" then
+    # What the delivery is about, and what it says.
+    (if $kind == "note" then
+       (str($o.noteable_type)) as $nt
+       | (if $nt == "Issue" then "issue" elif $nt == "MergeRequest" then "merge_request" elif $nt == "Commit" then "commit" elif $nt == "Snippet" then "snippet" else ($nt | ascii_downcase) end) as $on
+       | {on: $on, item: (if $on == "issue" then $p.issue elif $on == "merge_request" then $p.merge_request else null end), said: $o}
+     else {on: $kind, item: $o, said: null} end) as $t
+    | ($t.item // null) as $item
+    | ($t.said // null) as $said
+    | (if $said != null then str($said.note) else str($item.description) end) as $text
+    | (if $item == null then 0 else ($item.iid // 0) end) as $iid
+    | ($base | field(.; "noteable"; (if $said == null then "" else $t.on end))) as $f
+    | (if $item == null or $iid <= 0 or ($t.on != "issue" and $t.on != "merge_request") then . + {text: ($text | trunc), mentions: mentions($text), fields: $f}
+       else
+         (if $t.on == "issue" then "#" else "!" end) as $sep
+         | (if $t.on == "issue" then "issues" else "merge_requests" end) as $dir
+         | ($repo + $sep + ($iid | tostring)) as $thread
+         | (if $web != "" then $web + "/-/" + $dir + "/" + ($iid | tostring)
+            else (str($item.url) | sub("#.*$"; "")) end) as $url
+         | ($f | field(.; "number"; ($iid | tostring))
+               | field(.; "state"; str($item.state))
+               | (if $t.on == "merge_request" then
+                    field(.; "head_branch"; str($item.source_branch))
+                    | field(.; "head_sha"; str($item.last_commit.id))
+                    | field(.; "head_repo"; str($item.source.path_with_namespace))
+                    | field(.; "base"; str($item.target_branch))
+                  else . end)
+               | (labels($p.labels // $item.labels) as $ls
+                  | if ($ls | length) == 0 then . else . + {label: $ls} end)) as $f2
+         # An edit re-sends the comment whole, so its mentions are counted
+         # against the last one seen. The description is re-sent whole with
+         # every action, so its mentions are counted against the last one
+         # seen as well.
+         | . + {thread: {id: $thread, title: str($item.title), url: $url},
+                url: (if $said != null then str($said.url) else $url end),
+                assignee: assignee_of($p; $item),
+                text: ($text | trunc), mentions: mentions($text), fields: $f2}
+         | (if $said != null and ($said.id // 0) != 0 then
+              . + {message: ($said.id | tostring), entity: ("note-" + ($said.id | tostring))}
+            else . + {entity: $thread} end)
+       end)
+  else . + {fields: $base}
+  end
+'

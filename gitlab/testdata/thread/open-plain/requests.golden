@@ -1,0 +1,5 @@
+POST https://gitlab.com/api/v4/projects/Acme%2FShed/issues
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"title":"Check the gutters","description":"Before winter.\n /label ~bug\n\n<!-- yardr-thread 4e1b7d3a-9c25-4f08-b6a1-3d5f0a7c8e90 -->"}
+

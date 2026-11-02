@@ -1,0 +1,3 @@
+GET https://gitlab.com/api/v4/users?username=nobody
+  config: header = "PRIVATE-TOKEN: <token>"
+

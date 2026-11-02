@@ -1,0 +1,232 @@
+#!/bin/sh
+# The gitlab pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds; needs jq and bash, which
+# the pack's programs need.
+#
+# normalize turns each webhook body in testdata/hook/ into the yard's
+# envelope; its output must match the golden beside it byte for byte. The
+# fields those envelopes carry and hook.keys must agree both ways. The
+# thread commands run against a stand-in curl (testdata/bin/curl) that
+# makes no request: it records what the real one would have been asked,
+# and answers from the case's fixtures, so a changed request fails a case.
+# The token is a canary, looked for in every argument, output and record
+# the commands make. The link patterns of gitlab.yaml are run on the paths
+# in testdata/link.txt.
+#
+# UPDATE=1 ./test writes the goldens again from what the programs print;
+# read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+fail=0
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "test: jq is not on PATH: the pack's programs need it"
+  exit 1
+fi
+if ! command -v bash >/dev/null 2>&1; then
+  echo "test: bash is not on PATH: gitlab/thread needs it"
+  exit 1
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# differ <label> <golden> <actual>: succeeds, after saying how, when actual
+# differs from the golden; fails when they are the same. Under UPDATE it
+# writes the golden again and fails: nothing differs then.
+differ() {
+  if [ -n "${UPDATE-}" ]; then cp "$3" "$2"; return 1; fi
+  if cmp -s "$3" "$2"; then return 1; fi
+  echo "test: $1 differs from $2:"
+  diff -u "$2" "$3" 2>&1 | sed 's/^/    /' | head -40
+  return 0
+}
+
+# ---- normalize ------------------------------------------------------------
+
+for f in testdata/hook/*.json; do
+  g=${f%.json}.golden
+  case ${f##*/} in not-an-object.json) continue ;; esac
+  if [ ! -e "$g" ] && [ -z "${UPDATE-}" ]; then
+    echo "test: normalize $f has no golden ($g)"
+    fail=1
+    continue
+  fi
+  ./gitlab/normalize <"$f" >"$work/env" 2>"$work/err"
+  rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "test: normalize $f failed ($rc): $(head -c 300 "$work/err")"
+    fail=1
+  elif differ "normalize $f" "$g" "$work/env"; then
+    fail=1
+  else
+    echo "test: normalize $f ok"
+  fi
+done
+
+# A body that is no JSON object is refused: a non-zero exit, and nothing on
+# stdout for the core to take as an envelope.
+if ./gitlab/normalize <testdata/hook/not-an-object.json >"$work/env" 2>"$work/err"; then
+  echo "test: normalize testdata/hook/not-an-object.json was not refused"
+  fail=1
+elif [ -s "$work/env" ]; then
+  echo "test: normalize testdata/hook/not-an-object.json printed an envelope while refusing"
+  fail=1
+else
+  echo "test: normalize testdata/hook/not-an-object.json refused ok"
+fi
+
+# ---- the fields are the keys ---------------------------------------------
+# A field normalize sets is one a subscription may name only when
+# hook.keys lists it (or it is a common key), and a key the file lists
+# that no envelope here sets is stale. train is the core's to derive from
+# head_branch, so no fixture sets it.
+keys=$(sed -n 's/^  keys: \[\(.*\)\]$/\1/p' gitlab.yaml | tr -d ' ' | tr ',' ' ')
+common="type action team project repo label event"
+seen=$(for g in testdata/hook/*.golden; do jq -r '.fields // {} | keys[]' "$g"; done | sort -u | tr '\n' ' ')
+bad=0
+for k in $seen; do
+  case " $keys $common " in *" $k "*) ;; *) echo "test: a field $k is set and is in no hook.keys"; bad=1 ;; esac
+done
+for k in $keys; do
+  case " $seen " in *" $k "*) ;; *) [ "$k" = train ] || { echo "test: hook.keys lists $k and no envelope sets it"; bad=1; } ;; esac
+done
+if [ "$bad" = 0 ]; then echo "test: fields and hook.keys agree"; else fail=1; fi
+
+# ---- the thread commands --------------------------------------------------
+
+stand=$PWD/testdata/bin
+canary=glpat-CANARYa1b2c3d4e5f6
+base=https://gitlab.com/api/v4
+# Prove the stand-in is what thread would run, before anything runs.
+if [ "$(PATH="$stand:$PATH" command -v curl)" != "$stand/curl" ]; then
+  echo "test: the stand-in curl is not the first curl on PATH"
+  exit 1
+fi
+
+# run <cmd> <state dir> <case dir> <token>: gitlab/thread in a clean
+# environment: the stand-in first on PATH, a home and a temporary
+# directory of its own, the token and the base, and the yard's variables
+# not at all.
+run() {
+  env -i PATH="$stand:$PATH" HOME="$2" TMPDIR="$2" GITLAB_TOKEN="$4" YARDR_SOURCE_BASE="$base" \
+    STANDIN_DIR="$3" STANDIN_LOG="$2/requests" STANDIN_ARGV="$2/argv" STANDIN_STATE="$2" \
+    ./gitlab/thread "$1" <"$3/in.json" >"$2/out" 2>"$2/err"
+}
+
+for d in testdata/thread/*/; do
+  name=$(basename "$d")
+  case $name in _*) continue ;; esac
+  cmd=${name%%-*}
+  d=testdata/thread/$name
+  st=$work/$name
+  mkdir -p "$st"
+  : >"$st/requests"
+  : >"$st/argv"
+  run "$cmd" "$st" "$d" "$canary"
+  rc=$?
+  ok=1
+  if [ -n "${UPDATE-}" ]; then
+    if [ "$rc" = 0 ]; then rm -f "$d/err.golden"; else rm -f "$d/out.golden"; cp "$st/err" "$d/err.golden"; fi
+  fi
+  differ "thread $name requests" "$d/requests.golden" "$st/requests" && ok=0
+  if [ -e "$d/err.golden" ]; then
+    # A refusal: a non-zero exit, what it said on stderr, nothing on stdout.
+    [ "$rc" != 0 ] || { echo "test: thread $name: expected a failure, got exit 0"; ok=0; }
+    [ ! -s "$st/out" ] || { echo "test: thread $name: printed to stdout while failing: $(head -c 200 "$st/out")"; ok=0; }
+    differ "thread $name stderr" "$d/err.golden" "$st/err" && ok=0
+  else
+    [ "$rc" = 0 ] || { echo "test: thread $name: exit $rc: $(head -c 300 "$st/err")"; ok=0; }
+    [ ! -s "$st/err" ] || { echo "test: thread $name: printed to stderr: $(head -c 300 "$st/err")"; ok=0; }
+    if [ -e "$d/out.jq" ]; then
+      jq -c -f "$d/out.jq" "$st/out" >"$st/view" 2>/dev/null || cp "$st/out" "$st/view"
+    else
+      cp "$st/out" "$st/view"
+    fi
+    differ "thread $name stdout" "$d/out.golden" "$st/view" && ok=0
+  fi
+  # The token is on curl's stdin and nowhere else.
+  for f in argv out err requests; do
+    if grep -qF "$canary" "$st/$f"; then
+      echo "test: thread $name: the token is in $f"
+      ok=0
+    fi
+  done
+  if [ "$ok" = 1 ]; then echo "test: thread $name ok"; else fail=1; fi
+done
+
+# A token GitLab's has no characters like is refused before anything is
+# sent, and is not repeated.
+mkdir -p "$work/badtoken"
+cp testdata/thread/reply-issue/in.json "$work/badtoken/in.json"
+for t in '' 'bad"token' 'with space' 'back\slash'; do
+  st=$work/badtoken/run
+  rm -rf "$st"
+  mkdir -p "$st"
+  : >"$st/requests"
+  : >"$st/argv"
+  if run reply "$st" "$work/badtoken" "$t"; then
+    echo "test: thread with the token '$t' was not refused"
+    fail=1
+  elif [ -s "$st/requests" ]; then
+    echo "test: thread with the token '$t' sent a request"
+    fail=1
+  elif [ "$(cat "$st/err")" != "GITLAB_TOKEN is not set, or holds a character a GitLab token has none of" ]; then
+    echo "test: thread with the token '$t' said: $(head -c 300 "$st/err")"
+    fail=1
+  elif [ -n "$t" ] && grep -qF -- "$t" "$st/err"; then
+    echo "test: thread with the token '$t' repeated it"
+    fail=1
+  else
+    echo "test: thread with a bad token '$t' refused ok"
+  fi
+done
+
+# ---- the link patterns ----------------------------------------------------
+# gitlab.yaml's link.issue, link.pull.issue and link.repos, run on paths
+# through jq's regex engine (the core's is Go's; these patterns use what
+# both read alike), with link.fold applied to the groups before the fixed
+# and thread templates expand, as the core does.
+yaml() { sed -n "s/^$1: '\\(.*\\)'\$/\\1/p" gitlab.yaml; }
+tmpl() { sed -n "s/^$1: \"\\(.*\\)\"\$/\\1/p" gitlab.yaml; }
+issue_re=$(yaml '  issue')
+pull_re=$(yaml '    issue')
+repos_re=$(yaml '  repos')
+issue_fixed=$(tmpl '  fixed')
+issue_thread=$(tmpl '  thread')
+pull_fixed=$(tmpl '    fixed')
+pull_thread=$(tmpl '    thread')
+missing=0
+for v in "$issue_re" "$pull_re" "$repos_re" "$issue_fixed" "$issue_thread" "$pull_fixed" "$pull_thread"; do
+  [ -n "$v" ] || missing=1
+done
+if [ "$missing" = 1 ]; then
+  echo "test: the link patterns are not where test looks for them in gitlab.yaml"
+  fail=1
+else
+  nl=0
+  while IFS='	' read -r kind path want; do
+    case $kind in '' | '#'*) continue ;; esac
+    case $kind in
+    issue) re=$issue_re fixed=$issue_fixed thread=$issue_thread ;;
+    pull) re=$pull_re fixed=$pull_fixed thread=$pull_thread ;;
+    repos) re=$repos_re fixed='' thread='' ;;
+    esac
+    got=$(jq -n -r --arg re "$re" --arg fixed "$fixed" --arg thread "$thread" --arg path "$path" --arg kind "$kind" '
+      if $kind == "repos" then (if ($path | test("^(?:" + $re + ")$")) then ($path | ascii_downcase) else "-" end)
+      else ([$path | match($re)] | if length == 0 then "-"
+            else (.[0].captures | map(.string | ascii_downcase)) as $g
+                 | def fill($t): $t | gsub("\\{1\\}"; $g[0]) | gsub("\\{2\\}"; $g[1]);
+                   fill($fixed) + " " + fill($thread) end) end')
+    if [ "$got" = "$want" ]; then
+      nl=$((nl + 1))
+    else
+      echo "test: link $kind $path: got '$got', want '$want'"
+      fail=1
+    fi
+  done <testdata/link.txt
+  echo "test: link patterns: $nl paths ok"
+fi
+
+if [ "$fail" = 0 ]; then echo "test: gitlab ok"; fi
+exit $fail

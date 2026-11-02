@@ -1,0 +1,5 @@
+POST https://gitlab.com/api/v4/projects/Acme%2FShed/issues
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"title":"","description":"<!-- yardr-thread k -->"}
+

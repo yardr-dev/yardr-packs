@@ -1,0 +1,5 @@
+[
+  {"id": 313, "iid": 12, "title": "Newest, no marker", "description": "Something else.", "state": "opened", "web_url": "https://gitlab.com/Acme/Shed/-/issues/12", "references": {"full": "Acme/Shed#12"}},
+  {"id": 311, "iid": 10, "title": "For Bob", "description": "For Bob.\n\n<!-- yardr-thread 8a2c6e41-0b7d-4d39-a5f2-1c3e9b7d6a05 -->", "state": "closed", "web_url": "https://gitlab.com/Acme/Shed/-/issues/10", "references": {"full": "Acme/Shed#10"}},
+  {"id": 310, "iid": 9, "title": "Check the gutters", "description": "Before winter.", "state": "opened", "web_url": "https://gitlab.com/Acme/Shed/-/issues/9", "references": {"full": "Acme/Shed#9"}}
+]

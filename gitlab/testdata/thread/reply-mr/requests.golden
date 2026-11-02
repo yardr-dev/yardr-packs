@@ -1,0 +1,5 @@
+POST https://gitlab.com/api/v4/projects/acme%2Fplatform%2Fshed/merge_requests/16/notes
+  config: header = "PRIVATE-TOKEN: <token>"
+  header: Content-Type: application/json
+  body: {"body":"Looks right to me.\n\n<!-- yardr-reply 0c9d3a52-6a0e-4a53-9f3e-0b1f4f2d8e11 -->"}
+

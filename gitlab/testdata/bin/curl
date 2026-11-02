@@ -1,0 +1,66 @@
+#!/bin/bash
+# A stand-in for curl, for the thread tests: it makes no request. It records
+# what the real curl would have been asked, and answers from the case's
+# fixtures, in order. thread uses curl in one way only,
+#
+#   curl -sS -o FILE -w '%{http_code}' -K - -X METHOD [-H HEADER]
+#        [--data-binary @FILE] URL
+#
+# and any other word is refused, so a changed invocation fails the test
+# instead of passing unseen. The token is to come on stdin as curl's
+# config (-K -), never as an argument. The test gives it:
+#   STANDIN_DIR    the case's directory: its answers file lists, one line per
+#                  request in order, "STATUS FILE", FILE relative to the
+#                  directory of the cases
+#   STANDIN_LOG    where each request is written, the token cut out
+#   STANDIN_ARGV   where every argument is written as it came, for the test
+#                  to look for the token in
+#   STANDIN_STATE  a directory of the stand-in's own, for its count
+set -u
+out='' fmt='' cfg='' method='' url='' data='' hdrs=''
+printf '%s\n' "$@" >>"$STANDIN_ARGV"
+while [ $# -gt 0 ]; do
+  case $1 in
+  -sS) ;;
+  -o) out=$2; shift ;;
+  -w) fmt=$2; shift ;;
+  -K) cfg=$2; shift ;;
+  -X) method=$2; shift ;;
+  -H) hdrs="$hdrs  header: $2
+"; shift ;;
+  --data-binary) data=$2; shift ;;
+  -*) echo "standin curl: does not know $1" >&2; exit 2 ;;
+  *)
+    [ -z "$url" ] || { echo "standin curl: two urls" >&2; exit 2; }
+    url=$1 ;;
+  esac
+  shift
+done
+[ "$cfg" = - ] || { echo "standin curl: the token is to come on stdin (-K -)" >&2; exit 2; }
+[ "$fmt" = '%{http_code}' ] || { echo "standin curl: -w is to be the status code" >&2; exit 2; }
+[ -n "$out" ] && [ -n "$method" ] && [ -n "$url" ] || { echo "standin curl: wants -o, -X and a url" >&2; exit 2; }
+conf=$(cat)
+{
+  echo "$method $url"
+  echo "  config: ${conf//"$GITLAB_TOKEN"/<token>}"
+  printf '%s' "$hdrs"
+  if [ -n "$data" ]; then
+    case $data in
+    @*) echo "  body: $(cat "${data#@}")" ;;
+    *) echo "standin curl: the data is to be a file (--data-binary @FILE)" >&2; exit 2 ;;
+    esac
+  fi
+  echo
+} >>"$STANDIN_LOG"
+n=$(cat "$STANDIN_STATE/n" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$STANDIN_STATE/n"
+line=$(sed -n "${n}p" "$STANDIN_DIR/answers")
+if [ -z "$line" ]; then
+  echo "standin curl: no answer $n for $method $url" >&2
+  exit 7
+fi
+status=${line%% *}
+file=${line#* }
+cp "$(dirname "$STANDIN_DIR")/$file" "$out"
+printf '%s' "$status"

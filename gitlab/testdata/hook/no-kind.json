@@ -1,0 +1,8 @@
+{
+  "headers": {"X-Gitlab-Event": ["Merge Request Hook"]},
+  "body": {
+    "user": {"username": "Ada"},
+    "project": {"web_url": "https://gitlab.com/acme/shed", "path_with_namespace": "acme/shed"},
+    "object_attributes": {"iid": 3, "title": "A body that names no kind", "state": "opened", "action": "open", "description": "text"}
+  }
+}

@@ -1,0 +1,348 @@
+#!/bin/bash
+# thread: what the yard does in a GitLab thread: reply, posted, read, open,
+# opened, state. One JSON object on stdin, one on stdout, as the thread key
+# of the declaration says. GITLAB_TOKEN (a personal access token, sent in a
+# PRIVATE-TOKEN header) and YARDR_SOURCE_BASE, the declaration's base, are
+# in the environment. Needs curl and jq.
+#
+# A thread is GitLab's own reference to an issue or a merge request:
+# group/project#12 is the issue, group/project!12 the merge request, and
+# the project's path may nest to any depth. The two are numbered apart in
+# GitLab and sit under different paths of its API (issues, merge_requests),
+# so the character tells this script which, and everything else is shared:
+# a merge request's thread is its notes, as an issue's are its comments.
+set -euo pipefail
+in=$(cat)
+arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+base=${YARDR_SOURCE_BASE%/}
+# The address people read GitLab at, for a URL in an answer: the API's base
+# without its /api/v4. A base that is no /api/v4 of a site (a stand-in's)
+# has none, and an answer then carries no URL.
+web=${base%/api/v4}
+if [ "$web" = "$base" ]; then web=; fi
+
+# The token goes to curl as a config line on its stdin, written by the
+# shell itself: an argument can be read by every process on the machine
+# while curl runs. A token that holds a character a GitLab token never has
+# (a quote, a backslash, a line break) would end the config line early, so
+# it is refused, without saying what it held.
+case ${GITLAB_TOKEN-} in
+'' | *[!A-Za-z0-9_.~-]*)
+  echo "GITLAB_TOKEN is not set, or holds a character a GitLab token has none of" >&2
+  exit 1
+  ;;
+esac
+
+# scrub <text>: the text with the token cut out of it, in case an answer
+# repeats what it was sent. Bash does it in process: the token is never an
+# argument.
+scrub() { printf '%s' "${1//"$GITLAB_TOKEN"/<token>}"; }
+
+# api <method> <url> [data]: the answer's body, or the failure on stderr.
+# The data goes to curl as a file, not an argument: a long reply would not
+# fit one.
+api() {
+  local m u code
+  m=$1
+  u=$2
+  if [ $# -ge 3 ]; then
+    printf '%s' "$3" >"$tmp/req"
+    code=$(printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN" \
+      | curl -sS -o "$tmp/out" -w '%{http_code}' -K - -X "$m" "$u" \
+        -H 'Content-Type: application/json' --data-binary @"$tmp/req") || {
+      echo "could not reach $u (curl exit $?)" >&2
+      return 1
+    }
+  else
+    code=$(printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN" \
+      | curl -sS -o "$tmp/out" -w '%{http_code}' -K - -X "$m" "$u") || {
+      echo "could not reach $u (curl exit $?)" >&2
+      return 1
+    }
+  fi
+  if [ "${code:0:1}" != 2 ]; then
+    # GitLab says why in message (a string, or an object of lists), or in
+    # error and error_description for a token it refuses.
+    local why
+    why=$(jq -r '(.message // .error_description // .error // "no answer") | if type == "string" then . else tojson end | .[0:300]' "$tmp/out" 2>/dev/null || head -c 200 "$tmp/out")
+    echo "$u: HTTP $code: $(scrub "$why")" >&2
+    return 1
+  fi
+  cat "$tmp/out"
+}
+
+# pages <url with ?>: every page of a list endpoint as one array, in the
+# order the url asks for. GitLab lists 20 to a page; ask for 100 and stop
+# on a short page, since gitlab.com may leave out the headers that count
+# the pages.
+pages() {
+  local u page n
+  u=$1
+  page=1
+  : >"$tmp/pages"
+  while :; do
+    api GET "$u&per_page=100&page=$page" >"$tmp/page" || return 1
+    n=$(jq 'length' "$tmp/page") || return 1
+    cat "$tmp/page" >>"$tmp/pages"
+    [ "$n" -lt 100 ] && break
+    page=$((page + 1))
+  done
+  jq -c -s 'add // []' "$tmp/pages"
+}
+
+# A project as --in gives it, or as a thread names it: a namespace (which
+# may nest) and a project, each segment as GitLab writes a path. Nothing
+# that would reach another endpoint, and no two dots in a row.
+valid_project() { [[ $1 =~ ^[A-Za-z0-9_.][A-Za-z0-9_.-]*(/[A-Za-z0-9_.][A-Za-z0-9_.-]*)+$ ]] && [[ $1 != *..* ]]; }
+
+# A username as GitLab writes one, for the assignee.
+valid_user() { [[ $1 =~ ^[A-Za-z0-9_.][A-Za-z0-9_.-]*$ ]] && [[ $1 != *..* ]]; }
+
+# split <thread>: the project, the kind and the number a thread names, or
+# why it is no thread. pid is the project as the API takes it in a path,
+# its slashes encoded.
+split() {
+  # valid_project matches too, and BASH_REMATCH is the last match's: keep
+  # this one's parts first.
+  if [[ $1 =~ ^(.+)([#!])([1-9][0-9]*)$ ]]; then
+    local p=${BASH_REMATCH[1]} sep=${BASH_REMATCH[2]} num=${BASH_REMATCH[3]}
+    if valid_project "$p"; then
+      project=$p
+      n=$num
+      if [ "$sep" = '!' ]; then kind=merge_requests; else kind=issues; fi
+      pid=${project//\//%2F}
+      return 0
+    fi
+  fi
+  echo "thread $1: want group/project#number for an issue or group/project!number for a merge request" >&2
+  return 1
+}
+
+# literal <text>: the text as GitLab will keep it. When GitLab saves a note
+# or an issue's description it runs a line that starts with a slash as a
+# quick action (/close, /assign, /approve and the rest) and drops the line
+# from the text, so what an agent quoted could close, assign or approve as
+# the yard. A leading space on such a line renders the same and runs
+# nothing. GitLab takes the carriage returns out itself, and a line that
+# one hid the slash on would start with it then, so they go first. The
+# trailing newlines go with the substitution; GitLab strips them anyway.
+literal() {
+  local s
+  s=$(printf '%s' "$1" | tr -d '\r' | sed -e 's|^/| /|')
+  printf '%s' "$s"
+}
+
+# noteurl is the jq function that makes a note's URL: GitLab's answers
+# carry none, but the address of the thread and the id make it. It reads
+# $web, $project, $kind and $n, which each program is given as --arg.
+noteurl='def noteurl($id): if ($id | tostring) == "" or $web == "" then "" else "\($web)/\($project)/-/\($kind)/\($n)#note_\($id)" end;'
+
+case "$1" in
+reply) # GitLab takes no client-chosen id, so the key goes into the body
+  # as a marker that renders as nothing. A note on an issue or merge
+  # request is not threaded, so the parent is left out: every reply is
+  # top-level.
+  thread=$(arg thread)
+  body=$(arg body)
+  key=$(arg key)
+  split "$thread" || exit 1
+  body=$(literal "$body")
+  [ -n "$key" ] && body="$body
+
+<!-- yardr-reply $key -->"
+  note=$(printf '%s' "$body" | jq -Rsc '{body: .}')
+  api POST "$base/projects/$pid/$kind/$n/notes" "$note" |
+    jq -c --arg web "$web" --arg project "$project" --arg kind "$kind" --arg n "$n" \
+      "$noteurl"'((.id // "") | tostring) as $id | {id: $id} + (noteurl($id) as $u | if $u == "" then {} else {url: $u} end)' ;;
+
+posted) # {} for none: a retry asks before it posts, so nothing is posted twice
+  thread=$(arg thread)
+  key=$(arg key)
+  split "$thread" || exit 1
+  pages "$base/projects/$pid/$kind/$n/notes?sort=asc&order_by=created_at" |
+    jq -c --arg m "<!-- yardr-reply $key -->" --arg web "$web" --arg project "$project" --arg kind "$kind" --arg n "$n" \
+      "$noteurl"'[.[] | select((.system // false) | not) | select((.body // "") | contains($m))][0]
+       | if . == null then {}
+         else ((.id // "") | tostring) as $id | {id: $id} + (noteurl($id) as $u | if $u == "" then {} else {url: $u} end) end' ;;
+
+read) # every page, oldest first. A system note ("closed", "changed the
+  # description") is GitLab's record of what happened, not a comment.
+  thread=$(arg thread)
+  split "$thread" || exit 1
+  pages "$base/projects/$pid/$kind/$n/notes?sort=asc&order_by=created_at" |
+    jq -c --arg web "$web" --arg project "$project" --arg kind "$kind" --arg n "$n" \
+      "$noteurl"'{messages: [.[] | select((.system // false) | not) | ((.id // "") | tostring) as $id | {id: $id, parent: "",
+        author: {id: ((.author.username // "") | ascii_downcase), name: (.author.username // "")},
+        at: (.created_at // "0001-01-01T00:00:00Z"), body: (.body // ""), url: noteurl($id)}]}' ;;
+
+open) # GitLab takes no client-chosen id, so the key goes into the
+  # description as a marker. The thread is named by the project's path as
+  # GitLab spells it (the answer's references.full), which may differ in
+  # case from what was typed. An assignee is a username, which GitLab
+  # takes as an id, so it is looked up first.
+  into=$(arg in)
+  title=$(arg title)
+  body=$(arg body)
+  key=$(arg key)
+  assignee=$(arg assignee)
+  valid_project "$into" || {
+    echo "--in $into: want group/project" >&2
+    exit 1
+  }
+  if [ -n "$assignee" ] && ! valid_user "$assignee"; then
+    echo "assignee $assignee: want a GitLab username" >&2
+    exit 1
+  fi
+  body=$(literal "$body")
+  if [ -n "$key" ]; then
+    marker="<!-- yardr-thread $key -->"
+    if [ -z "${body//[[:space:]]/}" ]; then
+      body=$marker
+    else
+      body="$body
+
+$marker"
+    fi
+  fi
+  data=$(printf '%s' "$body" | jq -Rsc --arg t "$title" '{title: $t, description: .}')
+  if [ -n "$assignee" ]; then
+    # The user is looked up by name; a name GitLab does not know, or knows
+    # as another, assigns nobody, so it is no issue to open.
+    uid=$(api GET "$base/users?username=$assignee" |
+      jq -r --arg a "$assignee" '[.[] | select((.username // "" | ascii_downcase) == ($a | ascii_downcase))][0].id // empty') || exit 1
+    [ -n "$uid" ] || {
+      echo "assignee $assignee: GitLab knows no such user" >&2
+      exit 1
+    }
+    data=$(jq -c --argjson u "$uid" '. + {assignee_id: $u}' <<<"$data")
+  fi
+  api POST "$base/projects/${into//\//%2F}/issues" "$data" |
+    jq -c --arg in "$into" --arg a "$assignee" '
+      if (.iid // 0) <= 0 then error("the answer names no issue") else . end
+      | if $a != "" and ([.assignees[]?.username? | ascii_downcase] | index($a | ascii_downcase)) == null
+        then error("issue was created, but GitLab did not assign \($a); the account may not be allowed to assign in this project")
+        else . end
+      | ((.references.full // "") | split("#")[0]) as $full
+      | (if $full != "" then $full else $in end) as $project
+      | {id: "\($project)#\(.iid)", title: (.title // ""), url: (.web_url // "")}' ;;
+
+opened) # posted's sibling for an open whose answer was lost: the key is
+  # carried in the description's marker. Newest first, bounded by since
+  # where the attempt was put on record (a minute earlier, for clocks that
+  # disagree); issues the bound leaves out cannot be it.
+  into=$(arg in)
+  key=$(arg key)
+  since=$(arg since)
+  valid_project "$into" || {
+    echo "--in $into: want group/project" >&2
+    exit 1
+  }
+  q="state=all&order_by=created_at&sort=desc"
+  if [[ $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+    since=$(TZ=UTC jq -n -r --arg s "$since" \
+      'try ((($s | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) - 60 | strftime("%Y-%m-%dT%H:%M:%SZ"))) catch $s')
+    q="$q&created_after=$since"
+  fi
+  pages "$base/projects/${into//\//%2F}/issues?$q" |
+    jq -c --arg m "<!-- yardr-thread $key -->" --arg in "$into" '
+      [.[] | select((.description // "") | contains($m))][0]
+      | if . == null then {}
+        else ((.references.full // "") | split("#")[0]) as $full
+             | (if $full != "" then $full else $in end) as $project
+             | {id: "\($project)#\(.iid)", title: (.title // ""), url: (.web_url // "")}
+        end' ;;
+
+state) # started is open, done is closed, for an issue and for a merge
+  # request. A merge request that is merged has said all that done can
+  # say, and is not reopened. A label:<name> adds the label, to a merge
+  # request too, and nothing is ever removed.
+  thread=$(arg thread)
+  state=$(arg state)
+  forward=$(arg forward)
+  split "$thread" || exit 1
+  # The word first: nothing is asked of GitLab for one it has no status for.
+  case "$state" in
+  label:*)
+    want=label
+    name=${state#label:}
+    [ -n "$name" ] || {
+      echo "\"$state\" is no label: want label:<name>" >&2
+      exit 1
+    }
+    # The API takes labels as one comma-separated string.
+    case "$name" in
+    *,*)
+      echo "\"$name\" is no label GitLab can add by name: it has a comma" >&2
+      exit 1
+      ;;
+    esac
+    ;;
+  started) want=opened ;;
+  done) want=closed ;;
+  review)
+    echo "an issue or merge request has no review status: the states it has are started and done" >&2
+    exit 1
+    ;;
+  *)
+    echo "\"$state\" is no state here: want started, done" >&2
+    exit 1
+    ;;
+  esac
+  item=$(api GET "$base/projects/$pid/$kind/$n") || exit 1
+  # now is GitLab's word for where it stands: opened, closed, and for a
+  # merge request merged, or locked while it is being merged.
+  now=$(jq -r '.state // ""' <<<"$item")
+  case "$now" in
+  opened | closed | merged | locked) ;;
+  *)
+    echo "the answer names no state for $thread" >&2
+    exit 1
+    ;;
+  esac
+  if [ "$want" = label ]; then
+    # A label has no order to stand in: it is added wherever the issue
+    # or merge request stands, unless it is there.
+    has=$(jq -r --arg l "$name" '[.labels[]? | select(type == "string")] | map(select(ascii_downcase == ($l | ascii_downcase))) | .[0] // ""' <<<"$item")
+    if [ -n "$has" ]; then
+      jq -n -c --arg s "labeled $has" '{status: $s, moved: false}'
+      exit 0
+    fi
+    api PUT "$base/projects/$pid/$kind/$n" "$(jq -n -c --arg l "$name" '{add_labels: $l}')" >/dev/null || exit 1
+    jq -n -c --arg s "labeled $name" '{status: $s, moved: true}'
+    exit 0
+  fi
+  # standing: opened stands at started; closed, merged and locked have all
+  # that done can say.
+  if [ "$now" = opened ]; then standing=started; else standing="done"; fi
+  if [ "$forward" = true ]; then
+    # A stage map's move, which never moves backwards: an opened one
+    # stands at started, which is all that can be said of it, and a closed
+    # or merged one is never reopened.
+    if [ "$state" = started ] || [ "$standing" = "done" ]; then
+      jq -n -c --arg s "$now" '{status: $s, moved: false}'
+      exit 0
+    fi
+  elif [ "$now" = "$want" ] || { [ "$want" = closed ] && { [ "$now" = merged ] || [ "$now" = locked ]; }; }; then
+    # thread state moves exactly: only a thread already in the status
+    # stays. A merge request that is merged, or locked for merging, is past
+    # closed.
+    jq -n -c --arg s "$now" '{status: $s, moved: false}'
+    exit 0
+  elif [ "$want" = opened ] && { [ "$now" = merged ] || [ "$now" = locked ]; }; then
+    echo "$thread is $now, and a merge request that is $now is not reopened" >&2
+    exit 1
+  fi
+  if [ "$want" = closed ]; then event=close; else event=reopen; fi
+  moved=$(api PUT "$base/projects/$pid/$kind/$n" "$(jq -n -c --arg e "$event" '{state_event: $e}')") || exit 1
+  # An answer that says it is not where it was sent is no move.
+  [ "$(jq -r '.state // ""' <<<"$moved")" = "$want" ] || {
+    echo "GitLab answered, but $thread is not $want" >&2
+    exit 1
+  }
+  jq -n -c --arg s "$want" --arg was "$now" '{status: $s, moved: true, was: $was}' ;;
+
+*) echo "unknown: $1" >&2; exit 2 ;;
+esac

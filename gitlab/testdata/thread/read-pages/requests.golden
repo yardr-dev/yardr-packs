@@ -1,0 +1,6 @@
+GET https://gitlab.com/api/v4/projects/Acme%2FShed/issues/7/notes?sort=asc&order_by=created_at&per_page=100&page=1
+  config: header = "PRIVATE-TOKEN: <token>"
+
+GET https://gitlab.com/api/v4/projects/Acme%2FShed/issues/7/notes?sort=asc&order_by=created_at&per_page=100&page=2
+  config: header = "PRIVATE-TOKEN: <token>"
+
