@@ -25,6 +25,14 @@
 # and for all of them that the secret is in no output and in no argument
 # of curl or jq, that no file was written, and that the script gave curl
 # no option that would override a proxy or CA variable.
+#
+# The grant. The commands SETUP.md teaches for granting the source (step
+# 8's, and the --run of the card for a later grantee) are read out of
+# SETUP.md and run as written against the yardr on PATH, in a scratch
+# yard with the pack applied from its directory, as step 6 says. Each
+# must be accepted: yardr takes --preset only for a pack inside its own
+# binary, so a SETUP that teaches it fails here and yardr says why.
+# Without yardr the grant is not tried, and the test says so.
 set -u
 pack=$(cd "$(dirname "$0")" && pwd)
 cd "$pack" || exit 1
@@ -37,7 +45,22 @@ if [ "$(jq -nr '"é &" | @uri')" != "%C3%A9%20%26" ] || [ "$(jq -nr '"ab" | gsub
 fi
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/microsoft-test.XXXXXX") || exit 1
-trap 'rm -rf "${tmp:?}"' EXIT
+# The grant's scratch yard (below) is made when its turn comes, and has a
+# server that its first command starts and that would outlive the
+# directory it owns: stop it first. core is empty until then, whatever the
+# environment holds.
+core=
+# The trap runs this, which shellcheck does not see in a script that ends
+# in exit.
+# shellcheck disable=SC2329
+cleanup() {
+  if [ -n "${core:-}" ]; then
+    yrun server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
 # yaml2json <file> writes the file, read as YAML, as JSON on stdout.
@@ -278,6 +301,50 @@ if [ "$mint_bad" = 0 ]; then
 else
   echo "test: mint failed in $mint_bad of $ncases cases"
   fail=1
+fi
+
+# ---- the grant ------------------------------------------------------------
+
+# The commands are read out of SETUP.md, not copied here: a copy would pass
+# whatever SETUP teaches, and SETUP once taught --preset, which yardr
+# refuses for a pack applied from a directory. The scratch yard is under a
+# short path (a unix socket's path is held to 100 bytes), and each command
+# of it runs with an environment of its own home and a system PATH, so none
+# of this session's YARDR_* variables lead back to a real yard. It starts
+# no agent, and its server listens on a unix socket alone. The card of
+# SETUP.md grants the group reviewers, which a fresh yard has none of.
+grep -o 'source grant [^`"]*' SETUP.md > "$tmp/grants"
+if [ ! -s "$tmp/grants" ]; then
+  echo "test: grant failed: SETUP.md teaches no source grant command"
+  fail=1
+elif [ ! -x "$YARDR" ]; then
+  echo "test: yardr not found: the grants of SETUP.md were not tried"
+else
+  yrun() { env -i HOME="$core/h" PATH=/usr/bin:/bin "$YARDR" --home "$core/y" --actor tester "$@"; }
+  core=$(mktemp -d /tmp/microsoftt.XXXXXX) || exit 1
+  mkdir -p "$core/h"
+  if ! yrun init --harness claude --operator tester > "$core/out" 2>&1; then
+    echo "test: grant failed: the scratch yard could not be made: $(tail -c 300 "$core/out")"
+    fail=1
+  elif ! yrun pack apply "$pack" --yes > "$core/out" 2>&1; then
+    echo "test: grant failed: the pack did not apply from its directory: $(tail -c 300 "$core/out")"
+    fail=1
+  elif ! yrun group add reviewers --runner manual > "$core/out" 2>&1; then
+    echo "test: grant failed: the group of the card could not be made: $(tail -c 300 "$core/out")"
+    fail=1
+  else
+    while IFS= read -r cmd; do
+      # A grant is plain words, so $cmd is split on purpose. Its stdin is
+      # /dev/null so that it cannot read the rest of the list.
+      # shellcheck disable=SC2086
+      if yrun $cmd < /dev/null > "$core/out" 2>&1; then
+        echo "test: grant ok (yardr $cmd)"
+      else
+        echo "test: grant failed: yardr refused 'yardr $cmd', which SETUP.md teaches: $(tail -c 300 "$core/out")"
+        fail=1
+      fi
+    done < "$tmp/grants"
+  fi
 fi
 
 exit $fail

@@ -159,6 +159,14 @@ it checks that no file was written. The golden secret has an ampersand,
 angle brackets, quotes, a backslash, a plus, a slash, a percent sign, a
 space and non-ASCII characters in it.
 
+For the grant, the test reads the `source grant` commands SETUP.md
+teaches (step 8's, and the `--run` of its card) and runs each as written
+against the yardr on PATH, in a scratch yard of its own with the pack
+applied from its directory, as step 6 says. Each must be accepted. yardr
+takes `--preset` only for a pack inside its own binary, so a SETUP that
+teaches it fails there, with yardr's reason. Without a yardr the test
+says so and goes on.
+
 `render.jq` follows `call.go` as read, not a capture from a running
 yard, so its fidelity is the reading's. The first live run is the check
 on it.

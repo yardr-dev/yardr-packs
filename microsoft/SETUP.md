@@ -132,11 +132,11 @@ lists for it, and the app then reads the whole tenant.
    or group read everything the app may read. Grant it to those who need
    it:
    ```sh
-   yardr source grant microsoft --preset read --crew yardmaster
+   yardr source grant microsoft read --crew yardmaster
    ```
    A grantee who comes later gets one card:
    ```sh
-   yardr bead ask <bead> "Let the reviewers read Microsoft documents" --run "source grant microsoft --preset read --group reviewers" --context "The reviewers read the team's documents to check a bead's work; the card names each call it covers."
+   yardr bead ask <bead> "Let the reviewers read Microsoft documents" --run "source grant microsoft read --group reviewers" --context "The reviewers read the team's documents to check a bead's work; the card names each call it covers."
    ```
    One caller may make 60 calls of a source in an hour, and an agent
    that walks a library folder by folder uses them quickly. The
