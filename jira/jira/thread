@@ -1,0 +1,275 @@
+#!/bin/bash
+# thread: what the yard does in a Jira issue: reply, posted, read, open,
+# opened, state. One JSON object on stdin, one on stdout, as the thread key
+# of the declaration says. JIRA_AUTH (the Basic credential jira/mint made
+# from the account's email and API token) and YARDR_SOURCE_BASE, the
+# declaration's base, are in the environment. Needs curl and jq.
+#
+# A thread is an issue, named by its key (SHED-7). Jira takes no id of
+# ours for a comment or an issue, so the key a reply or an open is given
+# goes in as an entity property, `yardr.key`, in the same request that
+# makes the comment or the issue: posted and opened read it back, which
+# is how a retry finds what a lost answer left, and the property shows
+# on no page.
+set -euo pipefail
+in=$(cat)
+arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# The shipped base is no site, and nothing is sent to it: the operator
+# writes their own into the yard's copy of the declaration, and a pack
+# applied again puts this one back. (${VAR:?} is not used for what follows:
+# bash 3.2 exits 0 after it prints.)
+case ${YARDR_SOURCE_BASE:-} in
+https://example.atlassian.net | https://example.atlassian.net/)
+  echo "the jira source's base is still the pack's placeholder, https://example.atlassian.net: put your site's address in the yard's copy of jira.yaml (SETUP.md, step 2)" >&2
+  exit 1 ;;
+esac
+[ -n "${YARDR_SOURCE_BASE:-}" ] || { echo "YARDR_SOURCE_BASE is not set" >&2; exit 1; }
+[ -n "${JIRA_AUTH:-}" ] || { echo "JIRA_AUTH is not set: the account's JIRA_EMAIL and JIRA_API_TOKEN go in the crew member's env file (SETUP.md)" >&2; exit 1; }
+base=${YARDR_SOURCE_BASE%/}
+
+# jira_error: what Jira said, in a line, from the answer in $tmp/out. An
+# answer that is not JSON is not Jira's: a wrong base answers so.
+# Errors can echo user-authored text; remove terminal controls and flatten it
+# before it reaches stderr.
+jira_error() {
+  jq -r '[(.errorMessages // [])[], ((.errors // {}) | to_entries[] | "\(.key): \(.value)")] | join("; ") | gsub("\u001b\\[[0-?]*[ -/]*[@-~]"; "") | gsub("[[:cntrl:]]"; " ") | gsub("[[:space:]]+"; " ") | if . == "" then "no message" else . end' "$tmp/out" 2>/dev/null \
+    || echo "an answer that is not Jira's (is the base the site's address?)"
+}
+
+# api <method> <path> [json body]: the answer's body, or the failure on
+# stderr. The credential goes to curl as a config line on its stdin,
+# written by the shell itself: an argument can be read by every process on
+# the machine while curl runs. -q first, so no .curlrc of the operator's
+# can trace the header into an error.
+api() {
+  local m=$1 u=$base$2 code msg
+  if [ $# -ge 3 ]; then
+    code=$(printf 'header = "Authorization: Basic %s"\n' "$JIRA_AUTH" \
+      | curl -q -sS -o "$tmp/out" -w '%{http_code}' -K - -X "$m" "$u" \
+        -H 'Accept: application/json' -H 'Content-Type: application/json' -d "$3") || {
+      echo "could not reach $base (curl exit $?)" >&2
+      return 1
+    }
+  else
+    code=$(printf 'header = "Authorization: Basic %s"\n' "$JIRA_AUTH" \
+      | curl -q -sS -o "$tmp/out" -w '%{http_code}' -K - -X "$m" "$u" \
+        -H 'Accept: application/json') || {
+      echo "could not reach $base (curl exit $?)" >&2
+      return 1
+    }
+  fi
+  if [ "${code:0:1}" != 2 ]; then
+    msg=$(jira_error)
+    echo "$m $2: HTTP $code: ${msg//"$JIRA_AUTH"/[credential redacted]}" >&2
+    return 1
+  fi
+  cat "$tmp/out"
+}
+
+# site: the site's own address, which browse links are on. Under a scoped
+# token the base is Atlassian's gateway, and the site names itself.
+site() {
+  local s
+  # bash clears -e inside a command substitution, so the failure is passed on
+  # here, and api's message is the only one.
+  s=$(api GET /rest/api/3/serverInfo | jq -r '(.displayUrl // .baseUrl // "") | sub("/+$"; "")') || return 1
+  [ -n "$s" ] || { echo "Jira's serverInfo names no site address" >&2; return 1; }
+  printf '%s' "$s"
+}
+
+# An issue as a thread is its key, and nothing that would reach another
+# endpoint.
+valid_thread() {
+  [[ $1 =~ ^[A-Za-z][A-Za-z0-9_]*-[0-9]+$ ]] || { echo "thread $1: want an issue key (SHED-7)" >&2; return 1; }
+}
+
+# Text to ADF, Atlassian Document Format, which v3 takes in place of a
+# string: a paragraph at each blank line, a line break at each other. And
+# ADF back to text, a timestamp to RFC 3339, and the newest messages that
+# fit a command's 64 KB answer.
+lib='
+def adf:
+  gsub("\r\n?"; "\n") as $t
+  | [ $t | splits("\n{2,}") | gsub("^\n+|\n+$"; "") | select(test("\\S")) ] as $paras
+  | { type: "doc", version: 1,
+      content: ( if ($paras | length) == 0 then [{type: "paragraph"}]
+                 else [ $paras[] | split("\n") as $lines
+                        | { type: "paragraph",
+                            content: [ range(0; $lines | length) as $n
+                                       | (if $n > 0 then {type: "hardBreak"} else empty end),
+                                         (if $lines[$n] == "" then empty else {type: "text", text: $lines[$n]} end) ] } ] end ) };
+def adf_text:
+  if type == "string" then .
+  elif type != "object" then ""
+  elif .type == "text" then (.text // "")
+  elif .type == "hardBreak" then "\n"
+  elif .type == "mention" then (.attrs.text // "")
+  elif .type == "emoji" then (.attrs.text // .attrs.shortName // "")
+  elif .type == "inlineCard" or .type == "blockCard" then (.attrs.url // "")
+  elif (.type | IN("paragraph", "heading", "codeBlock")) then ([.content[]? | adf_text] | join(""))
+  else ([.content[]? | adf_text] | join("\n")) end;
+def rfc3339: sub("(?<h>[+-][0-9]{2})(?<m>[0-9]{2})$"; "\(.h):\(.m)");
+def fit($max):
+  . as $m
+  | [$m[] | (tojson | utf8bytelength) + 1] as $sz
+  | ( reduce range(($m | length) - 1; -1; -1) as $i ({sum: 0, from: ($m | length), full: false};
+        if .full then . elif .sum + $sz[$i] > $max then .full = true else .sum += $sz[$i] | .from = $i end) ) as $r
+  | $m[$r.from:];
+'
+
+case "$1" in
+reply) # comments are not threaded in Jira, so the parent is left out
+  thread=$(arg thread)
+  key=$(arg key)
+  valid_thread "$thread"
+  s=$(site)
+  api POST "/rest/api/3/issue/$thread/comment" \
+    "$(jq -c --arg k "$key" "$lib"'{body: (.body | adf)} + (if $k != "" then {properties: [{key: "yardr.key", value: $k}]} else {} end)' <<<"$in")" |
+    jq -c --arg s "$s" --arg t "$thread" '{id: (.id | tostring), url: "\($s)/browse/\($t)?focusedCommentId=\(.id)"}' ;;
+
+posted) # {} for none: a retry asks before it posts, so nothing is posted twice.
+  # Newest comments first, a page at a time, each page's properties read
+  # in one request: ours is among the latest.
+  thread=$(arg thread)
+  key=$(arg key)
+  valid_thread "$thread"
+  s=$(site)
+  start=0
+  found=
+  while [ -n "$key" ]; do
+    page=$(api GET "/rest/api/3/issue/$thread/comment?orderBy=-created&startAt=$start&maxResults=100")
+    n=$(jq '.comments | length' <<<"$page")
+    [ "$n" -gt 0 ] || break
+    found=$(api POST "/rest/api/3/comment/list?expand=properties" \
+      "$(jq -c '{ids: [.comments[].id | tonumber]}' <<<"$page")" |
+      jq -r --arg k "$key" '[.values[]? | select(any(.properties[]?; .key == "yardr.key" and .value == $k)) | .id | tostring][0] // empty')
+    [ -z "$found" ] || break
+    start=$((start + n))
+    [ "$start" -lt "$(jq '.total // 0' <<<"$page")" ] || break
+  done
+  if [ -n "$found" ]; then
+    jq -nc --arg id "$found" --arg u "$s/browse/$thread?focusedCommentId=$found" '{id: $id, url: $u}'
+  else
+    printf '%s' '{}'
+  fi ;;
+
+read) # every page, oldest first
+  thread=$(arg thread)
+  valid_thread "$thread"
+  s=$(site)
+  start=0
+  : >"$tmp/comments"
+  while :; do
+    page=$(api GET "/rest/api/3/issue/$thread/comment?orderBy=created&startAt=$start&maxResults=100")
+    jq -c '.comments[]?' <<<"$page" >>"$tmp/comments"
+    n=$(jq '.comments | length' <<<"$page")
+    start=$((start + n))
+    { [ "$n" -gt 0 ] && [ "$start" -lt "$(jq '.total // 0' <<<"$page")" ]; } || break
+  done
+  jq -cs --arg s "$s" --arg t "$thread" "$lib"'
+    {messages: ([.[] | {id: (.id | tostring), parent: "",
+        author: {id: (.author.accountId // ""), name: (.author.displayName // "")},
+        at: ((.created // "0001-01-01T00:00:00Z") | rfc3339), body: (.body | adf_text),
+        url: "\($s)/browse/\($t)?focusedCommentId=\(.id)"}] | fit(60000))}' "$tmp/comments" ;;
+
+open) # the project is given by its key. An issue type is needed: Task where
+  # the project has one, else its first ordinary type. An assignee is an
+  # account id.
+  into=$(arg in | tr '[:lower:]' '[:upper:]')
+  key=$(arg key)
+  assignee=$(arg assignee)
+  [[ $into =~ ^[A-Z][A-Z0-9_]*$ ]] || { echo "--in $(arg in): want a project key (SHED)" >&2; exit 1; }
+  s=$(site)
+  itype=$(api GET "/rest/api/3/issue/createmeta/$into/issuetypes?maxResults=200" | jq -r '
+    [(.issueTypes // .createMetaIssueType // [])[] | select(.subtask != true)] as $t
+    | ( [$t[] | select(.name | ascii_downcase == "task")][0]
+        // [$t[] | select((.hierarchyLevel // 0) == 0)][0] // $t[0] ) | .id // empty')
+  [ -n "$itype" ] || { echo "project $into has no issue type to open an issue as" >&2; exit 1; }
+  title=$(jq -r '.title | gsub("[\r\n]+"; " ") | .[0:255]' <<<"$in")
+  api POST /rest/api/3/issue \
+    "$(jq -c --arg p "$into" --arg t "$itype" --arg k "$key" --arg a "$assignee" --arg title "$title" "$lib"'
+      { fields: ( {project: {key: $p}, issuetype: {id: $t}, summary: $title}
+                  + (if (.body // "") | test("\\S") then {description: (.body | adf)} else {} end)
+                  + (if $a != "" then {assignee: {accountId: $a}} else {} end) ) }
+      + (if $k != "" then {properties: [{key: "yardr.key", value: $k}]} else {} end)' <<<"$in")" |
+    jq -c --arg s "$s" --arg title "$title" '{id: .key, title: $title, url: "\($s)/browse/\(.key)"}' ;;
+
+opened) # posted's sibling for an open whose answer was lost: one search for
+  # what this account made in the project since the attempt was put on
+  # record (a minute earlier, for clocks that disagree), asking for the
+  # key's property. The search lags the write by a few seconds: an attempt
+  # run again within them may not find what is there.
+  into=$(arg in | tr '[:lower:]' '[:upper:]')
+  key=$(arg key)
+  since=$(arg since)
+  [[ $into =~ ^[A-Z][A-Z0-9_]*$ ]] || { echo "--in $(arg in): want a project key (SHED)" >&2; exit 1; }
+  if [ -z "$key" ]; then
+    printf '%s' '{}'
+    exit 0
+  fi
+  s=$(site)
+  mins=$(jq -nr --arg s "$since" '
+    ( try ((now - ($s | sub("\\.[0-9]+"; "") | sub("[+-]00:00$"; "Z") | fromdateiso8601)) / 60 | ceil + 2) catch 1440 )
+    | if . < 2 then 2 else . end')
+  api POST /rest/api/3/search/jql \
+    "$(jq -nc --arg q "project = \"$into\" AND creator = currentUser() AND created >= -${mins}m ORDER BY created DESC" \
+      '{jql: $q, maxResults: 50, fields: ["summary"], properties: ["yardr.key"]}')" |
+    jq -c --arg k "$key" --arg s "$s" '
+      [.issues[]? | select(((.properties // {}) | if type == "array" then (map(select(.key == "yardr.key")) | .[0].value) else ."yardr.key" end) == $k)][0]
+      | if . == null then {} else {id: .key, title: (.fields.summary // ""), url: "\($s)/browse/\(.key)"} end' ;;
+
+state) # started, review or done: Jira moves an issue by a transition, not by
+  # naming a status, and the ones it may take depend on where it stands. A
+  # status is read by its category (new, indeterminate, done), which every
+  # workflow has. review is the started status whose name says review,
+  # else any started one; done is a done status that is not a way of not
+  # doing it (won't do, cancelled, duplicate).
+  thread=$(arg thread)
+  want=$(arg state)
+  forward=$(arg forward)
+  valid_thread "$thread"
+  case $want in
+  started | review | done) ;;
+  *)
+    echo "jira has no status for \"$want\"" >&2
+    exit 1 ;;
+  esac
+  cur=$(api GET "/rest/api/3/issue/$thread?fields=status")
+  trans=$(api GET "/rest/api/3/issue/$thread/transitions")
+  plan=$(jq -nc --argjson cur "$cur" --argjson tr "$trans" --arg w "$want" --arg fwd "$forward" '
+    $cur.fields.status as $c
+    | ($c.statusCategory.key // "") as $ck
+    # a category of no known kind is past every status, as a canceled one is
+    | (({"new": 1, "indeterminate": 2, "done": 3})[$ck] // 4) as $cr
+    | [ $tr.transitions[]? | select(.to != null and .isAvailable != false) ] as $all
+    | [ $all[] | select(.to.statusCategory.key == "indeterminate") ] as $started
+    | [ $started[] | select(.to.name | test("\\breview"; "i")) ] as $reviewing
+    | [ $all[] | select(.to.statusCategory.key == "done"
+                        and (.to.name | test("won.?t|cancel|reject|declin|duplicate|invalid|obsolete|abandon"; "i") | not)) ] as $finishing
+    | ( if $w == "done" then $finishing[0] elif $w == "review" then ($reviewing[0] // $started[0]) else $started[0] end ) as $t
+    | ( if $w == "done" then $ck == "done"
+        elif $w == "review" then ($ck == "indeterminate" and (($c.name | test("\\breview"; "i")) or ($reviewing | length) == 0))
+        else $ck == "indeterminate" end ) as $there
+    | (if $w == "done" then 3 else 2 end) as $wr
+    | if $there or ($fwd == "true" and $cr > $wr) then {move: false, status: $c.name}
+      elif $t == null then {error: (if ($all | length) == 0 then "no transition is open to the account from \($c.name)" else "no transition from \($c.name) to a \($w) status; it may take: \([$all[].to.name] | join(", "))" end)}
+      else {move: true, id: $t.id, status: $t.to.name, was: $c.name} end')
+  if [ -n "$(jq -r '.error // empty' <<<"$plan")" ]; then
+    err=$(jq -r '.error | gsub("\u001b\\[[0-?]*[ -/]*[@-~]"; "") | gsub("[[:cntrl:]]"; " ") | gsub("[[:space:]]+"; " ")' <<<"$plan")
+    echo "$thread: $err" >&2
+    exit 1
+  fi
+  if [ "$(jq -r .move <<<"$plan")" = true ]; then
+    api POST "/rest/api/3/issue/$thread/transitions" "$(jq -nc --arg id "$(jq -r .id <<<"$plan")" '{transition: {id: $id}}')" >/dev/null
+    jq -c '{status, moved: true, was}' <<<"$plan"
+  else
+    jq -c '{status, moved: false}' <<<"$plan"
+  fi ;;
+
+*)
+  echo "unknown: $1" >&2
+  exit 2 ;;
+esac

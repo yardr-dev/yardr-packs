@@ -1,0 +1,13 @@
+=== cmd
+open
+=== in
+{"in":"shed","title":"Retries drop the last attempt","body":"Seen in the nightly run.\n\nSteps: retry twice.","key":"7c1d9e52-3b6f-4e0a-9d44-8f2a1b3c5d6e","assignee":"557058:f58131cb-b67d-43c7-b30d-6b58d40bd077"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":200,"total":5,"issueTypes":[{"id":"10005","name":"Epic","subtask":false,"hierarchyLevel":1},{"id":"10004","name":"Sub-task","subtask":true,"hierarchyLevel":-1},{"id":"10003","name":"Bug","subtask":false,"hierarchyLevel":0},{"id":"10002","name":"Task","subtask":false,"hierarchyLevel":0},{"id":"10001","name":"Story","subtask":false,"hierarchyLevel":0}]}
+=== answer_3
+201
+{"id":"10050","key":"SHED-12","self":"https://acme.atlassian.net/rest/api/3/issue/10050"}

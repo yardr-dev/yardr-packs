@@ -1,0 +1,190 @@
+{
+  "about": "Jira Cloud issues and comments. Hears an admin webhook and speaks in its issues.",
+  "base": "https://example.atlassian.net",
+  "calls": [
+    {
+      "about": "Who the credential acts as.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "accountId",
+          "displayName",
+          "emailAddress",
+          "accountType",
+          "active"
+        ]
+      },
+      "kind": "read",
+      "name": "viewer",
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/myself"
+      }
+    },
+    {
+      "about": "Read one issue by its key, with its comments.",
+      "answer": {
+        "max": 1048576,
+        "select": [
+          "id",
+          "key",
+          "fields"
+        ]
+      },
+      "kind": "read",
+      "name": "issue",
+      "params": [
+        {
+          "log": true,
+          "max": 40,
+          "name": "key",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*-[0-9]+$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/3/issue/{key}",
+        "query": [
+          {
+            "key": "fields",
+            "value": "summary,status,issuetype,project,priority,assignee,reporter,labels,created,updated,resolution,description,comment"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Search issues by JQL, a page at a time.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "issues",
+          "nextPageToken",
+          "isLast"
+        ]
+      },
+      "kind": "read",
+      "name": "search",
+      "params": [
+        {
+          "max": 2000,
+          "name": "jql",
+          "type": "string"
+        },
+        {
+          "default": 20,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 512,
+          "name": "page",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "fields": [
+            "summary",
+            "status",
+            "issuetype",
+            "project",
+            "priority",
+            "assignee",
+            "labels",
+            "updated"
+          ],
+          "jql": "{jql}",
+          "maxResults": "{limit}",
+          "nextPageToken": "{page}"
+        },
+        "method": "POST",
+        "path": "/rest/api/3/search/jql"
+      }
+    }
+  ],
+  "check": "viewer",
+  "credential": {
+    "env": "JIRA_AUTH",
+    "header": "Authorization: Basic {credential}",
+    "mint": [
+      "JIRA_EMAIL",
+      "JIRA_API_TOKEN"
+    ],
+    "mint_command": [
+      "jira/mint"
+    ],
+    "not_secret": [
+      "JIRA_EMAIL"
+    ]
+  },
+  "hear": {
+    "address": {
+      "env": ""
+    },
+    "by": "identity",
+    "field": "sender"
+  },
+  "hook": {
+    "bodies": "unique",
+    "keys": [
+      "project",
+      "issuetype",
+      "status",
+      "label",
+      "sender"
+    ],
+    "normalize": [
+      "jira/normalize"
+    ],
+    "untimed": true,
+    "verify": {
+      "delivery": {
+        "header": "X-Atlassian-Webhook-Identifier"
+      },
+      "scheme": "hmac-sha256",
+      "signature": {
+        "encoding": "hex",
+        "header": "X-Hub-Signature",
+        "prefix": "sha256="
+      },
+      "signed": "body"
+    }
+  },
+  "name": "jira",
+  "thread": {
+    "assignee": "id",
+    "open": [
+      "jira/thread",
+      "open"
+    ],
+    "opened": [
+      "jira/thread",
+      "opened"
+    ],
+    "place": "project",
+    "posted": [
+      "jira/thread",
+      "posted"
+    ],
+    "read": [
+      "jira/thread",
+      "read"
+    ],
+    "reply": [
+      "jira/thread",
+      "reply"
+    ],
+    "state": [
+      "jira/thread",
+      "state"
+    ],
+    "states": [
+      "started",
+      "review",
+      "done"
+    ]
+  }
+}

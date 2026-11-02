@@ -1,0 +1,10 @@
+=== cmd
+open
+=== in
+{"in":"SHED","title":"Nothing to open it as","body":"","key":"k-1"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":200,"total":1,"issueTypes":[{"id":"10004","name":"Sub-task","subtask":true,"hierarchyLevel":-1}]}

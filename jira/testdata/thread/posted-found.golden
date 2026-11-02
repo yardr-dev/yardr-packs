@@ -1,0 +1,17 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7/comment?orderBy=-created&startAt=0&maxResults=100
+  auth: ok
+  header: Accept: application/json
+POST https://acme.atlassian.net/rest/api/3/comment/list?expand=properties
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"ids":[10402,10400,10300]}
+--- status
+0
+--- stdout
+{"id":"10400","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10400"}
+--- stderr

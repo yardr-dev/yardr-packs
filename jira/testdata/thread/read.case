@@ -1,0 +1,13 @@
+=== cmd
+read
+=== in
+{"thread":"SHED-7"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":2,"total":3,"comments":[{"id":"10300","author":{"accountId":"5b10ac8d82e05b22cc7d4ef5","displayName":"Ada Lovelace"},"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"mention","attrs":{"id":"557058:f58131cb-b67d-43c7-b30d-6b58d40bd077","text":"@Grace Hopper"}},{"type":"text","text":" the loop is off by one"},{"type":"hardBreak"},{"type":"text","text":"see below"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"retry twice"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"watch the log"}]}]}]}]},"created":"2026-11-02T10:10:00.789-0500","updated":"2026-11-02T10:10:00.789-0500"},{"id":"10301","author":{"accountId":"557058:f58131cb-b67d-43c7-b30d-6b58d40bd077","displayName":"Grace Hopper"},"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Fixed in the branch."}]}]},"created":"2026-11-02T10:12:00.000+0000"}]}
+=== answer_3
+200
+{"startAt":2,"maxResults":2,"total":3,"comments":[{"id":"10302","author":{"accountId":"712020:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","displayName":"Ren"},"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Thanks, merged."}]}]},"created":"2026-11-02T10:30:00.000Z"}]}

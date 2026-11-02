@@ -1,0 +1,10 @@
+=== cmd
+opened
+=== in
+{"in":"SHED","key":"7c1d9e52-3b6f-4e0a-9d44-8f2a1b3c5d6e"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"isLast":true,"issues":[{"id":"10052","key":"SHED-14","fields":{"summary":"Another issue of ours"},"properties":{"yardr.key":"aaaaaaaa-0000-4000-8000-000000000000"}},{"id":"10050","key":"SHED-12","fields":{"summary":"Retries drop the last attempt"},"properties":{"yardr.key":"7c1d9e52-3b6f-4e0a-9d44-8f2a1b3c5d6e"}}]}

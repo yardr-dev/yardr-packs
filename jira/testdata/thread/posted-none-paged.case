@@ -1,0 +1,19 @@
+=== cmd
+posted
+=== in
+{"thread":"SHED-7","key":"00000000-0000-4000-8000-00000000dead"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":2,"total":3,"comments":[{"id":"10402"},{"id":"10400"}]}
+=== answer_3
+200
+{"isLast":true,"values":[{"id":"10402","properties":[{"key":"sd.public.comment","value":{"internal":true}}]},{"id":"10400","properties":[{"key":"yardr.key","value":"3f0f8b2e-6a1d-4f0e-9a52-0d4f6a1b7c11"}]}]}
+=== answer_4
+200
+{"startAt":2,"maxResults":2,"total":3,"comments":[{"id":"10300"}]}
+=== answer_5
+200
+{"isLast":true,"values":[{"id":"10300"}]}

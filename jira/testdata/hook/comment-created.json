@@ -1,0 +1,13 @@
+{"headers": {"Content-Type": ["application/json"], "X-Atlassian-Webhook-Identifier": ["6f1c2d3e-0000-4000-8000-000000000004"], "X-Hub-Signature": ["sha256=0000000000000000000000000000000000000000000000000000000000000000"]},
+ "body": {
+  "timestamp": 1762078201001,
+  "webhookEvent": "comment_created",
+  "comment": {
+   "self": "https://acme.atlassian.net/rest/api/2/issue/10042/comment/10300", "id": "10300",
+   "author": {"self": "https://acme.atlassian.net/rest/api/2/user?accountId=5b10ac8d82e05b22cc7d4ef5", "accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Ada Lovelace", "accountType": "atlassian"},
+   "body": "[~accountid:557058:f58131cb-b67d-43c7-b30d-6b58d40bd077] and [~accountid:712020:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d], the *retry loop*\nstops one short. See {{attempts}} and again [~accountid:557058:f58131cb-b67d-43c7-b30d-6b58d40bd077].",
+   "updateAuthor": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Ada Lovelace"},
+   "created": "2026-11-02T10:10:00.789+0000", "updated": "2026-11-02T10:10:00.789+0000", "jsdPublic": true},
+  "issue": {
+   "id": "10042", "self": "https://acme.atlassian.net/rest/api/2/issue/10042", "key": "SHED-7",
+   "fields": {"summary": "Retries drop the last attempt of a run", "project": {"id": "10001", "key": "SHED", "name": "Shed"}, "issuetype": {"name": "Bug"}, "status": {"name": "In Progress"}, "labels": ["retries", "nightly"]}}}}

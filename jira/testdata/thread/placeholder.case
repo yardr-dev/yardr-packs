@@ -1,0 +1,6 @@
+=== cmd
+reply
+=== base
+https://example.atlassian.net
+=== in
+{"thread":"SHED-7","parent":"","body":"hello","key":"k"}

@@ -1,0 +1,6 @@
+--- requests
+--- status
+1
+--- stdout
+--- stderr
+thread ../../rest/api/3/myself: want an issue key (SHED-7)

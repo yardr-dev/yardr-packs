@@ -1,0 +1,10 @@
+=== cmd
+state
+=== in
+{"thread":"SHED-7","state":"done","forward":false}
+=== answer_1
+200
+{"id":"10042","key":"SHED-7","fields":{"status":{"id":"10000","name":"To Do\u001b[2J\nforged log line","statusCategory":{"id":2,"key":"new","name":"To Do"}}}}
+=== answer_2
+200
+{"expand":"transitions","transitions":[]}

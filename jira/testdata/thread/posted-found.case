@@ -1,0 +1,13 @@
+=== cmd
+posted
+=== in
+{"thread":"SHED-7","key":"3f0f8b2e-6a1d-4f0e-9a52-0d4f6a1b7c11"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":100,"total":3,"comments":[{"id":"10402","body":{"type":"doc","version":1,"content":[]}},{"id":"10400"},{"id":"10300"}]}
+=== answer_3
+200
+{"isLast":true,"maxResults":1048576,"startAt":0,"total":3,"values":[{"id":"10402","properties":[]},{"id":"10400","properties":[{"key":"yardr.key","value":"3f0f8b2e-6a1d-4f0e-9a52-0d4f6a1b7c11"}]},{"id":"10300","properties":[]}]}

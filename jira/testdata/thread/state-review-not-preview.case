@@ -1,0 +1,10 @@
+=== cmd
+state
+=== in
+{"thread":"SHED-7","state":"review","forward":false}
+=== answer_1
+200
+{"id":"10042","key":"SHED-7","fields":{"status":{"id":"3","name":"In Progress","statusCategory":{"id":4,"key":"indeterminate","name":"In Progress"}}}}
+=== answer_2
+200
+{"expand":"transitions","transitions":[{"id":"15","name":"Show a preview","to":{"id":"10300","name":"Preview","statusCategory":{"id":4,"key":"indeterminate","name":"In Progress"}},"hasScreen":false,"isAvailable":true}]}

@@ -1,0 +1,14 @@
+--- requests
+GET https://api.atlassian.com/ex/jira/0a1b2c3d-1111-4222-8333-444455556666/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+POST https://api.atlassian.com/ex/jira/0a1b2c3d-1111-4222-8333-444455556666/rest/api/3/issue/SHED-7/comment
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"body":{"content":[{"content":[{"text":"On it.","type":"text"}],"type":"paragraph"}],"type":"doc","version":1},"properties":[{"key":"yardr.key","value":"9d2e7a44-0c1b-4d8e-8f55-1e2f3a4b5c6d"}]}
+--- status
+0
+--- stdout
+{"id":"10401","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10401"}
+--- stderr

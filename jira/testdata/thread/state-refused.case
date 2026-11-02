@@ -1,0 +1,13 @@
+=== cmd
+state
+=== in
+{"thread":"SHED-7","state":"started","forward":false}
+=== answer_1
+200
+{"id":"10042","key":"SHED-7","fields":{"status":{"id":"10000","name":"To Do","statusCategory":{"id":2,"key":"new","name":"To Do"}}}}
+=== answer_2
+200
+{"expand":"transitions","transitions":[{"id":"11","name":"Start progress","to":{"id":"3","name":"In Progress","statusCategory":{"id":4,"key":"indeterminate","name":"In Progress"}},"hasScreen":false,"isAvailable":true}]}
+=== answer_3
+400
+{"errorMessages":[],"errors":{"resolution":"Resolution is required."}}

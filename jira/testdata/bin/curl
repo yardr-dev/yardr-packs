@@ -1,0 +1,59 @@
+#!/bin/sh
+# A stand-in curl for the thread tests, put first on the program's PATH. It
+# answers the options jira/thread uses and no others, records each request
+# in $FAKE_LOG, and answers from the case's fixtures: the nth request gets
+# $FAKE_CASE/answer_n, whose first line is the status and the rest the body
+# (a case with none for it answers 599, and a file named curl_exit_n makes
+# the nth request fail as a refused connection does).
+#
+# The credential comes on the stdin config line, as the real program sends
+# it. The log says only whether it was the one expected ($FAKE_AUTH) and
+# whether any argument held a secret ($FAKE_SECRETS): the test fails if a
+# secret reaches an argument, and the log never holds one.
+args="$*"
+config=$(cat)
+out= fmt= method= url= body= headers=
+while [ $# -gt 0 ]; do
+  case $1 in
+  -q | -s | -S | -sS) ;;
+  -K) shift ;;
+  -o) shift; out=$1 ;;
+  -w) shift; fmt=$1 ;;
+  -X) shift; method=$1 ;;
+  -H) shift; headers="$headers  header: $1
+" ;;
+  -d) shift; body=$1 ;;
+  -*) echo "stand-in curl: no option $1" >&2; exit 2 ;;
+  *) url=$1 ;;
+  esac
+  shift
+done
+n=$(cat "$FAKE_LOG.n" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$FAKE_LOG.n"
+got=$(printf '%s\n' "$config" | sed -n 's/^header = "Authorization: \(.*\)"$/\1/p')
+if [ "$got" = "$FAKE_AUTH" ]; then auth=ok; elif [ -z "$got" ]; then auth=missing; else auth=WRONG; fi
+leak=
+for s in $FAKE_SECRETS; do
+  case $args in *"$s"*) leak="  LEAK: an argument holds a secret
+" ;; esac
+done
+{
+  printf '%s %s\n' "$method" "$url"
+  printf '  auth: %s\n' "$auth"
+  printf '%s' "$headers"
+  [ -z "$body" ] || printf '  body: %s\n' "$(printf '%s' "$body" | jq -S -c . 2>/dev/null || echo "NOT JSON")"
+  printf '%s' "$leak"
+} >>"$FAKE_LOG"
+if [ -e "$FAKE_CASE/curl_exit_$n" ]; then
+  echo "curl: (7) Failed to connect to stand-in" >&2
+  exit 7
+fi
+if [ -r "$FAKE_CASE/answer_$n" ]; then
+  status=$(sed -n 1p "$FAKE_CASE/answer_$n")
+  sed 1d "$FAKE_CASE/answer_$n" >"$out"
+else
+  status=599
+  printf '%s' '{"errorMessages":["the stand-in has no answer for this request"]}' >"$out"
+fi
+case $fmt in *'%{http_code}'*) printf '%s' "$status" ;; esac

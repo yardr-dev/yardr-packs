@@ -1,0 +1,13 @@
+# The link key for the yard's copy of jira.yaml, for an operator who wants
+# a bead to track a Jira issue. SETUP.md step 9 appends it after replacing
+# <site host> with the site's own host (acme.atlassian.net), because the
+# pack cannot name a host that is different for every yard.
+#
+# It tells yardr which addresses are Jira issues. The key stays as typed
+# (SHED-7): the issue key a webhook carries is upper case, and a link that
+# folded its case would not match the thread it belongs to.
+link:
+  host: <site host>
+  issue: '^/browse/([A-Za-z][A-Za-z0-9_]*-[0-9]+)'
+  fixed: "https://<site host>/browse/{1}"
+  thread: "{1}"

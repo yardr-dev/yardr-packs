@@ -1,0 +1,10 @@
+=== cmd
+posted
+=== in
+{"thread":"SHED-9","key":"11111111-2222-4333-8444-555555555555"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+200
+{"startAt":0,"maxResults":100,"total":0,"comments":[]}

@@ -1,0 +1,12 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-9/comment?orderBy=-created&startAt=0&maxResults=100
+  auth: ok
+  header: Accept: application/json
+--- status
+0
+--- stdout
+{}
+--- stderr

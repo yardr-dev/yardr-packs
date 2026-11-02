@@ -1,0 +1,6 @@
+--- requests
+--- status
+1
+--- stdout
+--- stderr
+the jira source's base is still the pack's placeholder, https://example.atlassian.net: put your site's address in the yard's copy of jira.yaml (SETUP.md, step 2)

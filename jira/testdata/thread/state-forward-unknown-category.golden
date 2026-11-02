@@ -1,0 +1,12 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7?fields=status
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7/transitions
+  auth: ok
+  header: Accept: application/json
+--- status
+0
+--- stdout
+{"status":"Parked","moved":false}
+--- stderr

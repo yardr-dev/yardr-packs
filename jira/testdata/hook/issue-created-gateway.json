@@ -1,0 +1,8 @@
+{"headers": {"Content-Type": ["application/json"], "X-Atlassian-Webhook-Identifier": ["6f1c2d3e-0000-4000-8000-000000000008"], "X-Hub-Signature": ["sha256=0000000000000000000000000000000000000000000000000000000000000000"]},
+ "body": {
+  "timestamp": 1762077600999,
+  "webhookEvent": "jira:issue_created",
+  "user": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Ada Lovelace"},
+  "issue": {
+   "id": "10043", "self": "https://api.atlassian.com/ex/jira/0a1b2c3d-1111-4222-8333-444455556666/rest/api/2/issue/10043", "key": "SHED-8",
+   "fields": {"summary": "No description", "project": {"key": "SHED"}, "issuetype": {"name": "Task"}, "status": {"name": "To Do"}, "assignee": null}}}}

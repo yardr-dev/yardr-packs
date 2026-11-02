@@ -1,0 +1,14 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+POST https://acme.atlassian.net/rest/api/3/issue/SHED-7/comment
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"body":{"content":[{"content":[{"text":"Looked at the retry loop.","type":"text"}],"type":"paragraph"},{"content":[{"text":"It stops one short:","type":"text"},{"type":"hardBreak"},{"text":"attempts is compared with <, not <=.","type":"text"}],"type":"paragraph"},{"content":[{"text":"Fix is in the branch.","type":"text"}],"type":"paragraph"}],"type":"doc","version":1},"properties":[{"key":"yardr.key","value":"3f0f8b2e-6a1d-4f0e-9a52-0d4f6a1b7c11"}]}
+--- status
+0
+--- stdout
+{"id":"10400","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10400"}
+--- stderr

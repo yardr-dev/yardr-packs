@@ -1,0 +1,15 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7/comment?orderBy=created&startAt=0&maxResults=100
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7/comment?orderBy=created&startAt=2&maxResults=100
+  auth: ok
+  header: Accept: application/json
+--- status
+0
+--- stdout
+{"messages":[{"id":"10300","parent":"","author":{"id":"5b10ac8d82e05b22cc7d4ef5","name":"Ada Lovelace"},"at":"2026-11-02T10:10:00.789-05:00","body":"@Grace Hopper the loop is off by one\nsee below\nretry twice\nwatch the log","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10300"},{"id":"10301","parent":"","author":{"id":"557058:f58131cb-b67d-43c7-b30d-6b58d40bd077","name":"Grace Hopper"},"at":"2026-11-02T10:12:00.000+00:00","body":"Fixed in the branch.","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10301"},{"id":"10302","parent":"","author":{"id":"712020:0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","name":"Ren"},"at":"2026-11-02T10:30:00.000Z","body":"Thanks, merged.","url":"https://acme.atlassian.net/browse/SHED-7?focusedCommentId=10302"}]}
+--- stderr

@@ -1,0 +1,17 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7?fields=status
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/SHED-7/transitions
+  auth: ok
+  header: Accept: application/json
+POST https://acme.atlassian.net/rest/api/3/issue/SHED-7/transitions
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"transition":{"id":"12"}}
+--- status
+0
+--- stdout
+{"status":"Selected","moved":true,"was":"To Do"}
+--- stderr

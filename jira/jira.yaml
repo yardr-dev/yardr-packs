@@ -1,0 +1,165 @@
+# Jira Cloud as a declared source: how the core verifies a delivery from a
+# Jira admin webhook and the command that turns it into the envelope; what
+# the yard does in a Jira issue, by one command per thing; and three reads
+# an agent may ask for. Linear's declaration (packs/linear in the yardr
+# repository) is the pattern, and Jira differs where noted.
+#
+# Checked against Atlassian's documentation and OpenAPI description on
+# 2 November 2026, and against the real yardr in a scratch yard with a
+# stand-in for Jira. Not checked against a site: a person has to make one
+# (README.md says what that leaves open).
+#
+# The name is jira: a pack is named after the service it talks to.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: jira
+about: Jira Cloud issues and comments. Hears an admin webhook and speaks in its issues.
+
+# The names of the variables, never the values. Atlassian takes an API
+# token as HTTP Basic, the base64 of "email:token". A command is handed one
+# variable and a declared call's header takes one {credential}, so the
+# email and the token are two mint inputs and jira/mint makes the one value
+# both take, JIRA_AUTH. The email is no secret, so it is asked in the
+# clear. They live in the source's env file, and in each crew member's own
+# for the thread commands. hook.normalize is handed no credential at all.
+credential:
+  env: JIRA_AUTH
+  header: "Authorization: Basic {credential}"
+  mint:
+    - name: JIRA_EMAIL
+      secret: false
+    - JIRA_API_TOKEN
+  mint_command: [jira/mint]
+
+# ---- what it sends us ----------------------------------------------------
+
+hook:
+  # Adapter.Verify stays data, checked by the core: the secret of the
+  # webhook is handed to no command, and an unverified body reaches none.
+  # Jira signs a secured admin webhook X-Hub-Signature: sha256=<hex>, the
+  # HMAC-SHA256 of the body (Atlassian's webhooks page gives a test
+  # vector, which the pack's test holds this to). Every delivery names its
+  # id in X-Atlassian-Webhook-Identifier, the same on each retry.
+  #
+  # No timestamp window. Jira retries a failed delivery up to five times,
+  # five to fifteen minutes apart, so a window narrower than an hour and a
+  # quarter would refuse a genuine retry, and a wider one stops no replay
+  # that the delivery id and the body do not.
+  verify:
+    scheme: hmac-sha256
+    signed: body
+    signature: { header: X-Hub-Signature, encoding: hex, prefix: "sha256=" }
+    delivery: { header: X-Atlassian-Webhook-Identifier }
+  # Every body names the event's time to the millisecond and its own
+  # entity, so two events never share one. Two webhooks of the site that
+  # both match, aimed at one hook, would send the same event twice: the
+  # second is dropped here.
+  bodies: unique
+  # Jira's deliveries follow issue activity, not a rhythm, so silence is never quiet.
+  untimed: true
+
+  # Adapter.Normalize. stdin {"headers":{…},"body":{…}}, stdout the
+  # envelope. The core sets source and delivery itself.
+  normalize: [jira/normalize]
+
+  # The keys its events' fields may carry: a subscription's --where may
+  # name them beside type, action, team, project, repo and label. project
+  # is the project key, status and issuetype are names, and sender is the
+  # Atlassian account id of who did it, the field the hear key below
+  # matches.
+  keys: [project, issuetype, status, label, sender]
+
+# ---- who is heard ---------------------------------------------------------
+# A delivery is kept with its speaker named where the sender is a user of
+# the yard, matched by identity: fields.sender holds the account id, which
+# normalize also sets as actor.id. The core adds fields.speaker for a kept
+# delivery (the yard user's name, or outside where the hook's --unknown
+# word allows an unmapped sender). speaker is the derived filter key for
+# this hear, and stands in no hook.keys above, which names only what
+# normalize may set.
+
+hear:
+  field: sender
+  by: identity
+
+# ---- what the yard does in its threads ------------------------------------
+# One command per thing, each handed its object on stdin and the
+# credential under JIRA_AUTH, with YARDR_SOURCE_BASE from base below.
+# jira/thread is one program. A thread is an issue, named by its key.
+# Jira takes no id of ours for a comment or an issue, so reply and open
+# carry the key as an entity property, in the request that makes the
+# thing, and posted and opened read it back: reply posts the comment (a
+# comment has no parent in Jira), posted finds what a key left ({} for
+# none), read lists the issue's comments oldest first, open makes an issue
+# in the project in, opened finds what an open left ({} for none), and
+# state takes the transition that leads to the status the word means,
+# exactly, or never backwards with forward (a stage map's move). The shapes
+# are in docs/integrations.md in the yardr repository.
+
+thread:
+  reply:  [jira/thread, reply]      # in  {thread, parent, body, key}      out {id, url}
+  posted: [jira/thread, posted]     # in  {thread, key}                    out {id, url} or {}
+  read:   [jira/thread, read]       # in  {thread}                         out {messages: [...]}
+  place:  project                   # what open's in names: a project key
+  open:   [jira/thread, open]       # in  {in, title, body, key, assignee?} out {id, title, url}
+  assignee: id                      # the assignee open takes: an account id
+  opened: [jira/thread, opened]     # in  {in, key, since?}                out {id, title, url} or {}
+  state:  [jira/thread, state]      # in  {thread, state, forward?}        out {status, moved, was?}
+  states: [started, review, done]   # the words it has a status for
+
+# ---- its issues as a bead's link ------------------------------------------
+# None. The address of a Jira issue starts with the site's own host, which a
+# file shared by every yard cannot name. link.example.yaml is the key for
+# the yard's copy of this file (SETUP.md, step 9), and the thread commands
+# give the browse address of what they touch in their answers.
+
+# ---- what an agent may ask of it, through `yardr call` --------------------
+# Declared HTTPS requests, granted one by one. A command is never something
+# an agent calls.
+#
+# base is Jira's address, and Jira is per site, so this is a placeholder
+# that SETUP.md has the operator replace in the yard's copy of this file:
+# the credential goes to the hosts a file names and to no others. A token
+# with scopes is called at https://api.atlassian.com/ex/jira/<cloud id>,
+# and one without at https://<site>.atlassian.net. A pack applied again
+# replaces the yard's copy and puts this one back (SETUP.md, step 10), and
+# the commands refuse to send anything to it.
+base: https://example.atlassian.net
+check: viewer
+calls:
+  viewer:
+    kind: read
+    about: Who the credential acts as.
+    request: { method: GET, path: /rest/api/3/myself }
+    answer: { select: [accountId, displayName, emailAddress, accountType, active] }
+  issue:
+    kind: read
+    about: Read one issue by its key, with its comments.
+    params:
+      key: { type: string, pattern: "^[A-Za-z][A-Za-z0-9_]*-[0-9]+$", max: 40, log: true }
+    request:
+      method: GET
+      path: "/rest/api/3/issue/{key}"
+      # The fields an agent reads an issue by. comment is one: its total is
+      # the count, and its comments come with it, as ADF documents. The
+      # answer is read whole, up to the 1 MiB a call may raise its bound to.
+      query: { fields: "summary,status,issuetype,project,priority,assignee,reporter,labels,created,updated,resolution,description,comment" }
+    answer: { select: [id, key, fields], max: 1048576 }
+  search:
+    kind: read
+    about: Search issues by JQL, a page at a time.
+    params:
+      jql: { type: string, max: 2000 }
+      limit: { type: int, default: 20 }
+      page: { type: string, max: 512, optional: true }   # the nextPageToken of the page before
+    # A search is a read, though Jira takes it as a POST. The old
+    # /rest/api/3/search is being removed; this is its replacement. It wants
+    # a bounded query (a clause that limits the issues, not just an order)
+    # and answers ids alone unless fields says more.
+    request:
+      method: POST
+      path: /rest/api/3/search/jql
+      body: { jql: "{jql}", maxResults: "{limit}", nextPageToken: "{page}", fields: [summary, status, issuetype, project, priority, assignee, labels, updated] }
+    answer: { select: [issues, nextPageToken, isLast], max: 262144 }

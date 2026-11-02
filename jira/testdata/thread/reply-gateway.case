@@ -1,0 +1,12 @@
+=== cmd
+reply
+=== base
+https://api.atlassian.com/ex/jira/0a1b2c3d-1111-4222-8333-444455556666
+=== in
+{"thread":"SHED-7","parent":"10300","body":"On it.","key":"9d2e7a44-0c1b-4d8e-8f55-1e2f3a4b5c6d"}
+=== answer_1
+200
+{"baseUrl":"https://acme.atlassian.net","displayUrl":"https://acme.atlassian.net","deploymentType":"Cloud","serverTitle":"Acme"}
+=== answer_2
+201
+{"self":"https://api.atlassian.com/ex/jira/0a1b2c3d-1111-4222-8333-444455556666/rest/api/3/issue/10042/comment/10401","id":"10401","created":"2026-11-02T10:21:00.000+0000"}

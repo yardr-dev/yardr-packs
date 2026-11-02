@@ -1,0 +1,6 @@
+=== cmd
+read
+=== in
+{"thread":"SHED-7"}
+=== curl_exit_1
+x

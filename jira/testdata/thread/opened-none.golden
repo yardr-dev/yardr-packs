@@ -1,0 +1,14 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+POST https://acme.atlassian.net/rest/api/3/search/jql
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"fields":["summary"],"jql":"project = \"SHED\" AND creator = currentUser() AND created >= -1440m ORDER BY created DESC","maxResults":50,"properties":["yardr.key"]}
+--- status
+0
+--- stdout
+{}
+--- stderr

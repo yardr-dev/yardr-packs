@@ -1,0 +1,3 @@
+GET /rest/api/3/myself
+  auth: ok
+  accept: application/json

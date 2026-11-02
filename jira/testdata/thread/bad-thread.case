@@ -1,0 +1,4 @@
+=== cmd
+reply
+=== in
+{"thread":"../../rest/api/3/myself","parent":"","body":"hello","key":"k"}

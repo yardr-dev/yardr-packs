@@ -1,0 +1,28 @@
+# Jira Cloud as a pack of kind source: the integration, imported into the
+# yard and into no depot. What Jira is here: an admin webhook heard as
+# issue and comment envelopes, the yard's replies, issues and status moves
+# in its issues, and two reads an agent may ask for through `yardr call`.
+# Every agent granted a call, and every crew member given the account's
+# credential, acts as that one Atlassian account.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/jira
+#
+# The source is named jira: a pack is named after the service it talks to.
+# Jira is per site, so the declaration ships a placeholder address that
+# SETUP.md has the operator replace in the yard's copy.
+name: jira
+kind: source
+setup: SETUP.md
+
+sources:
+  jira:
+    declaration: jira.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them.
+presets:
+  read:
+    about: Read an issue and its comments and search issues by JQL; change nothing
+    grants:
+      jira: [read]

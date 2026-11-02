@@ -1,0 +1,9 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+--- status
+1
+--- stdout
+--- stderr
+GET /rest/api/3/serverInfo: HTTP 404: an answer that is not Jira's (is the base the site's address?)

@@ -1,0 +1,5 @@
+{"headers": {"Content-Type": ["application/json"], "X-Atlassian-Webhook-Identifier": ["6f1c2d3e-0000-4000-8000-000000000009"], "X-Hub-Signature": ["sha256=0000000000000000000000000000000000000000000000000000000000000000"]},
+ "body": {
+  "timestamp": 1762081200005,
+  "webhookEvent": "jira:version_released",
+  "version": {"id": "10010", "name": "1.4", "released": true, "projectId": 10001}}}

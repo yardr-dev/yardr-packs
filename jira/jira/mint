@@ -1,0 +1,22 @@
+#!/bin/sh
+# mint: the credential Jira takes, from the account's email and an API
+# token. stdin {"inputs": {"JIRA_EMAIL": …, "JIRA_API_TOKEN": …}, "scope": …},
+# stdout {"token": …, "expires_at": …}, as a source's mint_command is run.
+#
+# Jira's Basic scheme is the base64 of "email:token", and a declared call's
+# header takes one value (Authorization: Basic {credential}), as a command
+# is handed one variable. So the pair is made into that value here, once,
+# for the calls and the thread commands alike. The value does not expire;
+# the hour is only how long the yard keeps it before it asks again, and a
+# new token in the env file is a new key, minted at once.
+#
+# Nothing but a fixed line reaches stderr: jq's own errors can quote the
+# value they failed on, and the value is the token. Needs jq.
+jq -c '
+  .inputs as $i
+  | if ($i.JIRA_EMAIL | type) != "string" or ($i.JIRA_API_TOKEN | type) != "string"
+       or $i.JIRA_EMAIL == "" or $i.JIRA_API_TOKEN == ""
+    then error("incomplete") else . end
+  | { token: ("\($i.JIRA_EMAIL):\($i.JIRA_API_TOKEN)" | @base64),
+      expires_at: (now + 3600 | floor | todate) }
+' 2>/dev/null || { echo "jira/mint: want JIRA_EMAIL and JIRA_API_TOKEN among the inputs" >&2; exit 1; }

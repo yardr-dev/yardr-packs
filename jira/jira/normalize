@@ -1,0 +1,121 @@
+#!/bin/sh
+# A verified Jira webhook to the yard's envelope, as Linear's is made:
+# stdin {"headers":{…},"body":{…}}, stdout the envelope. Needs jq.
+#
+# The body is an admin webhook's: {timestamp, webhookEvent, user, issue,
+# comment, changelog}. A body that is not an object is refused: a non-zero
+# exit is answered 400, and the delivery reaches no subscription. Nothing
+# of the body is ever printed to stderr.
+#
+# Vocabulary is Linear's: type issue or comment, action create, update or
+# remove (Jira's created, updated, deleted). Any other event keeps its own
+# name as the type and has no action.
+#
+# A text field is a string (wiki markup, as the webhook's REST v2 shape
+# has it) or an ADF document (Atlassian Document Format, as v3 has it): both
+# are read, since the docs name the comment's shape "as the REST API
+# returns it" without saying which. A person is mentioned by account id,
+# `[~accountid:<id>]` in a string and a mention node in ADF; the id is what
+# the envelope's mentions and its sender carry, and what hear matches.
+#
+# The actor is who did it: the delivery's user where it names one, else the
+# comment's author (its editor, for an update). A deleted comment names
+# nobody, so a delete without a user has no actor and no sender.
+#
+# The thread is the issue, named by its key. Its url is the site's browse
+# page, from the host the payload's own self names (the site itself sends
+# it); where that is Atlassian's gateway, the host of YARDR_SOURCE_BASE
+# when that is a site address, else none.
+exec jq -c '
+def str($v): if ($v | type) == "string" then $v elif $v == null then "" else ($v | tostring) end;
+# trunc is hooks.truncate: whitespace collapsed, at most 500 runes. The jq
+# POSIX space class includes the Unicode spaces split by Go strings.Fields.
+def trunc: (gsub("^[[:space:]]+|[[:space:]]+$"; "") | gsub("[[:space:]]+"; " ")) | if length > 500 then .[0:499] + "…" else . end;
+def ordered: reduce .[] as $x ([]; if any(.[]; . == $x) then . else . + [$x] end);
+
+# ADF to text: a block puts its children on lines of their own, an inline
+# node runs on.
+def adf_text:
+  if type == "string" then .
+  elif type != "object" then ""
+  elif .type == "text" then (.text // "")
+  elif .type == "hardBreak" then "\n"
+  elif .type == "mention" then (.attrs.text // "")
+  elif .type == "emoji" then (.attrs.text // .attrs.shortName // "")
+  elif .type == "inlineCard" or .type == "blockCard" then (.attrs.url // "")
+  elif (.type | IN("paragraph", "heading", "codeBlock")) then ([.content[]? | adf_text] | join(""))
+  else ([.content[]? | adf_text] | join("\n")) end;
+def text_of: if type == "object" then adf_text else str(.) end;
+
+def mentions_in($v):
+  ( [ $v | select(type == "object") | .. | objects | select(.type == "mention")
+      | .attrs.id | select(type == "string" and . != "") ]
+  + [ $v | select(type == "string") | scan("\\[~accountid:([^\\]\\s]+)\\]") | .[0] ]
+  ) | ordered;
+
+def origin($u): if ($u | type) == "string" then ($u | capture("^(?<o>https?://[^/]+)") // {o: ""} | .o) else "" end;
+# The site that sent the delivery, for browse links.
+def site($i):
+  origin($i.self) as $o
+  | if $o != "" and ($o | test("^https?://api\\.atlassian\\.com$") | not) then $o
+    else (($ENV.YARDR_SOURCE_BASE // "") | capture("^(?<o>https://[A-Za-z0-9-]+\\.atlassian\\.net)(/|$)") // {o: ""} | .o) end;
+def browse($i): site($i) as $s | if $s != "" and str($i.key) != "" then "\($s)/browse/\($i.key)" else "" end;
+
+def person($u):
+  if ($u | type) == "object"
+  then {id: str($u.accountId), name: (str($u.displayName) | if . == "" then str($u.name) else . end)}
+  else {id: "", name: ""} end;
+
+def kind($e):
+  ($e | sub("^jira:"; "")) as $n
+  | ($n | capture("^(?<t>.+)_(?<a>created|updated|deleted)$") // null) as $m
+  | if $m == null then {type: ($n | ascii_downcase), action: ""}
+    else {type: ($m.t | ascii_downcase), action: ({"created": "create", "updated": "update", "deleted": "remove"}[$m.a])} end;
+
+def fields($i; $sender):
+  ( { project:   [$i.fields.project.key],
+      issuetype: [$i.fields.issuetype.name],
+      status:    [$i.fields.status.name],
+      label:     ($i.fields.labels // []) }
+    | map_values(map(select(. != null and . != ""))) | with_entries(select(.value | length > 0)) )
+  + (if $sender != "" then {sender: [$sender]} else {} end);
+def with_fields($i):
+  (.actor.id // "") as $sender | fields($i; $sender) as $f | if ($f | length) > 0 then . + {fields: $f} else . end;
+
+def changed($p):
+  ( [ $p.changelog.items[]? | .field | select(. != null and . != "") ] | ordered | join(", ") ) as $fs
+  | if $fs != "" then ("changed " + $fs | trunc)
+    elif $p.comment != null then "commented"
+    else "" end;
+
+def main:
+(.body | if type == "object" then . else error("jira body is not an object") end) as $p
+| ($p.issue // {}) as $i
+| ($i.fields // {}) as $f
+| ($p.comment // null) as $c
+| kind(str($p.webhookEvent)) as $k
+| if $k.type == "" then error("jira delivery names no webhookEvent") else . end
+| { source: "jira", type: $k.type, action: $k.action, url: browse($i) }
+| if .type == "comment" then . +
+    { url: (if browse($i) != "" and str($c.id) != "" then "\(browse($i))?focusedCommentId=\(str($c.id))" else browse($i) end),
+      actor: person($p.user // (if $k.action == "update" then ($c.updateAuthor // $c.author)
+                                 elif $k.action == "remove" then null
+                                 else ($c.author // $c.updateAuthor) end)),
+      thread: {id: str($i.key), title: str($f.summary), url: browse($i)},
+      text: ($c.body | text_of | trunc), message: str($c.id), parent: "", entity: str($c.id),
+      mentions: mentions_in($c.body) } | with_fields($i)
+  elif .type == "issue" then . +
+    { actor: person($p.user),
+      thread: {id: str($i.key), title: str($f.summary), url: browse($i)},
+      assignee: str($f.assignee.accountId),
+      text: (if .action == "update" then changed($p) else ($f.description | text_of | trunc) end),
+      entity: str($i.id), mentions: mentions_in($f.description) } | with_fields($i)
+  else . +
+    { actor: person($p.user),
+      thread: {id: str($i.key), title: str($f.summary), url: browse($i)},
+      mentions: [] } | with_fields($i)
+  end;
+# jq quotes the value it failed on, and the body is what a stranger wrote:
+# only the messages above, which start "jira ", get out.
+try main catch ((if type == "string" and startswith("jira ") then . else "jira body is not in a shape normalize reads" end) | error)
+'

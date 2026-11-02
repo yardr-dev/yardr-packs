@@ -1,0 +1,17 @@
+--- requests
+GET https://acme.atlassian.net/rest/api/3/serverInfo
+  auth: ok
+  header: Accept: application/json
+GET https://acme.atlassian.net/rest/api/3/issue/createmeta/SHED/issuetypes?maxResults=200
+  auth: ok
+  header: Accept: application/json
+POST https://acme.atlassian.net/rest/api/3/issue
+  auth: ok
+  header: Accept: application/json
+  header: Content-Type: application/json
+  body: {"fields":{"assignee":{"accountId":"000000:not-assignable"},"issuetype":{"id":"10002"},"project":{"key":"SHED"},"summary":"Assigned to nobody who can be"},"properties":[{"key":"yardr.key","value":"k-2"}]}
+--- status
+1
+--- stdout
+--- stderr
+POST /rest/api/3/issue: HTTP 400: assignee: User '000000:not-assignable' cannot be assigned issues.
