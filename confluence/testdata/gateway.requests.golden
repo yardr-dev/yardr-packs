@@ -1,0 +1,6 @@
+GET /ex/confluence/0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/wiki/api/v2/spaces?limit=25
+  auth: ok
+  accept: application/json
+GET /ex/confluence/0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d/wiki/api/v2/pages/98404?body-format=storage
+  auth: ok
+  accept: application/json

@@ -1,0 +1,5 @@
+=== args
+search
+cql=title ~ "nothing like this"
+=== answer
+{"results":[],"start":0,"limit":25,"size":0,"_links":{"base":"https://example.atlassian.net/wiki","context":"/wiki"}}

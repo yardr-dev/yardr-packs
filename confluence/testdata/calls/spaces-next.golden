@@ -1,0 +1,32 @@
+--- requests
+GET /wiki/api/v2/spaces?cursor=eyJpZCI6MTMxMDcyLCJzcGFjZVNvcnRPcmRlciI6eyJmaWVsZCI6IklEIiwiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIn19&limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/~5b10ac8d82e05b22cc7d4ef5"
+      },
+      "authorId": "5b10ac8d82e05b22cc7d4ef5",
+      "createdAt": "2024-03-12T09:30:00.000Z",
+      "currentActiveAlias": "~5b10ac8d82e05b22cc7d4ef5",
+      "description": null,
+      "homepageId": null,
+      "icon": null,
+      "id": "196608",
+      "key": "~5b10ac8d82e05b22cc7d4ef5",
+      "name": "Ada Lovelace",
+      "spaceOwnerId": "5b10ac8d82e05b22cc7d4ef5",
+      "status": "current",
+      "type": "personal"
+    }
+  ]
+}
+--- stderr

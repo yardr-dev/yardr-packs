@@ -1,0 +1,7 @@
+=== args
+search
+cql=type = page AND space = "ENG" AND title ~ "runbook"
+limit=2
+cursor=_t_WyJcdDk4NDA0ICsyOnFYI1pBTyo3JVNkQ2I+eCBhcCJd_h_W10=
+=== answer
+{"results":[{"id":"98433","type":"page","status":"current","title":"Runbook: payments","childTypes":{},"macroRenderedOutput":{},"restrictions":{},"_expandable":{"container":"","metadata":"","extensions":"","operations":"","children":"","history":"/rest/api/content/98433/history","ancestors":"","body":"","version":"","descendants":"","space":"/rest/api/space/OPS"},"_links":{"webui":"/spaces/OPS/pages/98433/Runbook:+payments","self":"https://example.atlassian.net/wiki/rest/api/content/98433","tinyui":"/x/BIAB"}}],"start":0,"limit":2,"size":1,"_links":{"base":"https://example.atlassian.net/wiki","context":"/wiki","self":"https://example.atlassian.net/wiki/rest/api/content/search?cql=type+%3d+page"}}

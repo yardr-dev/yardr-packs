@@ -1,0 +1,5 @@
+=== args
+page
+id=98404
+=== answer
+{"parentType":"page","authorId":"5b10ac8d82e05b22cc7d4ef5","parentId":"98400","ownerId":"5b10ac8d82e05b22cc7d4ef5","lastOwnerId":null,"createdAt":"2024-03-12T09:41:07.000Z","position":12345,"version":{"number":7,"message":"","minorEdit":false,"authorId":"5b10ac8d82e05b22cc7d4ef5","createdAt":"2026-10-14T16:22:41.512Z","ncsStepVersion":"14"},"id":"98404","spaceId":"98304","body":{"storage":{"representation":"storage","value":"<h1>Runbooks</h1><p>How we run <strong>production</strong>. Start at <ac:link><ri:page ri:content-title=\"On-call rota\" /></ac:link>, the déploiements come after.</p><ac:structured-macro ac:name=\"info\" ac:schema-version=\"1\" ac:macro-id=\"3f1c2a9e-5b7d-4e21-9c0a-1d2e3f4a5b6c\"><ac:rich-text-body><p>Keep this page short &amp; current 👋</p></ac:rich-text-body></ac:structured-macro><ul><li>Deploys</li><li>Rollbacks</li></ul>"}},"status":"current","title":"Runbooks","_links":{"editui":"/pages/resumedraft.action?draftId=98404","webui":"/spaces/ENG/pages/98404/Runbooks","edituiv2":"/spaces/ENG/pages/edit-v2/98404","tinyui":"/x/BIAB","base":"https://example.atlassian.net/wiki"}}

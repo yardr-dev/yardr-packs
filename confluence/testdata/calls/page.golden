@@ -1,0 +1,37 @@
+--- requests
+GET /wiki/api/v2/pages/98404?body-format=storage
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "editui": "/pages/resumedraft.action?draftId=98404",
+    "edituiv2": "/spaces/ENG/pages/edit-v2/98404",
+    "tinyui": "/x/BIAB",
+    "webui": "/spaces/ENG/pages/98404/Runbooks"
+  },
+  "body": {
+    "storage": {
+      "representation": "storage",
+      "value": "<h1>Runbooks</h1><p>How we run <strong>production</strong>. Start at <ac:link><ri:page ri:content-title=\"On-call rota\" /></ac:link>, the déploiements come after.</p><ac:structured-macro ac:name=\"info\" ac:schema-version=\"1\" ac:macro-id=\"3f1c2a9e-5b7d-4e21-9c0a-1d2e3f4a5b6c\"><ac:rich-text-body><p>Keep this page short &amp; current 👋</p></ac:rich-text-body></ac:structured-macro><ul><li>Deploys</li><li>Rollbacks</li></ul>"
+    }
+  },
+  "id": "98404",
+  "parentId": "98400",
+  "parentType": "page",
+  "spaceId": "98304",
+  "status": "current",
+  "title": "Runbooks",
+  "version": {
+    "authorId": "5b10ac8d82e05b22cc7d4ef5",
+    "createdAt": "2026-10-14T16:22:41.512Z",
+    "message": "",
+    "minorEdit": false,
+    "ncsStepVersion": "14",
+    "number": 7
+  }
+}
+--- stderr

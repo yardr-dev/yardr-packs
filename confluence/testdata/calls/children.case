@@ -1,0 +1,6 @@
+=== args
+children
+id=98400
+limit=2
+=== answer
+{"results":[{"id":"98404","status":"current","title":"Runbooks","childPosition":1000,"type":"page"},{"id":"98411","status":"current","title":"Archive","childPosition":2000,"type":"folder"}],"_links":{"next":"/wiki/api/v2/pages/98400/direct-children?limit=2&cursor=eyJpZCI6Ijk4NDExIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=","base":"https://example.atlassian.net/wiki"}}

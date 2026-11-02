@@ -1,0 +1,3 @@
+GET /wiki/api/v2/spaces?limit=25
+  auth: ok
+  accept: application/json

@@ -1,0 +1,17 @@
+--- requests
+GET /wiki/rest/api/content/search?cql=title+~+%22nothing+like+this%22&limit=25
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "context": "/wiki"
+  },
+  "limit": 25,
+  "results": [],
+  "size": 0
+}
+--- stderr

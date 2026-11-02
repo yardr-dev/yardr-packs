@@ -1,0 +1,209 @@
+{
+  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, a page's children listed.",
+  "base": "https://example.atlassian.net/wiki",
+  "calls": [
+    {
+      "about": "List the spaces the account may see, 25 at a time. Answers each space's id, key, name, type and homepageId, the page children starts from. keys narrows it to spaces by key, as an address shows it (/spaces/ENG/...). When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "spaces",
+      "params": [
+        {
+          "log": true,
+          "max": 500,
+          "name": "keys",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/spaces",
+        "query": [
+          {
+            "key": "keys",
+            "value": "{keys}"
+          },
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Read one page by its id, which is in its address (/spaces/ENG/pages/123456/Title). Answers its title, status, spaceId, parentId, version and links, and its body in Confluence storage format, in body.storage.value, which is XHTML with Confluence's own tags and macros, markup and not text.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "id",
+          "status",
+          "title",
+          "spaceId",
+          "parentId",
+          "parentType",
+          "version",
+          "body",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "page",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/pages/{id}",
+        "query": [
+          {
+            "key": "body-format",
+            "value": "storage"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List a page's direct children, 25 at a time, in the order of the page tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed); only a page's id is taken here, so a folder's own children are not listed. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "children",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/pages/{id}/direct-children",
+        "query": [
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Find content by CQL, Confluence's query language, 25 at a time, as in type = page AND space = \"ENG\" AND title ~ \"runbook\". Answers each hit's id, type, status, title and _links.webui, which names its space. When more than limit follow, _links.next is in the answer, and its cursor= value, percent-decoded, is the next call's cursor.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "results",
+          "size",
+          "limit",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "search",
+      "params": [
+        {
+          "max": 2000,
+          "name": "cql",
+          "type": "string"
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/content/search",
+        "query": [
+          {
+            "key": "cql",
+            "value": "{cql}"
+          },
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    }
+  ],
+  "check": "spaces",
+  "credential": {
+    "env": "CONFLUENCE_AUTH",
+    "header": "Authorization: Basic {credential}",
+    "mint": [
+      "CONFLUENCE_EMAIL",
+      "CONFLUENCE_API_TOKEN"
+    ],
+    "mint_command": [
+      "confluence/mint"
+    ],
+    "not_secret": [
+      "CONFLUENCE_EMAIL"
+    ]
+  },
+  "name": "confluence"
+}

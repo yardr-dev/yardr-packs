@@ -1,0 +1,50 @@
+--- requests
+GET /wiki/api/v2/spaces?limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "next": "/wiki/api/v2/spaces?limit=2&cursor=eyJpZCI6MTMxMDcyLCJzcGFjZVNvcnRPcmRlciI6eyJmaWVsZCI6IklEIiwiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIn19"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/ENG"
+      },
+      "authorId": "5b10ac8d82e05b22cc7d4ef5",
+      "createdAt": "2024-03-12T09:30:00.000Z",
+      "currentActiveAlias": "ENG",
+      "description": null,
+      "homepageId": "98400",
+      "icon": null,
+      "id": "98304",
+      "key": "ENG",
+      "name": "Engineering",
+      "spaceOwnerId": "5b10ac8d82e05b22cc7d4ef5",
+      "status": "current",
+      "type": "global"
+    },
+    {
+      "_links": {
+        "webui": "/spaces/OPS"
+      },
+      "authorId": "5b10ac8d82e05b22cc7d4ef5",
+      "createdAt": "2024-03-12T09:30:00.000Z",
+      "currentActiveAlias": "OPS",
+      "description": null,
+      "homepageId": "131100",
+      "icon": null,
+      "id": "131072",
+      "key": "OPS",
+      "name": "Operations",
+      "spaceOwnerId": "5b10ac8d82e05b22cc7d4ef5",
+      "status": "current",
+      "type": "global"
+    }
+  ]
+}
+--- stderr

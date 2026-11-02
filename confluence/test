@@ -1,0 +1,260 @@
+#!/bin/sh
+# The confluence pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds. It wants jq 1.6 or
+# later, python3 and yardr, and fails without them, since a skipped test
+# would leave the requests unpinned.
+#
+#   mint     confluence/mint makes the Basic credential from the email and
+#            the token, and says nothing of either when it cannot; the token
+#            is in no argument of anything it runs.
+#   core     the real yardr in a scratch yard of its own, with the pack
+#            applied: the declaration as the yard reads it, held to a golden
+#            and to reading nothing but with GET; then a copy of it aimed at
+#            a stand-in for Confluence on a loopback port (testdata/
+#            standin.py), the operator's way of SETUP.md step 2.
+#   calls    each testdata/calls/*.case is one `yardr call` of that source
+#            against the stand-in. The case's golden holds the requests the
+#            stand-in saw (method, path and query as sent, whether the
+#            credential was the right one), the exit status, what the call
+#            kept of the answer and what it said on stderr. A changed
+#            request, a changed select and a changed bound are each a
+#            changed golden, and a parameter the call should refuse shows
+#            as no request at all.
+#   host     a pack applied again over the operator's edited host, which the
+#            shipped host replaces, and what stands.
+#   secrets  the token and the credential made of it are in no file the
+#            run left but the env file, and in no output.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again: read the diff before
+# committing it.
+set -u
+cd "$(dirname "$0")"
+here=$(pwd)
+fail=0
+
+for need in jq python3; do
+  command -v "$need" >/dev/null 2>&1 || { echo "test: needs $need on PATH"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: needs yardr ($YARDR)"; exit 1; }
+
+tmp=$(mktemp -d)
+# The scratch yard's socket path is held to 100 bytes, so its directory is
+# short, and is not the tmp of a long $TMPDIR.
+core=$(mktemp -d /tmp/confluencet.XXXXXX)
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  # The scratch yard's server starts on its first command and would outlive
+  # the directory it owns: stop it first.
+  env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+  rm -rf "${core:?}" "${tmp:?}"
+}
+trap cleanup EXIT HUP INT TERM
+
+# check <name> <actual file> <golden file>
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# The account the tests use is a fixture, not a secret.
+email=ada@example.com
+token=tok-FIXTURE-0123456789abcdef
+auth=$(printf '{"inputs":{"CONFLUENCE_EMAIL":"%s","CONFLUENCE_API_TOKEN":"%s"},"scope":""}' "$email" "$token" | ./confluence/mint | jq -r .token)
+
+# ---- mint ------------------------------------------------------------------
+printf '{"inputs":{"CONFLUENCE_EMAIL":"%s","CONFLUENCE_API_TOKEN":"%s"},"scope":""}' "$email" "$token" | ./confluence/mint >"$tmp/mint.out"
+want=$(printf '%s:%s' "$email" "$token" | base64 | tr -d '\n')
+[ "$(jq -r .token "$tmp/mint.out")" = "$want" ]
+ok "mint makes base64 of email:token" $?
+jq -e '(.expires_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")) and (.expires_at | fromdateiso8601) > now and ((keys | sort) == ["expires_at", "token"])' "$tmp/mint.out" >/dev/null
+ok "mint answers a future RFC 3339 expiry and nothing else" $?
+# A token may hold a colon, and an email a plus; neither is the mint's to cut.
+printf '{"inputs":{"CONFLUENCE_EMAIL":"a+b@example.com","CONFLUENCE_API_TOKEN":"ATATT3x:y=z"}}' | ./confluence/mint | jq -e --arg w "$(printf 'a+b@example.com:ATATT3x:y=z' | base64 | tr -d '\n')" '.token == $w' >/dev/null
+ok "mint keeps a colon in the token and a plus in the email" $?
+i=0
+for bad in '{"inputs":{"CONFLUENCE_EMAIL":"'"$email"'"}}' '{"inputs":{"CONFLUENCE_API_TOKEN":"'"$token"'"}}' '{"inputs":{"CONFLUENCE_EMAIL":"","CONFLUENCE_API_TOKEN":"'"$token"'"}}' '{"inputs":{"CONFLUENCE_EMAIL":"'"$email"'","CONFLUENCE_API_TOKEN":""}}' '{"inputs":"'"$token"'"}' 'not json '"$token" '{"inputs":{"JIRA_EMAIL":"'"$email"'","JIRA_API_TOKEN":"'"$token"'"}}'; do
+  i=$((i + 1))
+  printf '%s' "$bad" | ./confluence/mint >"$tmp/m.out" 2>"$tmp/m.err"
+  rc=$?
+  [ "$rc" = 1 ] && [ ! -s "$tmp/m.out" ] && [ "$(cat "$tmp/m.err")" = "confluence/mint: want CONFLUENCE_EMAIL and CONFLUENCE_API_TOKEN among the inputs" ]
+  ok "mint refuses input $i with a fixed line that quotes none of it" $?
+done
+# What the shell runs is what ps shows anyone on the box: the token is in
+# none of it, only the program of jq.
+printf '{"inputs":{"CONFLUENCE_EMAIL":"%s","CONFLUENCE_API_TOKEN":"%s"}}' "$email" "$token" | sh -x ./confluence/mint >/dev/null 2>"$tmp/x.err"
+! grep -qF -e "$token" -e "$auth" "$tmp/x.err"
+ok "mint puts the token in no argument it runs" $?
+grep -q '^+ jq ' "$tmp/x.err"
+ok "mint's trace shows the jq it runs (so the check above looked at something)" $?
+
+# ---- core: the scratch yard ------------------------------------------------
+mkdir -p "$core/h"
+yrun() { env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester "$@"; }
+
+if ! yrun init --harness claude --operator tester >"$core/init.out" 2>&1; then
+  echo "test: core FAILED: the scratch yard could not be made: $(tail -c 300 "$core/init.out")"
+  exit 1
+fi
+if ! yrun pack apply "$here" --yes >"$core/apply.out" 2>&1; then
+  echo "test: core FAILED: the pack did not apply: $(tail -c 300 "$core/apply.out")"
+  exit 1
+fi
+
+# The declaration as the yard reads it, with the shipped host: base,
+# credential and every call's parameters, request and answer.
+yrun source show confluence --json | jq -S .declaration >"$core/declaration.json"
+check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
+jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 4' "$core/declaration.json" >/dev/null
+ok "the shipped host is the placeholder, and every call is a read by GET" $?
+yrun pack show confluence >"$core/packshow.out" 2>&1
+grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out"
+ok "pack show prints the one preset, read, as SETUP.md step 4 says" $?
+yrun source show confluence >"$core/show.shipped" 2>&1
+grep -qF 'https://example.atlassian.net/wiki' "$core/show.shipped"
+ok "source show names the host in use, the placeholder until the operator's copy is added" $?
+
+# The operator's copy: the declaration with its base replaced, and the
+# program beside it, as SETUP.md step 2 makes it. Here the site is the
+# stand-in.
+mkdir -p "$core/mine"
+cp -R "$here/confluence" "$core/mine/"
+cp testdata/spaces.json "$core/answer.json"
+: >"$core/requests"
+python3 -I testdata/standin.py "$core/port" "$core/requests" "$core/answer.json" 2>"$core/standin.err" <<EOF &
+$auth
+EOF
+standin_pid=$!
+i=0
+while [ ! -s "$core/port" ] && [ "$i" -lt 200 ]; do sleep 0.05; i=$((i + 1)); done
+if [ ! -s "$core/port" ]; then
+  echo "test: core FAILED: the stand-in did not listen: $(cat "$core/standin.err")"
+  exit 1
+fi
+site=http://127.0.0.1:$(cat "$core/port")
+sed "s|^base: .*|base: $site/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+# The credential is given as SETUP.md step 3 gives it: yardr source key, here
+# with the two lines on its standard input, which the server writes into the
+# source's env file.
+envfile=$core/y/sources/confluence.env
+yrun source add "$core/mine/confluence.local.yaml" >"$core/add.out" 2>&1 && printf 'CONFLUENCE_EMAIL=%s\nCONFLUENCE_API_TOKEN=%s\n' "$email" "$token" | yrun source key confluence >>"$core/add.out" 2>&1 && yrun source set confluence calls_per_hour=1000 >>"$core/add.out" 2>&1
+ok "the operator's copy is added and its credential given by source key" $? "$(tail -c 300 "$core/add.out")"
+[ -f "$envfile" ] && [ "$(ls -l "$envfile" | cut -c1-10)" = "-rw-------" ]
+ok "the env file is where SETUP.md says, mode 0600" $?
+
+# The check call: spaces, with the defaults, minted by confluence/mint.
+yrun source check confluence >"$core/check.out" 2>&1
+rc=$?
+[ "$rc" = 0 ] && grep -q 'minted' "$core/check.out" && grep -q 'check call spaces' "$core/check.out" && grep -q 'Engineering' "$core/check.out"
+ok "source check reaches the site with a minted credential" $? "exit $rc: $(tail -c 300 "$core/check.out")"
+check "the check call's request" "$core/requests" testdata/check.requests.golden
+
+# ---- calls -----------------------------------------------------------------
+# A case file is sections, each opened by a line "=== name": args (the call
+# and its parameters, one word to a line), answer (the stand-in's body) and
+# status (its HTTP status, 200 if left out). @FILL@ in an answer becomes
+# 300000 characters, for a body over the bound.
+for c in testdata/calls/*.case; do
+  n=$(basename "$c" .case)
+  d="$core/case_$n"
+  mkdir "$d"
+  awk -v dir="$d" '/^=== /{ name = substr($0, 5); f = dir "/" name; printf "" > f; next } { print >> f }' "$c"
+  if [ -e "$d/answer" ]; then
+    awk 'BEGIN { s = "x"; while (length(s) < 300000) s = s s; fill = substr(s, 1, 300000) } { gsub(/@FILL@/, fill); print }' "$d/answer" >"$core/answer.json"
+  else
+    printf '{}\n' >"$core/answer.json"
+  fi
+  rm -f "$core/answer.json.status"
+  [ ! -e "$d/status" ] || cp "$d/status" "$core/answer.json.status"
+  : >"$core/requests"
+  set --
+  while IFS= read -r word; do set -- "$@" "$word"; done <"$d/args"
+  yrun call confluence "$@" --json >"$d/stdout" 2>"$d/stderr"
+  status=$?
+  {
+    echo "--- requests"
+    cat "$core/requests"
+    echo "--- status"
+    echo "$status"
+    echo "--- stdout"
+    if [ -s "$d/stdout" ]; then jq -S . "$d/stdout" 2>/dev/null || cat "$d/stdout"; fi
+    echo "--- stderr"
+    cat "$d/stderr"
+  } | sed 's/the answer is [0-9][0-9]* bytes/the answer is N bytes/' >"$d/golden"
+  # (yardr counts an over-bound answer's bytes after the keys are kept, so
+  # the golden holds the bound and not the count.)
+  check "call $n" "$d/golden" "testdata/calls/$n.golden"
+done
+rm -f "$core/answer.json.status"
+# Reads only: of all the requests the cases made, the stand-in saw GETs.
+methods=$(awk '/^--- requests/ { r = 1; next } /^--- status/ { r = 0 } r && /^[A-Z]/ { print $1 }' "$core"/case_*/golden | sort -u)
+[ "$methods" = GET ]
+ok "no request of any case is anything but a GET" $? "methods seen: $methods"
+
+# The same calls through the gateway a token with scopes is called at: the
+# base carries a path of its own, and the paths of the calls follow it.
+cloud=0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+sed "s|^base: .*|base: $site/ex/confluence/$cloud/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+yrun source add "$core/mine/confluence.local.yaml" >"$core/add.gateway.out" 2>&1
+ok "a copy with the gateway's address is added" $? "$(tail -c 300 "$core/add.gateway.out")"
+printf '{"id":"98404","title":"Runbook","body":{"storage":{"representation":"storage","value":"<p>x</p>"}}}\n' >"$core/answer.json"
+: >"$core/requests"
+yrun source check confluence >"$core/check.gateway.out" 2>&1
+yrun call confluence page id=98404 --json >"$core/page.gateway.out" 2>&1
+check "the requests through the gateway's address" "$core/requests" testdata/gateway.requests.golden
+
+# ---- host: a pack applied again over an edited address ---------------------
+sed "s|^base: .*|base: $site/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
+yrun source show confluence >"$core/show.before-grant" 2>&1
+yrun source grant confluence read --crew yardmaster >"$core/grant.out" 2>&1
+ok "a crew member is granted every read call by name" $? "$(tail -c 300 "$core/grant.out")"
+yrun source show confluence >"$core/show.edited" 2>&1
+yrun pack check "$here" >"$core/plan.out" 2>&1
+yrun pack apply "$here" --yes >"$core/reapply.out" 2>&1
+yrun source show confluence >"$core/show.reapplied" 2>&1
+grep -qF "$site/wiki" "$core/show.edited" && ! grep -qF "https://example.atlassian.net/wiki" "$core/show.edited"
+ok "the operator's host is what the source calls after the edit is added" $?
+grep -qF "$site/wiki" "$core/plan.out"
+ok "the plan of an update names the host it would take away (how the operator notices)" $?
+grep -qF "https://example.atlassian.net/wiki" "$core/show.reapplied" && ! grep -qF "$site/wiki" "$core/show.reapplied"
+ok "a pack applied again puts the shipped host back (the edit does not survive)" $?
+grep -qF "$envfile" "$core/show.reapplied"
+ok "the env file stays set across the re-apply" $?
+! grep -q yardmaster "$core/show.before-grant" && grep -q yardmaster "$core/show.edited" && grep -q yardmaster "$core/show.reapplied"
+ok "a grant of the source stands across the re-apply" $?
+yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
+yrun source show confluence >"$core/show.readded" 2>&1
+grep -qF "$site/wiki" "$core/show.readded" && grep -qF "$envfile" "$core/show.readded"
+ok "adding the edited copy again restores the host, and the env file still stands" $?
+
+# ---- secrets ---------------------------------------------------------------
+# Every output of the run is a file under $core, and so is everything the
+# yard keeps. The token lives in the env file alone, and the credential made
+# of it in the server's memory alone.
+kill "$standin_pid" 2>/dev/null
+standin_pid=
+leaks=$(grep -rlF -e "$token" -e "$auth" "$core" 2>/dev/null | grep -vxF "$envfile")
+[ -z "$leaks" ]
+ok "the token and the credential are in no file of the run but the env file" $? "found in: $leaks"
+grep -qF "$token" "$envfile"
+ok "(and the env file does hold the token, so the search above looked at something)" $?
+
+if [ "$fail" = 0 ]; then echo "test: confluence: all ok"; else echo "test: confluence: FAILED"; fi
+exit $fail

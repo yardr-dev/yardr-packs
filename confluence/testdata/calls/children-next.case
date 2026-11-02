@@ -1,0 +1,6 @@
+=== args
+children
+id=98400
+cursor=eyJpZCI6Ijk4NDExIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=
+=== answer
+{"results":[{"id":"98417","status":"current","title":"Planning board","childPosition":3000,"type":"whiteboard"}],"_links":{"base":"https://example.atlassian.net/wiki"}}

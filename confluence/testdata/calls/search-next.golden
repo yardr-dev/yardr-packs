@@ -1,0 +1,46 @@
+--- requests
+GET /wiki/rest/api/content/search?cql=type+%3D+page+AND+space+%3D+%22ENG%22+AND+title+~+%22runbook%22&cursor=_t_WyJcdDk4NDA0ICsyOnFYI1pBTyo3JVNkQ2I%2BeCBhcCJd_h_W10%3D&limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "context": "/wiki",
+    "self": "https://example.atlassian.net/wiki/rest/api/content/search?cql=type+%3d+page"
+  },
+  "limit": 2,
+  "results": [
+    {
+      "_expandable": {
+        "ancestors": "",
+        "body": "",
+        "children": "",
+        "container": "",
+        "descendants": "",
+        "extensions": "",
+        "history": "/rest/api/content/98433/history",
+        "metadata": "",
+        "operations": "",
+        "space": "/rest/api/space/OPS",
+        "version": ""
+      },
+      "_links": {
+        "self": "https://example.atlassian.net/wiki/rest/api/content/98433",
+        "tinyui": "/x/BIAB",
+        "webui": "/spaces/OPS/pages/98433/Runbook:+payments"
+      },
+      "childTypes": {},
+      "id": "98433",
+      "macroRenderedOutput": {},
+      "restrictions": {},
+      "status": "current",
+      "title": "Runbook: payments",
+      "type": "page"
+    }
+  ],
+  "size": 1
+}
+--- stderr

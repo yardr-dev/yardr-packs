@@ -1,0 +1,118 @@
+# Confluence Cloud as a declared source: spaces listed, content found by
+# CQL, one page read and a page's children listed. Reads only. Jira's
+# declaration (the jira pack, beside this one) is the pattern for the
+# login and the site's address, and yardr's google-docs for a read call
+# whose answer is bounded; Confluence differs where noted.
+#
+# Checked against Atlassian's OpenAPI descriptions of the Confluence Cloud
+# REST API (v2 and v1) and its developer and support pages on 2 November
+# 2026, and by GET requests without a login to a public Confluence Cloud
+# site, which gave the shapes of the answers and of the cursors. Not
+# checked with a credential against a site of our own: a person has to make
+# one (README.md says what that leaves open).
+#   spaces:   GET /wiki/api/v2/spaces takes read:space:confluence and
+#     answers {results, _links}. _links.next is there only when another
+#     page is, and is the path of the next page with its cursor in it. v2
+#     also gives that address in a Link header, which a declared call
+#     cannot read, so the cursor is a parameter and the body's _links stays.
+#   page:     GET /wiki/api/v2/pages/{id} takes read:page:confluence.
+#     body-format=storage puts the body at body.storage.value. Confluence
+#     storage format is XHTML with Confluence's own tags and macros
+#     (ac:structured-macro, ri:page), and it is what comes back: turning
+#     it into text is the reader's.
+#   children: GET /wiki/api/v2/pages/{id}/direct-children takes
+#     read:hierarchical-content:confluence. Atlassian marks the older
+#     /pages/{id}/children deprecated, the one deprecated operation in v2.
+#     The newer one answers a page's pages and also its folders,
+#     whiteboards, databases and embeds, each with a type. It lists a
+#     page's children and no other kind of content's; a folder's own
+#     children are at /folders/{id}/direct-children, which no call here
+#     makes.
+#   search:   GET /wiki/rest/api/content/search takes search:confluence.
+#     CQL search is v1 only: Atlassian has no v2 equivalent, and has said
+#     it would deprecate this one only when there is. A hit is
+#     {id, type, status, title, _links} and the rest of its keys are
+#     empty objects and the paths of what expand would add; _links.webui
+#     names the space (/spaces/ENG/pages/123/Title), so nothing is
+#     expanded. The cursor is the one in _links.next, percent-decoded:
+#     that address writes it percent-encoded, and the call encodes it
+#     again. Its start is echoed and ignored, so none is declared.
+#
+# The credential. Atlassian takes an API token as HTTP Basic, the base64 of
+# "email:token". A declared call's header takes one {credential}, so the
+# email and the token are two mint inputs and confluence/mint makes the one
+# value every call takes, CONFLUENCE_AUTH. The email is no secret, so it is
+# asked in the clear. They live in the source's own env file; the
+# jira pack's source has one of its own and is given the same two values
+# again. Atlassian's form for a token with scopes has you choose the app
+# first, so Jira's token is not made for Confluence, where a token made
+# without scopes is the account's and serves both (SETUP.md, step 1).
+#
+# The host. Confluence is per site, so this is a placeholder that SETUP.md
+# has the operator replace in the yard's copy of this file: the credential
+# goes to the hosts a file names and to no others. A token with scopes is
+# called at https://api.atlassian.com/ex/confluence/<cloud id>/wiki and one
+# without at https://<site>.atlassian.net/wiki (Atlassian's support
+# article on scoped tokens). Both take Basic, so only the base differs, and
+# the /wiki is the base's, so every path below starts at /api or /rest. A
+# pack applied again replaces the yard's copy and puts this one back
+# (SETUP.md, step 6).
+name: confluence
+about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, a page's children listed.
+base: https://example.atlassian.net/wiki
+credential:
+  env: CONFLUENCE_AUTH
+  header: "Authorization: Basic {credential}"
+  mint:
+    - name: CONFLUENCE_EMAIL
+      secret: false               # an address, asked in the clear
+    - CONFLUENCE_API_TOKEN
+  mint_command: [confluence/mint]   # the program beside this file; the source's own mint_command wins over it
+check: spaces
+calls:
+  spaces:
+    kind: read
+    about: List the spaces the account may see, 25 at a time. Answers each space's id, key, name, type and homepageId, the page children starts from. keys narrows it to spaces by key, as an address shows it (/spaces/ENG/...). When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      keys: { type: string, max: 500, optional: true, log: true }   # space keys, comma-separated; left out, every space the account may see
+      limit: { type: int, default: 25 }   # spaces in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/spaces
+      query: { keys: "{keys}", limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links], max: 262144 }   # 250 spaces are about 100 KB
+  page:
+    kind: read
+    about: Read one page by its id, which is in its address (/spaces/ENG/pages/123456/Title). Answers its title, status, spaceId, parentId, version and links, and its body in Confluence storage format, in body.storage.value, which is XHTML with Confluence's own tags and macros, markup and not text.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }
+    request:
+      method: GET
+      path: /api/v2/pages/{id}
+      query: { body-format: storage }
+    answer: { select: [id, status, title, spaceId, parentId, parentType, version, body, _links], max: 262144 }   # a page's body is bounded as google-docs bounds a document's
+  children:
+    kind: read
+    about: List a page's direct children, 25 at a time, in the order of the page tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed); only a page's id is taken here, so a folder's own children are not listed. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }
+      limit: { type: int, default: 25 }   # children in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/pages/{id}/direct-children
+      query: { limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links] }
+  search:
+    kind: read
+    about: Find content by CQL, Confluence's query language, 25 at a time, as in type = page AND space = "ENG" AND title ~ "runbook". Answers each hit's id, type, status, title and _links.webui, which names its space. When more than limit follow, _links.next is in the answer, and its cursor= value, percent-decoded, is the next call's cursor.
+    params:
+      cql: { type: string, max: 2000 }   # free text, CQL: its value is in no event
+      limit: { type: int, default: 25 }   # hits in the page; Confluence may hold it lower
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next, percent-decoded
+    request:
+      method: GET
+      path: /rest/api/content/search
+      query: { cql: "{cql}", limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, size, limit, _links], max: 262144 }   # a hit is about 800 bytes, most of it empty keys

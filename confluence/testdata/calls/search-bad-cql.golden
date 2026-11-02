@@ -1,0 +1,11 @@
+--- requests
+GET /wiki/rest/api/content/search?cql=space+%3D&limit=25
+  auth: ok
+  accept: application/json
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call search: the service answered 400"
+}
+--- stderr

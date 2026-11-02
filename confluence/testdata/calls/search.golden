@@ -1,0 +1,73 @@
+--- requests
+GET /wiki/rest/api/content/search?cql=type+%3D+page+AND+space+%3D+%22ENG%22+AND+title+~+%22runbook%22&limit=25
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "context": "/wiki",
+    "self": "https://example.atlassian.net/wiki/rest/api/content/search?cql=type+%3d+page"
+  },
+  "limit": 25,
+  "results": [
+    {
+      "_expandable": {
+        "ancestors": "",
+        "body": "",
+        "children": "",
+        "container": "",
+        "descendants": "",
+        "extensions": "",
+        "history": "/rest/api/content/98404/history",
+        "metadata": "",
+        "operations": "",
+        "space": "/rest/api/space/ENG",
+        "version": ""
+      },
+      "_links": {
+        "self": "https://example.atlassian.net/wiki/rest/api/content/98404",
+        "tinyui": "/x/BIAB",
+        "webui": "/spaces/ENG/pages/98404/Runbooks"
+      },
+      "childTypes": {},
+      "id": "98404",
+      "macroRenderedOutput": {},
+      "restrictions": {},
+      "status": "current",
+      "title": "Runbooks",
+      "type": "page"
+    },
+    {
+      "_expandable": {
+        "ancestors": "",
+        "body": "",
+        "children": "",
+        "container": "",
+        "descendants": "",
+        "extensions": "",
+        "history": "/rest/api/content/98421/history",
+        "metadata": "",
+        "operations": "",
+        "space": "/rest/api/space/ENG",
+        "version": ""
+      },
+      "_links": {
+        "self": "https://example.atlassian.net/wiki/rest/api/content/98421",
+        "tinyui": "/x/BIAB",
+        "webui": "/spaces/ENG/pages/98421/Runbook+template"
+      },
+      "childTypes": {},
+      "id": "98421",
+      "macroRenderedOutput": {},
+      "restrictions": {},
+      "status": "current",
+      "title": "Runbook template",
+      "type": "page"
+    }
+  ],
+  "size": 2
+}
+--- stderr

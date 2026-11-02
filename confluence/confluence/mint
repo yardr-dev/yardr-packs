@@ -1,0 +1,23 @@
+#!/bin/sh
+# mint: the credential Confluence takes, from the account's email and an API
+# token. stdin {"inputs": {"CONFLUENCE_EMAIL": …, "CONFLUENCE_API_TOKEN": …},
+# "scope": …}, stdout {"token": …, "expires_at": …}, as a source's
+# mint_command is run.
+#
+# Atlassian's Basic scheme is the base64 of "email:token", and a declared
+# call's header takes one value (Authorization: Basic {credential}). So the
+# pair is made into that value here, once, for every call. The value does
+# not expire; the hour is only how long the yard keeps it before it asks
+# again, and a new token in the env file is a new key, minted at once. The
+# same as jira/mint of the jira pack, which reads its own two names.
+#
+# Nothing but a fixed line reaches stderr: jq's own errors can quote the
+# value they failed on, and the value is the token. Needs jq.
+jq -c '
+  .inputs as $i
+  | if ($i.CONFLUENCE_EMAIL | type) != "string" or ($i.CONFLUENCE_API_TOKEN | type) != "string"
+       or $i.CONFLUENCE_EMAIL == "" or $i.CONFLUENCE_API_TOKEN == ""
+    then error("incomplete") else . end
+  | { token: ("\($i.CONFLUENCE_EMAIL):\($i.CONFLUENCE_API_TOKEN)" | @base64),
+      expires_at: (now + 3600 | floor | todate) }
+' 2>/dev/null || { echo "confluence/mint: want CONFLUENCE_EMAIL and CONFLUENCE_API_TOKEN among the inputs" >&2; exit 1; }

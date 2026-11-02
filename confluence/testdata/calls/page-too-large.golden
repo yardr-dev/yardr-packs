@@ -1,0 +1,11 @@
+--- requests
+GET /wiki/api/v2/pages/98404?body-format=storage
+  auth: ok
+  accept: application/json
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call page: the answer is N bytes, over the call's bound of 262144 (answer.max in the declaration raises it, to 1048576 at most): it is refused, not cut, since half a JSON document misleads"
+}
+--- stderr

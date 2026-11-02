@@ -1,0 +1,11 @@
+--- requests
+GET /wiki/api/v2/pages/98404?body-format=storage
+  auth: ok
+  accept: application/json
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call page: the service answered 401"
+}
+--- stderr

@@ -1,0 +1,6 @@
+=== args
+spaces
+limit=2
+cursor=eyJpZCI6MTMxMDcyLCJzcGFjZVNvcnRPcmRlciI6eyJmaWVsZCI6IklEIiwiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIn19
+=== answer
+{"results":[{"id":"196608","key":"~5b10ac8d82e05b22cc7d4ef5","name":"Ada Lovelace","type":"personal","status":"current","authorId":"5b10ac8d82e05b22cc7d4ef5","createdAt":"2024-03-12T09:30:00.000Z","homepageId":null,"description":null,"icon":null,"spaceOwnerId":"5b10ac8d82e05b22cc7d4ef5","currentActiveAlias":"~5b10ac8d82e05b22cc7d4ef5","_links":{"webui":"/spaces/~5b10ac8d82e05b22cc7d4ef5"}}],"_links":{"base":"https://example.atlassian.net/wiki"}}

@@ -1,0 +1,22 @@
+--- requests
+GET /wiki/api/v2/pages/98400/direct-children?cursor=eyJpZCI6Ijk4NDExIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0%3D&limit=25
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "childPosition": 3000,
+      "id": "98417",
+      "status": "current",
+      "title": "Planning board",
+      "type": "whiteboard"
+    }
+  ]
+}
+--- stderr

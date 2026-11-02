@@ -1,0 +1,7 @@
+=== args
+search
+cql=space =
+=== answer
+{"statusCode":400,"data":{"authorized":false,"valid":true,"errors":[],"successful":false},"message":"Could not parse cql : space =","reason":"Bad Request"}
+=== status
+400
