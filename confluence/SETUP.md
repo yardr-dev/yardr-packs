@@ -2,9 +2,9 @@
 
 The pack wires Confluence Cloud into the yard as the declared source
 `confluence`. An agent lists the site's spaces, finds pages by CQL, reads one
-page and lists a page's children. It only reads. What it reads a page as is
-Confluence's storage format, which is markup and not text: turning it into text
-is the reader's.
+page and lists the children of a page, folder, whiteboard, database or embed. It
+only reads. What it reads a page as is Confluence's storage format, which is
+markup and not text: turning it into text is the reader's.
 
 **The yard reads as one Atlassian account.** Every agent granted a call of this
 source reads what that account can read, in every space it can view, and the
@@ -47,9 +47,9 @@ written, so a screen may be named otherwise than here.
    Choose Confluence and the four scopes the calls need, which are the ones
    Atlassian's API description lists for the four requests: `read:space:confluence`
    (spaces), `read:page:confluence` (page), `read:hierarchical-content:confluence`
-   (children) and `search:confluence` (search). Atlassian shows the token once. A
-   token lasts 1 to 365 days, a year unless you choose otherwise, so note the day
-   it ends. Step 6 says what to do then.
+   (children, of any kind) and `search:confluence` (search). Atlassian shows the
+   token once. A token lasts 1 to 365 days, a year unless you choose otherwise, so
+   note the day it ends. Step 6 says what to do then.
 
    A token made without scopes (Create API token, an ordinary account only) is
    the account's, serves Jira and Confluence alike, and can do everything the
@@ -167,8 +167,13 @@ written, so a screen may be named otherwise than here.
    yardr call confluence children id=98404
    ```
    `children` answers each child's `id`, `title`, `status` and `type`, which is
-   `page`, `folder`, `whiteboard`, `database` or `embed`. `page` and `children`
-   take the id of a page: a folder's own children are not walked by this pack.
+   `page`, `folder`, `whiteboard`, `database` or `embed`. To go down a level, give
+   the child's `id` and its `type` with an `s` as `kind`. For a folder:
+   ```sh
+   yardr call confluence children id=98411 kind=folders
+   ```
+   The other kinds are `whiteboards`, `databases` and `embeds`. A call with no
+   `kind` asks for the children of a page, and `page` takes the id of a page only.
    Content is found by CQL, Confluence's query language:
    ```sh
    yardr call confluence search cql='type = page AND space = "ENG" AND title ~ "runbook"'
@@ -180,8 +185,9 @@ written, so a screen may be named otherwise than here.
    `spaces`, `children` and `search` answer one page of 25, and `limit` asks for
    another size (250 at most for the first two). An answer that has another page
    keeps it as `_links.next`, whose `cursor=` value is `cursor` in the same call
-   again. Search writes it percent-encoded (`%2B`, `%3D`), and the call encodes
-   what it is given, so give it decoded:
+   again (for `children`, with the same `id` and `kind`). Search writes it
+   percent-encoded (`%2B`, `%3D`), and the call encodes what it is given, so give
+   it decoded:
    ```sh
    yardr call confluence children id=98400 cursor=eyJpZCI6Ijk4NDExIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=
    ```
@@ -220,8 +226,9 @@ written, so a screen may be named otherwise than here.
    credential in Atlassian Administration, and take the account out of the spaces.
 
 What is not there, on purpose: comments, labels and the list of a page's
-attachments (the next bead); an attachment's contents; blogposts; the children of
-a folder, whiteboard, database or embed; any write; turning storage format into
-text; and Confluence Data Center and Server, whose API and login are others. The
-yard's source format cannot express what is not listed, and the pack does not
+attachments (the next bead); an attachment's contents; blogposts; reading a
+folder, whiteboard, database or embed itself (`children` lists them, with their
+titles, and `page` takes a page's id only); any write; turning storage format
+into text; and Confluence Data Center and Server, whose API and login are others.
+The yard's source format cannot express what is not listed, and the pack does not
 change yardr.

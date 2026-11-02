@@ -1,9 +1,9 @@
 # Confluence Cloud as a pack of kind source: the integration, imported
 # into the yard and into no depot. What Confluence is here: the declared
 # source confluence, which lists spaces, finds content by CQL, reads a
-# page and lists a page's children, all through the REST API as one
-# Atlassian account. Read only. Every agent granted a call reads what that
-# account may read.
+# page and lists the children of a page, folder, whiteboard, database or
+# embed, all through the REST API as one Atlassian account. Read only.
+# Every agent granted a call reads what that account may read.
 #
 #   yardr pack apply /Users/mckean/projects/repos/yardr-packs/confluence
 #
@@ -11,8 +11,11 @@
 # talks to. Confluence is per site, so the declaration ships a placeholder
 # address that SETUP.md has the operator replace in the yard's copy. The
 # login is the Atlassian account the jira pack uses, given to this source in
-# its own env file.
+# its own env file. The pack is written for pack API 3, because children's
+# kind has a default and is in a path, which API 3 added. A yardr that
+# reads less is told to upgrade and is not given an error about the path.
 name: confluence
+api: 3
 kind: source
 setup: SETUP.md
 
@@ -25,6 +28,6 @@ sources:
 # terminal pack apply ignores them.
 presets:
   read:
-    about: List spaces, find content by CQL, read a page and list its children; change nothing
+    about: List spaces, find content by CQL, read a page and list the children of a page, folder, whiteboard, database or embed; change nothing
     grants:
       confluence: [read]

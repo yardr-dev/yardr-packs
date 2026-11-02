@@ -1,0 +1,30 @@
+--- requests
+GET /wiki/api/v2/embeds/98421/direct-children?limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "next": "/wiki/api/v2/embeds/98421/direct-children?limit=2&cursor=eyJpZCI6Ijk4NDIzIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0="
+  },
+  "results": [
+    {
+      "childPosition": 1000,
+      "id": "98422",
+      "status": "current",
+      "title": "Roadmap review notes",
+      "type": "page"
+    },
+    {
+      "childPosition": 2000,
+      "id": "98423",
+      "status": "current",
+      "title": "Roadmap sketch",
+      "type": "whiteboard"
+    }
+  ]
+}
+--- stderr

@@ -1,0 +1,7 @@
+=== args
+children
+id=98413
+kind=databases
+limit=2
+=== answer
+{"results":[{"id":"98414","status":"current","title":"Postmortem template","childPosition":1000,"type":"page"},{"id":"98416","status":"current","title":"Closed incidents","childPosition":2000,"type":"folder"}],"_links":{"next":"/wiki/api/v2/databases/98413/direct-children?limit=2&cursor=eyJpZCI6Ijk4NDE2IiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=","base":"https://example.atlassian.net/wiki"}}

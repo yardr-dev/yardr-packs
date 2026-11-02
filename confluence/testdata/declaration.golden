@@ -1,5 +1,5 @@
 {
-  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, a page's children listed.",
+  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed.",
   "base": "https://example.atlassian.net/wiki",
   "calls": [
     {
@@ -92,7 +92,7 @@
       }
     },
     {
-      "about": "List a page's direct children, 25 at a time, in the order of the page tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed); only a page's id is taken here, so a folder's own children are not listed. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "about": "List the direct children of a page, folder, whiteboard, database or embed, 25 at a time, in the order of the tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed). To go down a level, give the child's id, and give its type with an s as kind. A child whose type is folder takes kind=folders. kind is one of pages (the default), folders, whiteboards, databases and embeds. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor, with the same id and kind.",
       "answer": {
         "max": 65536,
         "select": [
@@ -111,6 +111,20 @@
           "type": "string"
         },
         {
+          "default": "pages",
+          "log": true,
+          "name": "kind",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "pages",
+            "folders",
+            "whiteboards",
+            "databases",
+            "embeds"
+          ]
+        },
+        {
           "default": 25,
           "name": "limit",
           "optional": true,
@@ -125,7 +139,7 @@
       ],
       "request": {
         "method": "GET",
-        "path": "/api/v2/pages/{id}/direct-children",
+        "path": "/api/v2/{kind}/{id}/direct-children",
         "query": [
           {
             "key": "limit",

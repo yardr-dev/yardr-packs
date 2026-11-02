@@ -1,8 +1,9 @@
 # Confluence Cloud as a declared source: spaces listed, content found by
-# CQL, one page read and a page's children listed. Reads only. Jira's
-# declaration (the jira pack, beside this one) is the pattern for the
-# login and the site's address, and yardr's google-docs for a read call
-# whose answer is bounded; Confluence differs where noted.
+# CQL, one page read and the children of a page, folder, whiteboard,
+# database or embed listed. Reads only. Jira's declaration (the jira
+# pack, beside this one) is the pattern for the login and the site's
+# address, and yardr's google-docs for a read call whose answer is
+# bounded; Confluence differs where noted.
 #
 # Checked against Atlassian's OpenAPI descriptions of the Confluence Cloud
 # REST API (v2 and v1) and its developer and support pages on 2 November
@@ -20,14 +21,20 @@
 #     storage format is XHTML with Confluence's own tags and macros
 #     (ac:structured-macro, ri:page), and it is what comes back: turning
 #     it into text is the reader's.
-#   children: GET /wiki/api/v2/pages/{id}/direct-children takes
+#   children: GET /wiki/api/v2/{kind}/{id}/direct-children takes
 #     read:hierarchical-content:confluence. Atlassian marks the older
 #     /pages/{id}/children deprecated, the one deprecated operation in v2.
 #     The newer one answers a page's pages and also its folders,
-#     whiteboards, databases and embeds, each with a type. It lists a
-#     page's children and no other kind of content's; a folder's own
-#     children are at /folders/{id}/direct-children, which no call here
-#     makes.
+#     whiteboards, databases and embeds, each with a type. The same
+#     operation is also at /folders/{id}/direct-children,
+#     /whiteboards/{id}/direct-children, /databases/{id}/direct-children
+#     and /embeds/{id}/direct-children, with the same scope, parameters
+#     and answer, so one call walks all five. Its kind is a child's type
+#     and an s. It is an enum
+#     because it becomes a segment of the path, and the enum is the only
+#     check on it. Left out it is pages, so a call that names no kind
+#     asks the page endpoint. A default in a path is what pack.yaml's
+#     api: 3 is for.
 #   search:   GET /wiki/rest/api/content/search takes search:confluence.
 #     CQL search is v1 only: Atlassian has no v2 equivalent, and has said
 #     it would deprecate this one only when there is. A hit is
@@ -58,7 +65,7 @@
 # pack applied again replaces the yard's copy and puts this one back
 # (SETUP.md, step 6).
 name: confluence
-about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, a page's children listed.
+about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed.
 base: https://example.atlassian.net/wiki
 credential:
   env: CONFLUENCE_AUTH
@@ -94,14 +101,15 @@ calls:
     answer: { select: [id, status, title, spaceId, parentId, parentType, version, body, _links], max: 262144 }   # a page's body is bounded as google-docs bounds a document's
   children:
     kind: read
-    about: List a page's direct children, 25 at a time, in the order of the page tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed); only a page's id is taken here, so a folder's own children are not listed. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    about: List the direct children of a page, folder, whiteboard, database or embed, 25 at a time, in the order of the tree. Answers each child's id, title, status and type (page, folder, whiteboard, database or embed). To go down a level, give the child's id, and give its type with an s as kind. A child whose type is folder takes kind=folders. kind is one of pages (the default), folders, whiteboards, databases and embeds. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor, with the same id and kind.
     params:
       id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }
+      kind: { type: enum, values: [pages, folders, whiteboards, databases, embeds], default: pages, log: true }   # the sort of node id is, written as a child's type and an s
       limit: { type: int, default: 25 }   # children in the page, 250 at most
       cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
     request:
       method: GET
-      path: /api/v2/pages/{id}/direct-children
+      path: /api/v2/{kind}/{id}/direct-children
       query: { limit: "{limit}", cursor: "{cursor}" }
     answer: { select: [results, _links] }
   search:

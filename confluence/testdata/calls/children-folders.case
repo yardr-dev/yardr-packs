@@ -1,0 +1,7 @@
+=== args
+children
+id=98411
+kind=folders
+limit=2
+=== answer
+{"results":[{"id":"98412","status":"current","title":"Q3 retrospective","childPosition":1000,"type":"page"},{"id":"98413","status":"current","title":"Incident log","childPosition":2000,"type":"database"}],"_links":{"next":"/wiki/api/v2/folders/98411/direct-children?limit=2&cursor=eyJpZCI6Ijk4NDEzIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=","base":"https://example.atlassian.net/wiki"}}

@@ -2,8 +2,9 @@
 
 Confluence Cloud pages through its REST API, read as one Atlassian account. As
 the declared source `confluence`, an agent lists a site's spaces, finds pages by
-CQL, reads one page and lists a page's children. Calls are read-only. A page
-comes back in Confluence's storage format, and the pack turns nothing into text.
+CQL, reads one page and lists the children of a page, folder, whiteboard,
+database or embed. Calls are read-only. A page comes back in Confluence's storage
+format, and the pack turns nothing into text.
 Nothing here is compiled into yardr; apply it with:
 
 ```sh
@@ -30,7 +31,7 @@ ones Atlassian's API descriptions list for each request, read on 2 November 2026
 |---|---|---|---|
 | `spaces` | `GET /wiki/api/v2/spaces` | `keys`, `limit` (25), `cursor` | `read:space:confluence` |
 | `page` | `GET /wiki/api/v2/pages/{id}?body-format=storage` | `id` | `read:page:confluence` |
-| `children` | `GET /wiki/api/v2/pages/{id}/direct-children` | `id`, `limit` (25), `cursor` | `read:hierarchical-content:confluence` |
+| `children` | `GET /wiki/api/v2/{kind}/{id}/direct-children` | `id`, `kind` (`pages`), `limit` (25), `cursor` | `read:hierarchical-content:confluence` |
 | `search` | `GET /wiki/rest/api/content/search` | `cql`, `limit` (25), `cursor` | `search:confluence` |
 
 What is behind the table:
@@ -38,8 +39,16 @@ What is behind the table:
 - `children` is on `direct-children`. Atlassian marks `GET /pages/{id}/children`
   deprecated, the one deprecated operation in v2, and `direct-children` is what
   stands beside it. It answers a page's pages and also its folders, whiteboards,
-  databases and embeds, each with a `type`. A folder's own children are at
-  `/folders/{id}/direct-children`, which no call here makes.
+  databases and embeds, each with a `type`. The same operation is also at
+  `/folders/{id}/direct-children`, `/whiteboards/{id}/direct-children`,
+  `/databases/{id}/direct-children` and `/embeds/{id}/direct-children`, with the
+  same scope, parameters and answer, so one call walks all five. Its `kind` is
+  a child's `type` and an `s` (`pages`, `folders`, `whiteboards`, `databases`,
+  `embeds`), so a child of type `folder` takes `kind=folders`. Left out, `kind` is
+  `pages`, so a call that names no kind asks the page endpoint. It is an enum
+  because it becomes a segment of the path. A word outside the five sends no
+  request, a child's own `type` in the singular (`folder`) among them. One call is
+  one grant, and `read` covers all five.
 - `search` is the v1 endpoint, because CQL search is v1 only: Atlassian has no v2
   equivalent, and has said it would deprecate this one only when there is. A hit
   is `id`, `type`, `status`, `title` and `_links`, and `_links.webui` names its
@@ -113,7 +122,10 @@ trips on this, a core `base_url` setting is its own bead.
 
 `confluence/mint` needs `sh` and `jq` 1.6 or later. The test needs those, and
 `python3` and `yardr`, and fails without them, since a skipped test would leave
-the requests unpinned.
+the requests unpinned. The pack is written for pack API 3 (`api: 3` in
+`pack.yaml`), because `children`'s `kind` has a default and is in a path,
+which API 3 added. A yardr that reads less refuses the pack with `upgrade yardr`,
+not with a complaint about the path.
 
 ## Testing
 
@@ -131,11 +143,13 @@ in this directory, about three seconds, no network and no secret. The gate
 - the real yardr in a scratch yard with its own home, the pack applied, and a copy
   of the declaration aimed at the stand-in on a loopback port, which the credential
   reaches as the right Basic value: the check call; a `.case` for each call, with
-  its first page and its next, its default and its given parameters, a page over
-  the bound, the statuses 400, 401 and 404, and the parameters the call must
-  refuse (a page id with a slash, a missing id, a body format, a CQL of 2001
-  characters, a limit that is no number), each of which sends no request. A
-  changed path, query, select, bound or pattern is a changed golden.
+  its first page and its next, its default and its given parameters (`children`
+  once for each of the five kinds, each on a node and a path segment of its own),
+  a page over the bound, the statuses 400, 401 and 404, and the parameters the
+  call must refuse (a page id with a slash, a missing id, a body format, a CQL of
+  2001 characters, a limit that is no number, a `kind` in the singular), each of
+  which sends no request. A changed path, query, select, bound, pattern or enum
+  value is a changed golden.
 - the calls again through the gateway's address, whose base carries a path.
 - a pack applied again over an edited address: the plan names the address it
   takes away, the shipped address returns, and the env file and a grant stand.
@@ -148,13 +162,16 @@ commit it.
 ## What was checked, and what was not
 
 Checked on 2 November 2026 against Atlassian's pages: the four requests, their
-parameters and scopes in the OpenAPI descriptions of v2 and v1; the deprecation
-of `GET /pages/{id}/children`; the gateway's address for a token with scopes and
-that Atlassian's own examples send it as Basic; that a 401 is the answer to a
-missing scope and to an account without access. Seen on a public Confluence
-Cloud site without a login (openmrs.atlassian.net): the shapes of the answers
-of all four requests, the cursors, that v1 search takes its cursor alone, and
-`tenant_info`.
+parameters and scopes in the OpenAPI descriptions of v2 and v1; that pages,
+folders, whiteboards, databases and embeds each have a `direct-children`, none of
+them deprecated, with the one scope, the same parameters (`id`, `cursor`, `limit`
+from 1 to 250 and 25 by default, `sort`) and the same answer type; the
+deprecation of `GET /pages/{id}/children`; the gateway's address for a
+token with scopes and that Atlassian's own examples send it as Basic; that a 401
+is the answer to a missing scope and to an account without access. Seen on a
+public Confluence Cloud site without a login (openmrs.atlassian.net): the shapes
+of the answers of all four requests (`children` on a page's id), the cursors,
+that v1 search takes its cursor alone, and `tenant_info`.
 
 Not checked with a credential against a site of our own, because a person has to
 make one (a free Atlassian Cloud site serves this pack and the Jira one). The
@@ -170,13 +187,17 @@ live proof is a later bead. It should settle:
 - whether a service account can make one token with the scopes of both apps, which
   would make the Jira token serve here;
 - what the account sees in a space that lets every user of the site view it;
+- what `children` answers for a folder, whiteboard, database or embed. Those four
+  endpoints are read in Atlassian's description and not called, with a login or
+  without, and the cases' answers are made like the page's. The live proof needs a
+  node of each kind that has children;
 - a very long page, and a space with thousands of children.
 
 ## Left out
 
 Comments, labels and a page's list of attachments (yardr-packs-5ev5, behind this
 one); an attachment's contents (a file's bytes are yardr-racg's to settle);
-blogposts; the children of a folder, whiteboard, database or embed
-(yardr-packs-5dsw); page history and versions; any write; turning storage
-format into text; and Confluence Data Center and Server, whose API and login are
-others. Each is a later bead.
+blogposts; reading a folder, whiteboard, database or embed itself (a walk lists
+one with its title, and `page` takes a page's id only); page history and
+versions; any write; turning storage format into text; and Confluence Data Center
+and Server, whose API and login are others. Each is a later bead.
