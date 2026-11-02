@@ -1,0 +1,42 @@
+{
+  "call": "drives",
+  "about": "A site's libraries. The site id has two commas, which yardr writes as %2C in the path. The answer has the five fields $select asks for, in the shape of Microsoft's example for GET /sites/{siteId}/drives.",
+  "params": { "site": "contoso.sharepoint.com,da60e844-ba1d-49bc-b4d4-d5e36bae9019,712a596e-90a1-49e3-9b48-bfa80bee8740" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#drives(id,name,webUrl,driveType,description)",
+    "value": [
+      {
+        "id": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+        "name": "Documents",
+        "description": "",
+        "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents",
+        "driveType": "documentLibrary"
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://graph.microsoft.com/v1.0/sites/contoso.sharepoint.com%2Cda60e844-ba1d-49bc-b4d4-d5e36bae9019%2C712a596e-90a1-49e3-9b48-bfa80bee8740/drives?%24select=id%2Cname%2CwebUrl%2CdriveType%2Cdescription",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "value": [
+        {
+          "id": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+          "name": "Documents",
+          "description": "",
+          "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents",
+          "driveType": "documentLibrary"
+        }
+      ]
+    },
+    "bound": 262144
+  },
+  "refused": [
+    { "params": {}, "error": "parameter site is missing" },
+    { "params": { "site": "../admin" }, "error": "parameter site does not match its pattern ^[A-Za-z0-9][A-Za-z0-9._,-]*$" },
+    { "params": { "site": ".." }, "error": "parameter site does not match its pattern ^[A-Za-z0-9][A-Za-z0-9._,-]*$" },
+    { "params": { "site": "a/b" }, "error": "parameter site does not match its pattern ^[A-Za-z0-9][A-Za-z0-9._,-]*$" }
+  ]
+}

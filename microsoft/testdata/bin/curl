@@ -1,0 +1,29 @@
+#!/bin/sh
+# A stand-in for curl, first on the PATH of the mint's test, so that no
+# request leaves the machine and the test can read exactly what the mint
+# asked curl for. It writes into MS_CAPTURE: curl.argv (one argument a
+# line), curl.stdin (the bytes it was handed) and curl.env (the proxy and
+# CA variables it was started with, sorted). It answers from the files
+# the test names:
+#   MS_CURL_BODY    the body it answers (none if unset)
+#   MS_CURL_STATUS  the status it answers, 200 if unset
+#   MS_CURL_EXIT    a curl exit status to fail with, answering nothing
+# Of curl's options it understands one, --write-out, and of its formats
+# the one the mint uses: \n and %{http_code}.
+PATH=/usr/bin:/bin
+: "${MS_CAPTURE:?}"
+printf '%s\n' "$@" > "$MS_CAPTURE/curl.argv"
+cat > "$MS_CAPTURE/curl.stdin"
+env | grep -E '^(HTTPS?_PROXY|https?_proxy|NO_PROXY|no_proxy|SSL_CERT_FILE|SSL_CERT_DIR|NODE_EXTRA_CA_CERTS)=' | LC_ALL=C sort > "$MS_CAPTURE/curl.env"
+[ "${MS_CURL_EXIT:-0}" = 0 ] || exit "$MS_CURL_EXIT"
+[ -z "${MS_CURL_BODY:-}" ] || cat "$MS_CURL_BODY"
+fmt=''
+prev=''
+for a in "$@"; do
+  case $prev in --write-out|-w) fmt=$a ;; esac
+  prev=$a
+done
+if [ -n "$fmt" ]; then
+  printf '%s' "$fmt" | sed -e 's/\\n/\
+/g' -e "s/%{http_code}/${MS_CURL_STATUS:-200}/g"
+fi

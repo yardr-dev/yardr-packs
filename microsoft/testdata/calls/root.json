@@ -1,0 +1,93 @@
+{
+  "call": "root",
+  "about": "The top level of a library, with top left out so its default of 50 goes. The answer has the fields $select asks for, in the shape of Microsoft's example for a folder's children: a folder with a childCount, a file, and the next link Graph adds. The drive id has a ! in it, which yardr writes as %21.",
+  "params": { "drive": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#drives('b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd')/root/children(id,name,webUrl,size,lastModifiedDateTime,file,folder,parentReference)",
+    "value": [
+      {
+        "id": "01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K",
+        "name": "Policies",
+        "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Policies",
+        "size": 2048,
+        "lastModifiedDateTime": "2026-10-20T09:15:00Z",
+        "folder": { "childCount": 4 },
+        "parentReference": {
+          "driveType": "documentLibrary",
+          "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+          "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+          "name": "Shared Documents",
+          "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+          "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+        }
+      },
+      {
+        "id": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX",
+        "name": "Budget 2026.xlsx",
+        "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+        "size": 197,
+        "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+        "file": { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "hashes": { "quickXorHash": "dGhpcyBpcyBhIHRlc3Q=" } },
+        "parentReference": {
+          "driveType": "documentLibrary",
+          "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+          "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+          "name": "Shared Documents",
+          "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+          "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+        }
+      }
+    ],
+    "@odata.nextLink": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root/children?%24select=id%2Cname&%24top=50&%24skiptoken=UGFnZWQ9VFJVRQ"
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root/children?%24select=id%2Cname%2CwebUrl%2Csize%2ClastModifiedDateTime%2Cfile%2Cfolder%2CparentReference&%24top=50",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "value": [
+        {
+          "id": "01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K",
+          "name": "Policies",
+          "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Policies",
+          "size": 2048,
+          "lastModifiedDateTime": "2026-10-20T09:15:00Z",
+          "folder": { "childCount": 4 },
+          "parentReference": {
+            "driveType": "documentLibrary",
+            "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+            "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+            "name": "Shared Documents",
+            "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+            "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+          }
+        },
+        {
+          "id": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX",
+          "name": "Budget 2026.xlsx",
+          "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+          "size": 197,
+          "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+          "file": { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "hashes": { "quickXorHash": "dGhpcyBpcyBhIHRlc3Q=" } },
+          "parentReference": {
+            "driveType": "documentLibrary",
+            "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+            "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+            "name": "Shared Documents",
+            "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+            "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+          }
+        }
+      ],
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root/children?%24select=id%2Cname&%24top=50&%24skiptoken=UGFnZWQ9VFJVRQ"
+    },
+    "bound": 262144
+  },
+  "refused": [
+    { "params": {}, "error": "parameter drive is missing" },
+    { "params": { "drive": "a/b" }, "error": "parameter drive does not match its pattern ^[A-Za-z0-9!_-]+$" },
+    { "params": { "drive": "abc", "top": "many" }, "error": "parameter top is no whole number" }
+  ]
+}

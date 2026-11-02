@@ -1,0 +1,283 @@
+#!/bin/sh
+# The microsoft pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds. It wants jq 1.6 or
+# later, and one of ruby, python3 with PyYAML or yq to read microsoft.yaml
+# as data; with none of them it fails and says so, since a skipped test
+# would leave the requests unpinned.
+#
+# The calls. microsoft.yaml is read as data and testdata/render.jq builds
+# from it, for each fixture in testdata/calls/, the request yardr sends
+# for the fixture's parameters and what the call keeps of the fixture's
+# recorded Graph answer. Both are compared with what the fixture says they
+# must be, which was written from Microsoft's documentation and not from
+# the declaration, so a changed path, query, body, parameter pattern or
+# select fails here. The fixture's refusals are parameters the call must
+# turn away before sending. The declaration's call names and kinds are
+# also compared with what yardr pack check reads of the same file.
+#
+# The mint. Each case in testdata/mint/cases.json runs microsoft-mint
+# itself, as the core does: stdin of {inputs, scope}, a bare environment,
+# a PATH that holds only a stand-in curl (it records the arguments, stdin
+# and environment it was given and answers from the case), a jq that logs
+# its arguments before running the real one, and cat. Of each run the test
+# compares the answer, the exit status and the message; for the cases that
+# say so, the curl arguments and the form against testdata/mint/request.*;
+# and for all of them that the secret is in no output and in no argument
+# of curl or jq, that no file was written, and that the script gave curl
+# no option that would override a proxy or CA variable.
+set -u
+pack=$(cd "$(dirname "$0")" && pwd)
+cd "$pack" || exit 1
+fail=0
+
+command -v jq >/dev/null 2>&1 || { echo "test: needs jq on PATH"; exit 1; }
+if [ "$(jq -nr '"é &" | @uri')" != "%C3%A9%20%26" ] || [ "$(jq -nr '"ab" | gsub("(?<n>b)"; "[\(.n)]")')" != "a[b]" ]; then
+  echo "test: needs jq 1.6 or later ($(jq --version))"
+  exit 1
+fi
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/microsoft-test.XXXXXX") || exit 1
+trap 'rm -rf "${tmp:?}"' EXIT
+trap 'exit 1' HUP INT TERM
+
+# yaml2json <file> writes the file, read as YAML, as JSON on stdout.
+yaml2json() {
+  if command -v ruby >/dev/null 2>&1; then
+    ruby -ryaml -rjson -e 'puts JSON.generate(YAML.safe_load(File.read(ARGV[0])))' "$1"
+  elif command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; then
+    python3 -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))' "$1"
+  elif command -v yq >/dev/null 2>&1; then
+    yq -o=json '.' "$1" 2>/dev/null || yq '.' "$1"
+  else
+    echo "needs ruby, python3 with PyYAML, or yq to read $1" >&2
+    return 1
+  fi
+}
+
+# same <what> <wanted.json> <got.json> is 0 when both are the same JSON,
+# keys in any order, and says the difference where they are not.
+same() {
+  jq -S . "$2" > "$tmp/want.txt" 2>/dev/null || { echo "test: $1: $2 is no JSON"; return 1; }
+  jq -S . "$3" > "$tmp/got.txt" 2>/dev/null || { echo "test: $1: $3 is no JSON"; return 1; }
+  if cmp -s "$tmp/want.txt" "$tmp/got.txt"; then return 0; fi
+  echo "test: $1 differs (- wanted, + got):"
+  diff -u "$tmp/want.txt" "$tmp/got.txt" | sed 's/^/  /'
+  return 1
+}
+
+# ---- the declaration ----------------------------------------------------
+
+if ! yaml2json microsoft.yaml > "$tmp/decl.json" 2> "$tmp/yaml.err"; then
+  echo "test: microsoft.yaml cannot be read as data: $(cat "$tmp/yaml.err")"
+  fail=1
+else
+  jq '{name, base, check: (.check // null), credential, kinds: (.calls | map_values(.kind))}' "$tmp/decl.json" > "$tmp/got.json"
+  if same "declaration (name, base, credential, kinds)" testdata/declaration.json "$tmp/got.json"; then
+    echo "test: declaration ok"
+  else
+    fail=1
+  fi
+
+  # Every call has a fixture, and every fixture a call.
+  jq -r '.calls | keys[]' "$tmp/decl.json" | LC_ALL=C sort > "$tmp/declared.txt"
+  jq -r '.call' testdata/calls/*.json | LC_ALL=C sort -u > "$tmp/fixtured.txt"
+  if cmp -s "$tmp/declared.txt" "$tmp/fixtured.txt"; then
+    echo "test: every call has a fixture"
+  else
+    echo "test: the calls of microsoft.yaml and of testdata/calls/ differ (- declared, + fixtured):"
+    diff -u "$tmp/declared.txt" "$tmp/fixtured.txt" | sed 's/^/  /'
+    fail=1
+  fi
+
+  for f in testdata/calls/*.json; do
+    [ -e "$f" ] || continue
+    label=$(basename "$f" .json)
+    call=$(jq -r .call "$f")
+    bad=0
+    jq -n --slurpfile d "$tmp/decl.json" --slurpfile f "$f" --arg call "$call" \
+      '{decl: $d[0], call: $call, given: $f[0].params, answer: $f[0].answer}' |
+      jq -f testdata/render.jq > "$tmp/got.json"
+    jq '.want' "$f" > "$tmp/want.json"
+    same "call $label (request and kept answer)" "$tmp/want.json" "$tmp/got.json" || bad=1
+    nref=$(jq '.refused // [] | length' "$f")
+    r=0
+    while [ "$r" -lt "$nref" ]; do
+      jq -n --slurpfile d "$tmp/decl.json" --slurpfile f "$f" --arg call "$call" --argjson r "$r" \
+        '{decl: $d[0], call: $call, given: $f[0].refused[$r].params, answer: {}}' |
+        jq -f testdata/render.jq > "$tmp/got.json"
+      jq --argjson r "$r" '{error: .refused[$r].error}' "$f" > "$tmp/want.json"
+      same "call $label refusal $r" "$tmp/want.json" "$tmp/got.json" || bad=1
+      r=$((r + 1))
+    done
+    if [ "$bad" = 0 ]; then echo "test: call $label ok ($nref refusals)"; else fail=1; fi
+  done
+fi
+
+# The same file as yardr itself reads it: the source, its base, its calls
+# with their kinds and its mint command. As .yardr/test finds yardr.
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+if [ -x "$YARDR" ] && [ -s "$tmp/decl.json" ]; then
+  "$YARDR" pack check . --json 2>/dev/null | jq -r '.declared[0] | (.source, .base, (.calls[]), (.commands[].program))' > "$tmp/yardr.txt"
+  jq -r '.name, .base, (.calls | to_entries[] | "\(.key) (\(.value.kind))"), .credential.mint_command[0]' "$tmp/decl.json" > "$tmp/ours.txt"
+  if cmp -s "$tmp/ours.txt" "$tmp/yardr.txt"; then
+    echo "test: yardr pack check reads the same calls and mint"
+  else
+    echo "test: yardr pack check reads microsoft.yaml otherwise (- read here, + read by yardr):"
+    diff -u "$tmp/ours.txt" "$tmp/yardr.txt" | sed 's/^/  /'
+    fail=1
+  fi
+else
+  echo "test: yardr not found: the calls were not compared with what it reads"
+fi
+
+# ---- the mint -------------------------------------------------------------
+
+real_jq=$(command -v jq)
+nl='
+'
+
+# The PATH of every run: the stand-ins and cat, and nothing else.
+mkdir -p "$tmp/bin"
+ln -s "$pack/testdata/bin/curl" "$tmp/bin/curl"
+ln -s "$pack/testdata/bin/jq" "$tmp/bin/jq"
+ln -s "$(command -v cat)" "$tmp/bin/cat"
+
+# What to look for of the golden secret, one line each: as it is,
+# percent-encoded, as the whole of stdin carries it (Go writes an
+# ampersand there as a backslash-u escape), and its longest run of letters
+# and digits, which none of those writes differently. The golden secret
+# has one, and a case that changes the secret changes it to none worth
+# looking for.
+secret=$(jq -r '.inputs.MICROSOFT_CLIENT_SECRET' testdata/mint/stdin.json)
+{
+  printf '%s\n' "$secret"
+  printf '%s' "$secret" | jq -Rr '@uri'
+  cat testdata/mint/stdin.json
+  echo
+  printf '%s\n' "$secret" | grep -o '[A-Za-z0-9]*' | awk 'length($0) > m { m = length($0); s = $0 } END { if (m >= 6) print s }'
+} | sed '/^$/d' > "$tmp/needles"
+
+# mint_case <index> runs one case of cases.json, says what is wrong with
+# it, and is 0 when nothing is. The case's fields reach the shell as
+# assignments from one jq run, which shellcheck cannot see.
+# shellcheck disable=SC2154
+mint_case() {
+  idx=$1
+  c="$tmp/c$idx.json"
+  jq -c ".[$idx]" testdata/mint/cases.json > "$c"
+  eval "$(jq -r '@sh "name=\(.name) has_stdin=\(has("stdin")) has_edit=\(has("set") or has("drop")) has_body=\(has("body")) body_text=\(.body | type == "string") has_env=\(has("env")) status=\(.status // 200) cexit=\(.curl_exit // 0) want_exit=\(.want.exit) want_curl=\(.want.curl) want_request=\(.want.request // false) want_token=\(.want.token // "") want_err=\(.want.stderr // "") exp_in=\(((.body | objects | .expires_in) // 0) | tonumber)"' "$c")"
+  w="$tmp/m$idx"
+  mkdir -p "$w/home" "$w/work" "$w/cap"
+  problems=""
+  say() { problems="$problems
+    $*"; }
+
+  # What the core writes on stdin: the golden file as it is, with the
+  # case's changes to its inputs, or the case's own text.
+  stdin_file="$w/stdin"
+  if [ "$has_stdin" = true ]; then
+    jq -j .stdin "$c" > "$stdin_file"
+  elif [ "$has_edit" = true ]; then
+    jq -cj --slurpfile c "$c" '.inputs |= ((. + ($c[0].set // {})) | with_entries(select(.key as $k | (($c[0].drop // []) | index($k)) == null)))' testdata/mint/stdin.json > "$stdin_file"
+  else
+    stdin_file="$pack/testdata/mint/stdin.json"
+  fi
+  # What the stand-in curl answers.
+  if [ "$has_body" != true ]; then
+    : > "$w/body"
+  elif [ "$body_text" = true ]; then
+    jq -j .body "$c" > "$w/body"
+  else
+    jq -c .body "$c" > "$w/body"
+  fi
+  # The environment the core gives a command, and the stand-ins' own.
+  set -- "PATH=$tmp/bin" "HOME=$w/home" "USER=u" "LOGNAME=u" \
+    "YARDR_SOURCE_BASE=https://graph.microsoft.com/v1.0" \
+    "MS_CAPTURE=$w/cap" "MS_REAL_JQ=$real_jq" "MS_CURL_BODY=$w/body" "MS_CURL_STATUS=$status" "MS_CURL_EXIT=$cexit"
+  if [ "$has_env" = true ]; then
+    jq -r '.env | to_entries[] | "\(.key)=\(.value)"' "$c" > "$w/env.lines"
+    while IFS= read -r kv; do set -- "$@" "$kv"; done < "$w/env.lines"
+  fi
+
+  t0=0 t1=0
+  [ -z "$want_token" ] || t0=$(date +%s)
+  ( cd "$w/work" && env -i "$@" "$pack/microsoft-mint" < "$stdin_file" > "$w/out" 2> "$w/err" )
+  rc=$?
+  [ -z "$want_token" ] || t1=$(date +%s)
+
+  # The answer, the status and the message.
+  [ "$rc" = "$want_exit" ] || say "exit $rc, wanted $want_exit"
+  if [ -n "$want_token" ]; then
+    got=$(jq -r 'if keys == ["expires_at", "token"] and (.expires_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")) then "\(.token)\n\(.expires_at | fromdate)" else empty end' "$w/out" 2>/dev/null)
+    if [ -z "$got" ]; then
+      say "stdout is not one {token, expires_at} with an RFC 3339 time in Z: $(cat "$w/out")"
+    else
+      [ "${got%%"$nl"*}" = "$want_token" ] || say "the token is not the one wanted"
+      exp_at=${got#*"$nl"}
+      if [ "$exp_at" -lt $((t0 + exp_in - 2)) ] || [ "$exp_at" -gt $((t1 + exp_in + 2)) ]; then
+        say "expires_at is not expires_in ($exp_in s) from now"
+      fi
+    fi
+  else
+    [ ! -s "$w/out" ] || say "stdout should be empty: $(cat "$w/out")"
+  fi
+  got_err=$(cat "$w/err")
+  [ "$got_err" = "$want_err" ] || say "stderr is '$got_err', wanted '$want_err'"
+
+  # What curl was asked for.
+  if [ "$want_curl" = true ]; then
+    [ -f "$w/cap/curl.argv" ] || say "curl was not run"
+  elif [ -f "$w/cap/curl.argv" ]; then
+    say "curl was run, and nothing should have been sent"
+  fi
+  if [ "$want_request" = true ]; then
+    if ! cmp -s testdata/mint/request.argv "$w/cap/curl.argv"; then
+      say "curl's arguments differ (- wanted, + got):"
+      problems="$problems
+$(diff -u testdata/mint/request.argv "$w/cap/curl.argv" | sed 's/^/      /')"
+    fi
+    cmp -s testdata/mint/request.stdin "$w/cap/curl.stdin" || say "the form handed to curl differs from testdata/mint/request.stdin"
+  fi
+  if [ -f "$w/cap/curl.env" ]; then
+    if [ "$has_env" = true ]; then
+      jq -r '(.want.env // [])[]' "$c" | LC_ALL=C sort > "$w/want.env"
+      cmp -s "$w/want.env" "$w/cap/curl.env" || say "curl's proxy and CA variables are not the ones set: $(cat "$w/cap/curl.env")"
+    elif [ -s "$w/cap/curl.env" ]; then
+      say "curl was given proxy or CA variables that were not set: $(cat "$w/cap/curl.env")"
+    fi
+    if grep -E -x -q -e '--proxy.*|--noproxy|--cacert|--capath|--cert.*|--insecure|-k|-x|-E|--ssl-no-revoke' "$w/cap/curl.argv"; then
+      say "curl was given an option that overrides a proxy or CA variable"
+    fi
+  fi
+
+  # The secret, in no output and in no argument of curl or jq. grep reads
+  # bytes, which is what a leak is made of.
+  if LC_ALL=C grep -F -q -f "$tmp/needles" "$w/out" "$w/err" "$w/cap/curl.argv" "$w/cap/jq.argv" 2>/dev/null; then
+    for f in out err cap/curl.argv cap/jq.argv; do
+      if LC_ALL=C grep -F -q -f "$tmp/needles" "$w/$f" 2>/dev/null; then say "the secret is in $f"; fi
+    done
+  fi
+  if [ -n "$(find "$w/work" "$w/home" -type f 2>/dev/null)" ]; then say "the script wrote a file"; fi
+
+  if [ -n "$problems" ]; then
+    echo "test: mint case $name:$problems"
+    return 1
+  fi
+  return 0
+}
+
+ncases=$(jq 'length' testdata/mint/cases.json)
+mint_bad=0
+i=0
+while [ "$i" -lt "$ncases" ]; do
+  mint_case "$i" || mint_bad=$((mint_bad + 1))
+  i=$((i + 1))
+done
+if [ "$mint_bad" = 0 ]; then
+  echo "test: mint ok ($ncases cases)"
+else
+  echo "test: mint failed in $mint_bad of $ncases cases"
+  fail=1
+fi
+
+exit $fail

@@ -1,0 +1,101 @@
+{
+  "call": "search",
+  "about": "Document search with every parameter given. The body is the request of Microsoft's example for searching files (entityTypes driveItem) with the region application permissions require, and size and from as numbers. The answer is that example's response, with the @odata.context Graph adds.",
+  "params": { "query": "budget \"Q3 2026\" filetype:xlsx", "region": "NAM", "size": "25", "from": "50" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#search",
+    "value": [
+      {
+        "searchTerms": [ "budget", "q3 2026", "filetype:xlsx" ],
+        "hitsContainers": [
+          {
+            "total": 1,
+            "moreResultsAvailable": false,
+            "hits": [
+              {
+                "hitId": "FlULeN/ui/1GjLx1rUfio5UAAEl",
+                "rank": 1,
+                "summary": "<c0>Budget</c0> <c0>Q3 2026</c0> <ddd/>",
+                "resource": {
+                  "@odata.type": "#microsoft.graph.driveItem",
+                  "createdDateTime": "2026-07-10T06:37:43Z",
+                  "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+                  "name": "Budget 2026.xlsx",
+                  "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+                  "createdBy": { "user": { "displayName": "Ada Lovelace" } },
+                  "lastModifiedBy": { "user": { "displayName": "Richard Mayer" } },
+                  "parentReference": {
+                    "siteId": "contoso.sharepoint.com,da60e844-ba1d-49bc-b4d4-d5e36bae9019,712a596e-90a1-49e3-9b48-bfa80bee8740",
+                    "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+                    "sharepointIds": { "listId": "c61d1892-ca82-4f53-b16f-6bb8a379e2b2", "listItemId": "1027", "listItemUniqueId": "E320AFEB-AD73-46A2-83D7-985FAA4B206D" }
+                  },
+                  "fileSystemInfo": { "createdDateTime": "2026-07-10T06:37:43Z", "lastModifiedDateTime": "2026-10-21T14:02:11Z" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "POST",
+      "url": "https://graph.microsoft.com/v1.0/search/query",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "Content-Type": "application/json", "User-Agent": "yardr" },
+      "body": {
+        "requests": [
+          {
+            "entityTypes": [ "driveItem" ],
+            "query": { "queryString": "budget \"Q3 2026\" filetype:xlsx" },
+            "region": "NAM",
+            "from": 50,
+            "size": 25
+          }
+        ]
+      }
+    },
+    "kept": {
+      "value": [
+        {
+          "searchTerms": [ "budget", "q3 2026", "filetype:xlsx" ],
+          "hitsContainers": [
+            {
+              "total": 1,
+              "moreResultsAvailable": false,
+              "hits": [
+                {
+                  "hitId": "FlULeN/ui/1GjLx1rUfio5UAAEl",
+                  "rank": 1,
+                  "summary": "<c0>Budget</c0> <c0>Q3 2026</c0> <ddd/>",
+                  "resource": {
+                    "@odata.type": "#microsoft.graph.driveItem",
+                    "createdDateTime": "2026-07-10T06:37:43Z",
+                    "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+                    "name": "Budget 2026.xlsx",
+                    "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+                    "createdBy": { "user": { "displayName": "Ada Lovelace" } },
+                    "lastModifiedBy": { "user": { "displayName": "Richard Mayer" } },
+                    "parentReference": {
+                      "siteId": "contoso.sharepoint.com,da60e844-ba1d-49bc-b4d4-d5e36bae9019,712a596e-90a1-49e3-9b48-bfa80bee8740",
+                      "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+                      "sharepointIds": { "listId": "c61d1892-ca82-4f53-b16f-6bb8a379e2b2", "listItemId": "1027", "listItemUniqueId": "E320AFEB-AD73-46A2-83D7-985FAA4B206D" }
+                    },
+                    "fileSystemInfo": { "createdDateTime": "2026-07-10T06:37:43Z", "lastModifiedDateTime": "2026-10-21T14:02:11Z" }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "bound": 262144
+  },
+  "refused": [
+    { "params": { "query": "budget" }, "error": "parameter region is missing" },
+    { "params": { "query": "budget", "region": "nam" }, "error": "parameter region does not match its pattern ^[A-Z]{3}$" },
+    { "params": { "query": "budget", "region": "NAM", "size": "ten" }, "error": "parameter size is no whole number" },
+    { "params": { "query": "budget", "region": "NAM", "fields": "name" }, "error": "\"fields\" is no parameter of the call (it takes: query, region, size, from)" }
+  ]
+}

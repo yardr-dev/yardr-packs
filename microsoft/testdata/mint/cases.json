@@ -1,0 +1,238 @@
+[
+  {
+    "name": "good",
+    "about": "Microsoft's success answer. The stand-in curl is handed exactly request.argv and request.stdin; the secret in stdin.json has & < > \" \\ + / = % a space and non-ASCII in it, and goes as the form body of request.stdin says.",
+    "body": { "token_type": "Bearer", "expires_in": 3599, "ext_expires_in": 3599, "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20ifQ.c2lnbmF0dXJl" },
+    "want": { "exit": 0, "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20ifQ.c2lnbmF0dXJl", "curl": true, "request": true }
+  },
+  {
+    "name": "expires-in-as-a-string",
+    "about": "The older endpoint writes expires_in as a string.",
+    "body": { "token_type": "Bearer", "expires_in": "3599", "access_token": "abc.def.ghi" },
+    "want": { "exit": 0, "token": "abc.def.ghi", "curl": true }
+  },
+  {
+    "name": "proxy-and-ca-variables",
+    "about": "The nine variables the core hands a command reach curl as they were set, and the script adds no option of its own that would override them.",
+    "env": {
+      "HTTPS_PROXY": "http://proxy.corp:3128",
+      "https_proxy": "http://proxy.corp:3128",
+      "HTTP_PROXY": "http://proxy.corp:3128",
+      "http_proxy": "http://proxy.corp:3128",
+      "NO_PROXY": "localhost,.corp",
+      "no_proxy": "localhost,.corp",
+      "SSL_CERT_FILE": "/etc/ssl/corp.pem",
+      "SSL_CERT_DIR": "/etc/ssl/corp",
+      "NODE_EXTRA_CA_CERTS": "/etc/ssl/corp-extra.pem"
+    },
+    "body": { "token_type": "Bearer", "expires_in": 3599, "access_token": "abc.def.ghi" },
+    "want": {
+      "exit": 0,
+      "token": "abc.def.ghi",
+      "curl": true,
+      "request": true,
+      "env": [
+        "HTTPS_PROXY=http://proxy.corp:3128",
+        "https_proxy=http://proxy.corp:3128",
+        "HTTP_PROXY=http://proxy.corp:3128",
+        "http_proxy=http://proxy.corp:3128",
+        "NO_PROXY=localhost,.corp",
+        "no_proxy=localhost,.corp",
+        "SSL_CERT_FILE=/etc/ssl/corp.pem",
+        "SSL_CERT_DIR=/etc/ssl/corp",
+        "NODE_EXTRA_CA_CERTS=/etc/ssl/corp-extra.pem"
+      ]
+    }
+  },
+  {
+    "name": "wrong-secret",
+    "about": "Entra's 401, whose description repeats the secret. The failure says the status, the error word and the AADSTS number, and nothing of the description.",
+    "status": 401,
+    "body": { "error": "invalid_client", "error_description": "AADSTS7000215: Invalid client secret provided. p&ss+SEKRET9f3c+w0rd/=%20 \"q\" \\ ünï <x> ~._-é\r\nTrace ID: 0000aaaa-11bb-cccc-dd22-eeeeee333333", "error_codes": [ 7000215 ], "timestamp": "2026-11-02 09:00:00Z", "trace_id": "0000aaaa-11bb-cccc-dd22-eeeeee333333" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 401 (invalid_client, AADSTS7000215)", "curl": true }
+  },
+  {
+    "name": "expired-secret",
+    "status": 401,
+    "body": { "error": "invalid_client", "error_description": "AADSTS7000222: The provided client secret keys are expired.", "error_codes": [ 7000222 ] },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 401 (invalid_client, AADSTS7000222)", "curl": true }
+  },
+  {
+    "name": "unknown-app",
+    "status": 400,
+    "body": { "error": "unauthorized_client", "error_description": "AADSTS700016: Application not found in the directory.", "error_codes": [ 700016 ] },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 400 (unauthorized_client, AADSTS700016)", "curl": true }
+  },
+  {
+    "name": "unknown-tenant",
+    "status": 400,
+    "body": { "error": "invalid_request", "error_description": "AADSTS90002: Tenant not found.", "error_codes": [ 90002 ] },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 400 (invalid_request, AADSTS90002)", "curl": true }
+  },
+  {
+    "name": "gateway-html",
+    "about": "A proxy's page, with the secret in it, says only its status.",
+    "status": 502,
+    "body": "<html><body>Bad gateway p&ss+SEKRET9f3c+w0rd/=%20</body></html>",
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 502", "curl": true }
+  },
+  {
+    "name": "error-word-that-is-not-a-code",
+    "about": "An error that is not one short lower-case word is not repeated; the number is.",
+    "status": 400,
+    "body": { "error": "Bad Word p&ss+SEKRET9f3c+w0rd/=%20", "error_codes": [ 70011 ] },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 400 (AADSTS70011)", "curl": true }
+  },
+  {
+    "name": "error-with-no-fields",
+    "status": 500,
+    "body": {},
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 500", "curl": true }
+  },
+  {
+    "name": "no-token",
+    "body": {},
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "token-with-a-space",
+    "body": { "access_token": "a b", "expires_in": 3599 },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "token-that-is-not-a-string",
+    "body": { "access_token": 5, "expires_in": 3599 },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "no-expiry",
+    "body": { "access_token": "abc.def.ghi" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "zero-expiry",
+    "body": { "access_token": "abc.def.ghi", "expires_in": 0 },
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "answer-that-is-not-json",
+    "body": "nope",
+    "want": { "exit": 1, "stderr": "microsoft-mint: the token endpoint answered 200 with no token", "curl": true }
+  },
+  {
+    "name": "tenant-with-a-slash",
+    "about": "The tenant is a path segment of the token address. Each character that could leave the segment, or turn it into another address, has a case of its own, since a case with two of them stays refused when one is let through.",
+    "set": { "MICROSOFT_TENANT": "evil.example/x" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-question-mark",
+    "set": { "MICROSOFT_TENANT": "evil.example?x" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-hash",
+    "set": { "MICROSOFT_TENANT": "evil.example#x" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-an-at-sign",
+    "set": { "MICROSOFT_TENANT": "a@evil.example" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-colon",
+    "set": { "MICROSOFT_TENANT": "evil.example:8080" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-percent",
+    "set": { "MICROSOFT_TENANT": "evil%2Fexample" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-space",
+    "set": { "MICROSOFT_TENANT": "evil example" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-line-break",
+    "set": { "MICROSOFT_TENANT": "evil\nexample" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-with-a-leading-dash",
+    "set": { "MICROSOFT_TENANT": "-x" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "tenant-that-is-dots",
+    "set": { "MICROSOFT_TENANT": ".." },
+    "want": { "exit": 1, "stderr": "microsoft-mint: MICROSOFT_TENANT is no tenant id or domain name", "curl": false }
+  },
+  {
+    "name": "no-tenant",
+    "drop": [ "MICROSOFT_TENANT" ],
+    "want": { "exit": 1, "stderr": "microsoft-mint: its inputs name no MICROSOFT_TENANT", "curl": false }
+  },
+  {
+    "name": "empty-tenant",
+    "set": { "MICROSOFT_TENANT": "" },
+    "want": { "exit": 1, "stderr": "microsoft-mint: its inputs name no MICROSOFT_TENANT", "curl": false }
+  },
+  {
+    "name": "no-client-id",
+    "drop": [ "MICROSOFT_CLIENT_ID" ],
+    "want": { "exit": 1, "stderr": "microsoft-mint: its inputs name no MICROSOFT_CLIENT_ID", "curl": false }
+  },
+  {
+    "name": "no-secret",
+    "drop": [ "MICROSOFT_CLIENT_SECRET" ],
+    "want": { "exit": 1, "stderr": "microsoft-mint: its inputs name no MICROSOFT_CLIENT_SECRET", "curl": false }
+  },
+  {
+    "name": "secret-that-is-not-a-string",
+    "set": { "MICROSOFT_CLIENT_SECRET": 5 },
+    "want": { "exit": 1, "stderr": "microsoft-mint: its inputs name no MICROSOFT_CLIENT_SECRET", "curl": false }
+  },
+  {
+    "name": "empty-stdin",
+    "stdin": "",
+    "want": { "exit": 1, "stderr": "microsoft-mint: reads {inputs, scope} on stdin, and got nothing", "curl": false }
+  },
+  {
+    "name": "stdin-with-no-inputs",
+    "stdin": "{\"scope\":\"\"}",
+    "want": { "exit": 1, "stderr": "microsoft-mint: reads {inputs, scope} on stdin, and got no inputs", "curl": false }
+  },
+  {
+    "name": "stdin-that-is-not-json",
+    "stdin": "nope",
+    "want": { "exit": 1, "stderr": "microsoft-mint: reads {inputs, scope} on stdin, and got no inputs", "curl": false }
+  },
+  {
+    "name": "curl-cannot-connect",
+    "curl_exit": 7,
+    "want": { "exit": 1, "stderr": "microsoft-mint: could not reach login.microsoftonline.com (curl exit 7, no connection; behind a proxy, HTTPS_PROXY names it)", "curl": true }
+  },
+  {
+    "name": "curl-cannot-resolve",
+    "curl_exit": 6,
+    "want": { "exit": 1, "stderr": "microsoft-mint: could not reach login.microsoftonline.com (curl exit 6, no connection; behind a proxy, HTTPS_PROXY names it)", "curl": true }
+  },
+  {
+    "name": "curl-times-out",
+    "curl_exit": 28,
+    "want": { "exit": 1, "stderr": "microsoft-mint: could not reach login.microsoftonline.com (curl exit 28, no answer in 20 seconds)", "curl": true }
+  },
+  {
+    "name": "curl-does-not-trust-the-certificate",
+    "curl_exit": 60,
+    "want": { "exit": 1, "stderr": "microsoft-mint: could not reach login.microsoftonline.com (curl exit 60, TLS failed; a proxy that inspects TLS needs its CA in SSL_CERT_FILE)", "curl": true }
+  },
+  {
+    "name": "curl-fails-another-way",
+    "curl_exit": 22,
+    "want": { "exit": 1, "stderr": "microsoft-mint: could not reach login.microsoftonline.com (curl exit 22)", "curl": true }
+  }
+]

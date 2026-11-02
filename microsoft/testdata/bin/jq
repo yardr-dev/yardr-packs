@@ -1,0 +1,8 @@
+#!/bin/sh
+# A stand-in for jq, on the PATH of the mint's test beside the stand-in
+# curl: it logs the arguments of each run to MS_CAPTURE/jq.argv, then
+# runs the real jq (MS_REAL_JQ) on them. The test reads the log for a
+# secret in an argument, where `ps` would show it to anyone on the box.
+: "${MS_CAPTURE:?}" "${MS_REAL_JQ:?}"
+printf '%s\n' "$*" >> "$MS_CAPTURE/jq.argv"
+exec "$MS_REAL_JQ" "$@"

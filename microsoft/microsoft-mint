@@ -1,0 +1,105 @@
+#!/bin/sh
+# Mints a Microsoft Graph access token for an Entra app: the mint command
+# the microsoft pack's declaration brings (credential.mint_command), whose
+# credential names MICROSOFT_TENANT, MICROSOFT_CLIENT_ID and
+# MICROSOFT_CLIENT_SECRET under credential.mint. Applying the pack copies
+# it under <home>/sources/microsoft/; the core runs it with {inputs,
+# scope} on stdin and reads {token, expires_at} on stdout.
+#
+# The grant is OAuth 2.0 client credentials against Microsoft's v2.0
+# endpoint, as Microsoft's page on the flow writes it: POST
+# https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token with the
+# form client_id, scope=https://graph.microsoft.com/.default,
+# client_secret and grant_type=client_credentials. The token is the app's
+# own and carries the application permissions an administrator consented
+# to. The scope on stdin is the call's; Entra narrows by consent, not by
+# call, so it is read and ignored.
+#
+# The secret reaches the token request and nothing else. jq reads it from
+# stdin, since the core writes stdin with Go's json.Marshal, which turns
+# an ampersand into a backslash-u escape (and < and > the same), and only
+# a JSON reader turns that back. It goes on to
+# curl's stdin through pipes of printf, a builtin of every sh yardr runs
+# on, so it is in no argument, no file and no heredoc. No message below
+# repeats a value of the inputs or a word of Entra's answer: a failure
+# says the HTTP status, Entra's error if it is one short lower-case word,
+# and the number in error_codes (70011 is AADSTS70011).
+#
+# Needs curl and jq on the PATH the yard's server has. curl reaches
+# login.microsoftonline.com through the proxy and CA variables the core
+# hands on (HTTPS_PROXY, https_proxy, NO_PROXY, no_proxy, SSL_CERT_FILE,
+# SSL_CERT_DIR), and this script gives it no option that overrides them:
+# no --proxy, --noproxy, --cacert or -k. curl does not read
+# NODE_EXTRA_CA_CERTS, a Node variable. Reading it as --cacert would
+# replace the system's roots where Node adds to them, so it is left alone.
+set -eu
+
+fail() { echo "microsoft-mint: $*" >&2; exit 1; }
+
+command -v curl >/dev/null 2>&1 || fail "needs curl on PATH"
+command -v jq >/dev/null 2>&1 || fail "needs jq on PATH"
+
+input=$(cat)
+[ -n "$input" ] || fail "reads {inputs, scope} on stdin, and got nothing"
+
+# jq's own messages are dropped throughout: one may quote the value it
+# choked on, and a value here may be the secret.
+printf '%s' "$input" | jq -e '.inputs | type == "object"' >/dev/null 2>&1 ||
+  fail "reads {inputs, scope} on stdin, and got no inputs"
+for name in MICROSOFT_TENANT MICROSOFT_CLIENT_ID MICROSOFT_CLIENT_SECRET; do
+  printf '%s' "$input" | jq -e --arg n "$name" '.inputs[$n] | strings | length > 0' >/dev/null 2>&1 ||
+    fail "its inputs name no $name"
+done
+
+# The tenant is a path segment of the token address, a GUID or a domain
+# name, so nothing that could leave the segment is let through.
+tenant=$(printf '%s' "$input" | jq -j '.inputs.MICROSOFT_TENANT' 2>/dev/null) ||
+  fail "cannot read MICROSOFT_TENANT"
+case $tenant in
+  ''|-*|.*|*[!A-Za-z0-9.-]*) fail "MICROSOFT_TENANT is no tenant id or domain name" ;;
+esac
+
+# The form in the order Microsoft's page writes it. @uri percent-encodes
+# what is interpolated, which Microsoft asks of the secret, and leaves
+# the text around it as written.
+form=$(printf '%s' "$input" | jq -j '@uri "client_id=\(.inputs.MICROSOFT_CLIENT_ID)&scope=https%3A%2F%2Fgraph.microsoft.com%2F.default&client_secret=\(.inputs.MICROSOFT_CLIENT_SECRET)&grant_type=client_credentials"' 2>/dev/null) ||
+  fail "cannot write the token request"
+
+# The answer is read with its status after it, split at the last line
+# break by the shell itself. The core ends this command at 30 seconds.
+nl='
+'
+resp=$(printf '%s' "$form" | curl --silent --max-time 20 --proto '=https' --tlsv1.2 \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-binary @- --write-out '\n%{http_code}' \
+  "https://login.microsoftonline.com/$tenant/oauth2/v2.0/token") || {
+  rc=$?
+  case $rc in
+    5|6|7) why="no connection; behind a proxy, HTTPS_PROXY names it" ;;
+    28) why="no answer in 20 seconds" ;;
+    35|60|77) why="TLS failed; a proxy that inspects TLS needs its CA in SSL_CERT_FILE" ;;
+    *) why= ;;
+  esac
+  fail "could not reach login.microsoftonline.com (curl exit $rc${why:+, $why})"
+}
+code=${resp##*"$nl"}
+body=${resp%"$nl"*}
+case $code in
+  [0-9][0-9][0-9]) ;;
+  *) fail "the token endpoint answered with no status" ;;
+esac
+
+if [ "$code" != 200 ]; then
+  detail=$(printf '%s' "$body" | jq -r '[(.error | strings | select(test("^[a-z_]{1,40}$"))), (.error_codes[0]? | numbers | "AADSTS\(.)")] | join(", ")' 2>/dev/null) || detail=
+  fail "the token endpoint answered $code${detail:+ ($detail)}"
+fi
+
+# A token is one line of the characters a JWT is written in, and the
+# expiry is now plus expires_in, which Entra writes as a number (and the
+# older endpoint as a string). The core reads expires_at as RFC 3339.
+out=$(printf '%s' "$body" | jq -ce '
+  select((.access_token | type) == "string" and (.access_token | test("^[A-Za-z0-9._~+/=-]+$"))
+         and ((.expires_in | tonumber? // 0) > 0))
+  | {token: .access_token, expires_at: ((now + (.expires_in | tonumber)) | floor | todate)}' 2>/dev/null) ||
+  fail "the token endpoint answered 200 with no token"
+printf '%s\n' "$out"

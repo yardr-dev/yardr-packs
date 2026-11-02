@@ -1,0 +1,153 @@
+# Microsoft 365 documents as a declared source: SharePoint sites searched
+# by name, a site's libraries listed, a library's folders and files
+# listed, one item's metadata and link read, and documents searched by
+# words. All of it goes through Microsoft Graph as one Entra app, with no
+# person signed in, so the app's consent decides what is read and every
+# agent granted a call reads all of it. What it never does: no write of
+# any kind, no full file bytes (no call here downloads a file's bytes; a
+# search hit may still include Graph's short text excerpt), no Outlook or
+# Teams, no reading as each person, no delta sync, and no paging. An
+# answer that has a next page keeps
+# @odata.nextLink as the sign of more and follows none; search pages with
+# from and size, which its body can say.
+#
+# Checked against Microsoft's Graph and Entra documentation on 2
+# November 2026, not against a tenant:
+#   sites: GET /sites?search={query} takes the application permission
+#     Sites.Read.All (Sites.ReadWrite.All above it). The page says the
+#     method "doesn't support the Sites.Selected application permission".
+#   drives, root, children, item: GET /sites/{id}/drives, GET
+#     /drives/{id}/root/children, GET /drives/{id}/items/{id}/children and
+#     GET /drives/{id}/items/{id} take Files.Read.All (Sites.Read.All above
+#     it) and each supports $select. Their tables do not name
+#     Sites.Selected. The overview of the Selected permissions says that
+#     "the destination to be accessed controls the behavior", whatever
+#     Graph path reaches it, so a site granted to the app with the role
+#     read should answer these four.
+#     No items/root alias is documented; the top of a library is the
+#     drive's root relationship, hence the call root.
+#   search: POST /search/query with entityTypes driveItem takes Files.Read.All
+#     (Sites.Read.All above it); Sites.Selected is not listed. With
+#     application permissions the request must carry region, "Required
+#     for searches that use application permissions": the tenant's data
+#     location code, siteCollection.dataLocationCode, which v1.0 says is
+#     "Only present for multi-geo tenants". Application search covers
+#     shared content only; private content needs sharePointOneDriveOptions
+#     and an index that can take days to build, so the body leaves it out.
+#     size is at most 500, and a from past 1000 is not supported. The
+#     default hit carries name, webUrl and parentReference (siteId,
+#     driveId); the fields property would replace those with list columns,
+#     so the body names none.
+#
+# A driveItem has @microsoft.graph.downloadUrl, a link Microsoft calls
+# preauthenticated: it needs no sign-in and lives an hour, so it would
+# hand an agent a file's bytes outside any grant. Microsoft's page on
+# downloading a file has an app get it by selecting it by name
+# (select=id,@microsoft.graph.downloadUrl); the pages read do not say what
+# a request without $select returns. These requests send $select with
+# their own fields and never name the link. select keeps top-level keys
+# only and cannot reach into value[], so for root and children the
+# $select is all that keeps the link out; item's select drops it as well.
+# An answer is read whole up to 1 MiB and what select keeps is bounded by
+# answer.max, 64 KB unless raised; the lists raise it, since an item
+# with these fields is about 650 bytes, so 50 are about 32 KB and Graph's
+# own page of 200 about 130 KB.
+#
+# The credential mints: MICROSOFT_TENANT and MICROSOFT_CLIENT_ID name the
+# tenant and the app (neither is a secret, so both are asked in the
+# clear) and MICROSOFT_CLIENT_SECRET is the app's secret, which
+# microsoft-mint, beside this file, turns into the app's token by the
+# client credentials grant. The operator's own mint_command wins over it.
+# The file names no check call: which call works depends on the
+# permission the app was given (sites and search fail under
+# Sites.Selected), so any fixed one would call a good setup broken. A
+# mint is made only for a check call, so `yardr source check` here
+# reports where the three variables are set and sends nothing; the
+# first call is the test (SETUP.md).
+name: microsoft
+about: SharePoint and OneDrive documents through Microsoft Graph, read as one Entra app; sites, libraries and folders listed, items read, documents searched.
+base: https://graph.microsoft.com/v1.0
+credential:
+  env: MICROSOFT_TOKEN
+  header: "Authorization: Bearer {credential}"
+  mint:
+    - name: MICROSOFT_TENANT
+      secret: false               # a tenant id or domain, asked in the clear
+    - name: MICROSOFT_CLIENT_ID
+      secret: false               # the app's id, asked in the clear
+    - MICROSOFT_CLIENT_SECRET
+  mint_command: [microsoft-mint]    # the file beside this one; the source's own mint_command wins
+calls:
+  sites:
+    kind: read
+    about: Search sites by name; answers each site's id, which drives takes. Needs Sites.Read.All on the app.
+    params:
+      query: { type: string, max: 200 }   # free text: its value is in no event
+    request:
+      method: GET
+      path: /sites
+      query: { search: "{query}" }
+    answer: { select: [value, "@odata.nextLink"], max: 262144 }   # nextLink says there is more; paging is left out
+  drives:
+    kind: read
+    about: List a site's document libraries; answers each library's id, which root and children take.
+    params:
+      site: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9._,-]*$", max: 300, log: true }   # contoso.sharepoint.com,<guid>,<guid>
+    request:
+      method: GET
+      path: /sites/{site}/drives
+      query: { $select: "id,name,webUrl,driveType,description" }
+    answer: { select: [value, "@odata.nextLink"], max: 262144 }
+  root:
+    kind: read
+    about: List the top level of a library, one page; answers each item's id, name, webUrl and size, and childCount for a folder.
+    params:
+      drive: { type: string, pattern: "^[A-Za-z0-9!_-]+$", max: 200, log: true }
+      top: { type: int, default: 50 }   # items in the page; Graph's own page is 200
+    request:
+      method: GET
+      path: /drives/{drive}/root/children
+      query: { $select: "id,name,webUrl,size,lastModifiedDateTime,file,folder,parentReference", $top: "{top}" }
+    answer: { select: [value, "@odata.nextLink"], max: 262144 }
+  children:
+    kind: read
+    about: List the items in a folder, one page; answers what root does for a folder's id.
+    params:
+      drive: { type: string, pattern: "^[A-Za-z0-9!_-]+$", max: 200, log: true }
+      item: { type: string, pattern: "^[A-Za-z0-9!_-]+$", max: 200, log: true }
+      top: { type: int, default: 50 }
+    request:
+      method: GET
+      path: /drives/{drive}/items/{item}/children
+      query: { $select: "id,name,webUrl,size,lastModifiedDateTime,file,folder,parentReference", $top: "{top}" }
+    answer: { select: [value, "@odata.nextLink"], max: 262144 }
+  item:
+    kind: read
+    about: Read one item's metadata and its webUrl, the link a person opens.
+    params:
+      drive: { type: string, pattern: "^[A-Za-z0-9!_-]+$", max: 200, log: true }
+      item: { type: string, pattern: "^[A-Za-z0-9!_-]+$", max: 200, log: true }
+    request:
+      method: GET
+      path: /drives/{drive}/items/{item}
+      query: { $select: "id,name,webUrl,size,lastModifiedDateTime,file,folder,parentReference" }   # leaves out @microsoft.graph.downloadUrl
+    answer: { select: [id, name, webUrl, size, lastModifiedDateTime, file, folder, parentReference] }
+  search:
+    kind: read
+    about: Search documents by words; answers hits with name, webUrl and parentReference, and may include Graph's short text excerpt in summary. Needs Files.Read.All or Sites.Read.All on the app, and region, the tenant's data location code (NAM, EUR, APC). Finds shared content only.
+    params:
+      query: { type: string, max: 500 }   # free text, Microsoft's query syntax: its value is in no event
+      region: { type: string, pattern: "^[A-Z]{3}$" }   # Microsoft's PreferredDataLocation code: NAM, EUR, GBR
+      size: { type: int, default: 10 }   # hits in the page, 500 at most
+      from: { type: int, default: 0 }   # hits to skip, 1000 at most
+    request:
+      method: POST
+      path: /search/query
+      body:
+        requests:
+          - entityTypes: [driveItem]
+            query: { queryString: "{query}" }
+            region: "{region}"
+            from: "{from}"
+            size: "{size}"
+    answer: { select: [value], max: 262144 }

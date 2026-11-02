@@ -1,0 +1,56 @@
+{
+  "call": "item",
+  "about": "One item's metadata and link. The recorded answer is the driveItem of Microsoft's example for GET /drives/{drive-id}/items/{item-id} with the fields Graph adds when it ignores $select, among them @microsoft.graph.downloadUrl, a link that needs no sign-in. select must drop it.",
+  "params": { "drive": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd", "item": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#drives('b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd')/items/$entity",
+    "@microsoft.graph.downloadUrl": "https://contoso.sharepoint.com/sites/siteA/_layouts/15/download.aspx?UniqueId=e320afeb-ad73-46a2-83d7-985faa4b206d&Translate=false&tempauth=eyJ0eXAiOiJKV1QifQ.eyJhdWQiOiIwMDAwMDAwMy0wMDAwLTBmZjEtY2UwMC0wMDAwMDAwMDAwMDAvY29udG9zby5zaGFyZXBvaW50LmNvbUA3NGM2ZmY2ZC0w.c2ln&ApiVersion=2.0",
+    "createdBy": { "user": { "id": "efee1b77-fb3b-4f65-99d6-274c11914d12", "displayName": "Ryan Gregg" } },
+    "createdDateTime": "2016-03-21T20:01:37Z",
+    "cTag": "\"c:{86EB4C8E-D20D-46B9-AD41-23B8868DDA8A},0\"",
+    "eTag": "\"{86EB4C8E-D20D-46B9-AD41-23B8868DDA8A},1\"",
+    "id": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX",
+    "lastModifiedBy": { "user": { "id": "efee1b77-fb3b-4f65-99d6-274c11914d12", "displayName": "Ryan Gregg" } },
+    "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+    "name": "Budget 2026.xlsx",
+    "size": 197,
+    "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+    "file": { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "hashes": { "quickXorHash": "dGhpcyBpcyBhIHRlc3Q=" } },
+    "parentReference": {
+      "driveType": "documentLibrary",
+      "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+      "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+      "name": "Shared Documents",
+      "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+      "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+    }
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/items/01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX?%24select=id%2Cname%2CwebUrl%2Csize%2ClastModifiedDateTime%2Cfile%2Cfolder%2CparentReference",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "id": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX",
+      "name": "Budget 2026.xlsx",
+      "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Budget%202026.xlsx",
+      "size": 197,
+      "lastModifiedDateTime": "2026-10-21T14:02:11Z",
+      "file": { "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "hashes": { "quickXorHash": "dGhpcyBpcyBhIHRlc3Q=" } },
+      "parentReference": {
+        "driveType": "documentLibrary",
+        "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+        "id": "01BYE5RZ56Y2GOVW7725BZO354PWSELRRZ",
+        "name": "Shared Documents",
+        "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:",
+        "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+      }
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "drive": "b!abc" }, "error": "parameter item is missing" },
+    { "params": { "drive": "b!abc", "item": "x y" }, "error": "parameter item does not match its pattern ^[A-Za-z0-9!_-]+$" }
+  ]
+}

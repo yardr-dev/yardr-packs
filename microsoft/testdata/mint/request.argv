@@ -1,0 +1,13 @@
+--silent
+--max-time
+20
+--proto
+=https
+--tlsv1.2
+--header
+Content-Type: application/x-www-form-urlencoded
+--data-binary
+@-
+--write-out
+\n%{http_code}
+https://login.microsoftonline.com/contoso.onmicrosoft.com/oauth2/v2.0/token

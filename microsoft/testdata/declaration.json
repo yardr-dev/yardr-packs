@@ -1,0 +1,23 @@
+{
+  "name": "microsoft",
+  "base": "https://graph.microsoft.com/v1.0",
+  "check": null,
+  "credential": {
+    "env": "MICROSOFT_TOKEN",
+    "header": "Authorization: Bearer {credential}",
+    "mint": [
+      { "name": "MICROSOFT_TENANT", "secret": false },
+      { "name": "MICROSOFT_CLIENT_ID", "secret": false },
+      "MICROSOFT_CLIENT_SECRET"
+    ],
+    "mint_command": [ "microsoft-mint" ]
+  },
+  "kinds": {
+    "sites": "read",
+    "drives": "read",
+    "root": "read",
+    "children": "read",
+    "item": "read",
+    "search": "read"
+  }
+}

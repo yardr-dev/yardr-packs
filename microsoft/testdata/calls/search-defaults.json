@@ -1,0 +1,25 @@
+{
+  "call": "search",
+  "about": "Document search with only the required parameters: size goes as 10 and from as 0. A search with no hit answers a container with a total of 0 and no hits.",
+  "params": { "query": "contoso", "region": "EUR" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#search",
+    "value": [ { "searchTerms": [ "contoso" ], "hitsContainers": [ { "total": 0, "moreResultsAvailable": false } ] } ]
+  },
+  "want": {
+    "request": {
+      "method": "POST",
+      "url": "https://graph.microsoft.com/v1.0/search/query",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "Content-Type": "application/json", "User-Agent": "yardr" },
+      "body": {
+        "requests": [
+          { "entityTypes": [ "driveItem" ], "query": { "queryString": "contoso" }, "region": "EUR", "from": 0, "size": 10 }
+        ]
+      }
+    },
+    "kept": {
+      "value": [ { "searchTerms": [ "contoso" ], "hitsContainers": [ { "total": 0, "moreResultsAvailable": false } ] } ]
+    },
+    "bound": 262144
+  }
+}

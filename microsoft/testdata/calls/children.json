@@ -1,0 +1,59 @@
+{
+  "call": "children",
+  "about": "A folder's items, with top given. A page that ends with the last items has no next link.",
+  "params": { "drive": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd", "item": "01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K", "top": "10" },
+  "answer": {
+    "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#drives('b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd')/items('01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K')/children(id,name,webUrl,size,lastModifiedDateTime,file,folder,parentReference)",
+    "value": [
+      {
+        "id": "01BYE5RZ7CQJ6U3A6ZXRGZSPXVUT3EMLKH",
+        "name": "Leave policy.docx",
+        "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Policies/Leave%20policy.docx",
+        "size": 40960,
+        "lastModifiedDateTime": "2026-09-30T08:00:00Z",
+        "file": { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+        "parentReference": {
+          "driveType": "documentLibrary",
+          "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+          "id": "01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K",
+          "name": "Policies",
+          "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:/Policies",
+          "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+        }
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/items/01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K/children?%24select=id%2Cname%2CwebUrl%2Csize%2ClastModifiedDateTime%2Cfile%2Cfolder%2CparentReference&%24top=10",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "value": [
+        {
+          "id": "01BYE5RZ7CQJ6U3A6ZXRGZSPXVUT3EMLKH",
+          "name": "Leave policy.docx",
+          "webUrl": "https://contoso.sharepoint.com/sites/siteA/Shared%20Documents/Policies/Leave%20policy.docx",
+          "size": 40960,
+          "lastModifiedDateTime": "2026-09-30T08:00:00Z",
+          "file": { "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+          "parentReference": {
+            "driveType": "documentLibrary",
+            "driveId": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd",
+            "id": "01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K",
+            "name": "Policies",
+            "path": "/drives/b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/root:/Policies",
+            "siteId": "da60e844-ba1d-49bc-b4d4-d5e36bae9019"
+          }
+        }
+      ]
+    },
+    "bound": 262144
+  },
+  "refused": [
+    { "params": { "drive": "b!abc" }, "error": "parameter item is missing" },
+    { "params": { "drive": "b!abc", "item": "01BY/../x" }, "error": "parameter item does not match its pattern ^[A-Za-z0-9!_-]+$" },
+    { "params": { "drive": "b!abc?x=1", "item": "01BY" }, "error": "parameter drive does not match its pattern ^[A-Za-z0-9!_-]+$" }
+  ]
+}
