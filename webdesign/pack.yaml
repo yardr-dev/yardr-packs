@@ -1,0 +1,64 @@
+# Webdesign pack for yardr: the lane a question of look takes before anything
+# is built. A bead of type mockup carries a brief. A designer makes three
+# standalone HTML mockups of three distinct design directions on the bead's
+# branch and shoots each one, and a person looks at the shots and names the
+# direction to build from. Nothing is built for real and nothing lands.
+# Like the starter pack it names no agent product, model, depot, person or
+# secret: the import asks, and they stay in the yard. The format is the
+# starter's (packs/starter/pack.yaml, docs/packs.md in the yardr repository).
+
+name: webdesign
+
+# The kind of depot the pack is for: the mockups are committed on the bead's
+# branch.
+kind: git
+
+# The setup notes, for the operator: the import, the agent it asks for and the
+# programs the shots need. pack check and pack apply print them.
+setup: SETUP.md
+
+# One flow, for beads of type mockup, beside the flow the depot follows for its
+# own work (the starter's, say): this pack has none without a type. The type is
+# the pack's own because a type follows one flow. The design pack's flow is for
+# type design, so a pack that reused that type would have its import re-point
+# every depot already on the document-design flow.
+#
+# There is no assembly stage. The mockups stay on the bead's branch and the
+# shots on its note, and the words of the person's pick name the direction:
+# landing all three pages would put throwaways on the base, and landing one
+# would need another agent to take the other two out. A bead ends at picked.
+#
+# Rounds are not limited. The only way back is a person's move from pick, with
+# a note that says what to change, so a person decides each round.
+flows:
+  mockup:
+    type: mockup
+    stages:
+      backlog: { group: backlog,   file: flows/mockup/backlog.md, manual: [mockups] }
+      mockups: { group: designers, file: flows/mockup/mockups.md, outcomes: { done: pick, question: pick }, manual: [backlog] }
+      pick:    { group: decisions, file: flows/mockup/pick.md,    manual: [picked, mockups, backlog] }
+      picked:  { end: true }
+
+# The designers are a group of this pack's own. The design pack takes the
+# depot's builders because its roles are the starter's text, but a pack names a
+# group together with its role, so naming builders here would aim the depot's
+# code builders at a designer's prompt. The import makes <depot>-designers and
+# asks which agent runs it. One bead at a time: each serves its worktree and
+# runs headless Chrome three times. A yard that wants more raises the limit of
+# the group it has (yardr group set). backlog and decisions are the yard's two
+# people groups, which the import reuses.
+groups:
+  designers: { agent: roles/designer.md, limit: 1 }
+  backlog:   { people: true }
+  decisions: { people: true }
+
+# The designer's role tells it to mail {{yardmaster}}, so the pack names the
+# crew member, as the starter does. It hears a bead enter pick, a bead close,
+# and the events that need someone. The pack carries no role for it: the
+# yardmaster keeps the prompt it has.
+crew:
+  yardmaster:
+    hears:
+      events: [attention]
+      stages: [pick]
+      done: true

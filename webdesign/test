@@ -1,0 +1,126 @@
+#!/bin/sh
+# The webdesign pack's tests: what the gate runs beside yardr pack check.
+# Needs no network, no secret and no yardr, and is done in well under a second.
+# The pack is text, so there is nothing to run. What the test pins is what a
+# later edit could lose without a sound:
+#
+#   role      roles/designer.md carries both pins with their licence one-liners,
+#             the vendored frontend-design block is the upstream body byte for
+#             byte, and the rules the stage files refer to are still in it
+#   notices   THIRD_PARTY_NOTICES.md holds both licence texts byte for byte as at
+#             the pins, with the full commits, the copyright line and the hashes
+#             this test compares against
+#   stages    each stage file has its exit line, and pick.md the card of its moves
+#   shape     the decisions of pack.yaml: the pack's own type and group, no
+#             assembly, the yardmaster hearing pick and carrying no role
+#   closed    no role or stage file points at a file the import does not install
+#
+# Re-pinning a vendored file changes its block, the hash here and the hash in
+# THIRD_PARTY_NOTICES.md together; the test fails until all three agree.
+set -u
+cd "$(dirname "$0")" || exit 1
+fail=0
+
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+# has <file> <fixed text>: the text is in the file.
+has() { grep -qF -- "$2" "$1"; }
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256; else sha256sum; fi | cut -c1-64
+}
+# between <file> <begin line> <end line>: the lines after the begin line and
+# before the end line, which are not themselves printed.
+between() {
+  LC_ALL=C awk -v b="$2" -v e="$3" '$0 == b { f = 1; next } $0 == e { f = 0 } f' "$1"
+}
+
+role=roles/designer.md
+notices=THIRD_PARTY_NOTICES.md
+fd_body=9a431b51da4772b46331b8b630da283bad07b87c7569f16a54f3e0e16f8784d2
+fd_licence=0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
+taste_licence=4575a543ab88dad12ccea7d97e563d0bce5b448b06072e65d3264497dad326df
+
+# ---- the role ---------------------------------------------------------------
+# A vendored block opens with one line: name, URL, pin and licence.
+grep -q '^> Vendored from frontend-design (https://github.com/anthropics/skills/blob/ca45fc496a3436251f191354091d557da31c15b5/skills/frontend-design/SKILL.md), pin anthropics/skills@ca45fc4, licence Apache-2\.0\.' "$role"
+ok "role: the frontend-design one-liner names the project, URL, pin and licence" $?
+grep -q '^> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/SKILL.md), pin Leonxlnx/taste-skill@12af471, licence MIT\.' "$role"
+ok "role: the taste-skill one-liner names the project, URL, pin and licence" $?
+
+n=$(grep -c '^<!-- begin vendored: frontend-design -->$' "$role")
+[ "$n" = 1 ] && [ "$(grep -c '^<!-- end vendored: frontend-design -->$' "$role")" = 1 ]
+ok "role: one vendored frontend-design block, with its begin and end markers" $? "found $n begin markers"
+got=$(between "$role" '<!-- begin vendored: frontend-design -->' '<!-- end vendored: frontend-design -->' | sha256)
+[ "$got" = "$fd_body" ]
+ok "role: the frontend-design block is the upstream body, byte for byte" $? "sha256 $got, want $fd_body"
+
+# What the stage files name, so it stays in the role: the distinctness rule and
+# the shot mechanics, and the files the pack hands on.
+for t in 'The distinctness rule' 'contrib/shot/shot' '1280x800' 'PNG image data, 1280 x 800' \
+         'mockups/<n>-<name>.html' '--file'; do
+  has "$role" "$t"
+  ok "role: carries '$t'" $?
+done
+
+# ---- the notices ------------------------------------------------------------
+for t in ca45fc496a3436251f191354091d557da31c15b5 12af471f627f866411b4bd785b19646d3672784c \
+         'Copyright (c) 2026 Leonxlnx' "$fd_body" "$fd_licence" "$taste_licence"; do
+  has "$notices" "$t"
+  ok "notices: records $t" $?
+done
+got=$(between "$notices" '<!-- begin licence: frontend-design -->' '<!-- end licence: frontend-design -->' | sed '1d;$d' | sha256)
+[ "$got" = "$fd_licence" ]
+ok "notices: the Apache-2.0 text is the pinned LICENSE.txt, byte for byte" $? "sha256 $got, want $fd_licence"
+got=$(between "$notices" '<!-- begin licence: taste-skill -->' '<!-- end licence: taste-skill -->' | sed '1d;$d' | sha256)
+[ "$got" = "$taste_licence" ]
+ok "notices: the MIT text is the pinned LICENSE, byte for byte" $? "sha256 $got, want $taste_licence"
+
+# ---- the stage files --------------------------------------------------------
+# The exit line is the lead-in of each stage's list of what must hold.
+for row in 'backlog|Before it is sent to `mockups`' \
+           'mockups|Before the bead leaves as `done`:' \
+           'pick|A bead leaves `pick` when'; do
+  f=flows/mockup/${row%%|*}.md
+  line=${row#*|}
+  has "$f" "$line"
+  ok "$f: its exit line '$line'" $?
+  head -1 "$f" | grep -q '^summary: .'
+  ok "$f: opens with a summary line" $?
+done
+grep -q '^## Ask$' flows/mockup/pick.md && grep -q '^kind: moves$' flows/mockup/pick.md
+ok "flows/mockup/pick.md: ends in the card of its moves (kind: moves)" $?
+has flows/mockup/mockups.md 'your role'"'"'s distinctness rule'
+ok "flows/mockup/mockups.md: names the role's distinctness rule" $?
+
+# ---- pack.yaml --------------------------------------------------------------
+yaml=$(grep -v '^ *#' pack.yaml)
+y() { printf '%s\n' "$yaml" | grep -q "$@"; }
+y '^    type: mockup$'
+ok "pack.yaml: the flow is for the pack's own type mockup" $?
+y 'mockups: { group: designers, file: flows/mockup/mockups.md, outcomes: { done: pick, question: pick }, manual: \[backlog\] }'
+ok "pack.yaml: mockups is worked by designers, and done and question both go to pick" $?
+y 'pick:    { group: decisions, file: flows/mockup/pick.md,    manual: \[picked, mockups, backlog\] }'
+ok "pack.yaml: pick moves by hand to picked, mockups or backlog" $?
+y 'picked:  { end: true }'
+ok "pack.yaml: the flow ends at picked" $?
+y 'designers: { agent: roles/designer.md, limit: 1 }'
+ok "pack.yaml: the designers are a group of their own, one at a time" $?
+! y 'builders'
+ok "pack.yaml: no group of the depot's builders" $?
+! y 'run:'
+ok "pack.yaml: no script group, so nothing lands" $?
+y 'stages: \[pick\]'
+ok "pack.yaml: the yardmaster hears a bead enter pick" $?
+! y '^    role:'
+ok "pack.yaml: the yardmaster carries no role" $?
+
+# ---- closed -----------------------------------------------------------------
+# An import installs the role, the stage files and the setup notes: a role or a
+# stage file that sends its reader to another file of the pack sends it nowhere.
+! grep -n 'THIRD_PARTY_NOTICES\|README\|SETUP\.md' "$role" flows/mockup/*.md
+ok "role and stage files: point at no file of the pack that the import leaves behind" $?
+
+if [ "$fail" = 0 ]; then echo "test: webdesign: all ok"; else echo "test: webdesign: FAILED"; fi
+exit $fail
