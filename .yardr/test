@@ -8,7 +8,15 @@
 # executable program named test beside its pack.yaml has that run, in
 # whatever language it is written: the gate knows nothing of languages. A
 # pack's test must need no network and no secret, and must exit 0 in seconds.
-# An empty repository passes: there is nothing to check.
+#
+# The root is the directory above the one this script sits in, when that has
+# a pack at its top, so that a run by path works from anywhere; otherwise it
+# is the working directory. The landing needs the second: it runs a copy of
+# this script from a temporary file, where $0 names no repository, with the
+# worktree as its working directory. A root that cannot be entered ends the
+# run with 2, which merge-local takes for a run that could not be made and
+# holds the bead on. A root with no pack in it ends the run with 1, naming the
+# root, because a run that checked nothing is no pass.
 #
 # A pack that names a depot's own things (flows, groups, crew) is refused by a
 # bare pack check, which wants the depot the pack would be imported into. The
@@ -19,7 +27,14 @@
 # Any other failure, and the second check's, fails the pack. The operator's
 # yard is never named.
 set -e
-cd "$(dirname "$0")/.."
+# cd looks a relative name up through CDPATH first, and .yardr/.. is one: with
+# CDPATH set, the run could land in another checkout and pass on that one's
+# packs.
+unset CDPATH
+root=$(dirname "$0")/..
+set -- "$root"/*/pack.yaml
+[ -e "$1" ] || root=.
+cd "$root" || exit 2
 YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
 rc=0 n=0
 
@@ -98,5 +113,8 @@ for p in */pack.yaml; do
     if (cd "$d" && ./test); then echo "test: $d/test ok"; else echo "test: $d/test failed"; rc=1; fi
   fi
 done
+# A root with no pack checked nothing, and that is no pass. Name the root, so
+# that a wrong one is plain in the log.
+if [ "$n" = 0 ]; then echo "test: no pack under $PWD: nothing matches */pack.yaml" >&2; rc=1; fi
 if [ "$rc" = 0 ]; then echo "test: sh .yardr/test: pass, $n packs"; else echo "test: sh .yardr/test: FAIL, $n packs"; fi
 exit $rc
