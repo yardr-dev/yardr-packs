@@ -1,0 +1,3 @@
+=== args
+query
+statement=INSERT INTO T VALUES (1)

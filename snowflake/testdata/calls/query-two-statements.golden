@@ -1,0 +1,14 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"SELECT 1; SELECT 2","timeout":60}
+--- status
+1
+--- stdout
+{
+  "error": "source snowflake, call query: the service answered 422"
+}
+--- stderr

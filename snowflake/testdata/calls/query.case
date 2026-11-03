@@ -1,0 +1,5 @@
+=== args
+query
+statement=SELECT C_CUSTKEY, C_NAME, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 3
+=== answer
+@select-first-partition

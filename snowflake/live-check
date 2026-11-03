@@ -1,0 +1,133 @@
+#!/bin/sh
+# live-check: the snowflake pack against a real Snowflake account, through
+# the real yardr in a scratch yard of its own. Not part of ./test, which
+# needs no network and no secret: this needs the account, the user with its
+# public key set, and the key file.
+#
+#   ./live-check <account identifier> [user [key file]]
+#
+# The account identifier is written as the account's address writes it
+# (myorg-acct1, or xy12345.us-east-2.aws); the user is YARDR and the key file
+# ~/.yardr/keys/snowflake_rsa_key.p8 unless they are given, as SETUP.md names
+# them. SNOWFLAKE_BASE replaces the address, for a dry run against
+# testdata/standin.py on a loopback port. SNOWFLAKE_WAREHOUSE names the
+# warehouse the SELECTs run on, where the user has no default one (a SELECT
+# with no warehouse is refused 422, and the reason is not shown).
+#
+# It follows SETUP.md steps 3 and 4 (the pack applied, the operator's copy
+# with the address, the three names given by yardr source key), then makes
+# the check call and reads: SHOW DATABASES, SHOW SCHEMAS, SHOW TABLES, a
+# SELECT of three rows from SNOWFLAKE_SAMPLE_DATA, the status of that
+# statement, the same SELECT with async=true polled through status, and two
+# statements that Snowflake should refuse (a second statement in a request,
+# and a mistake). Every statement is a SELECT or a SHOW; execute is never
+# called. It prints counts, column names and statuses, and never a token, a
+# key or a value of a row. It exits 0 when everything that should work did,
+# and 1 otherwise; the scratch yard and its server are removed either way.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+account=${1:?usage: ./live-check <account identifier> [user [key file]]}
+user=${2:-YARDR}
+key=${3:-$HOME/.yardr/keys/snowflake_rsa_key.p8}
+host=$(printf '%s' "$account" | LC_ALL=C tr 'A-Z' 'a-z')
+base=${SNOWFLAKE_BASE:-https://$host.snowflakecomputing.com}
+wh=${SNOWFLAKE_WAREHOUSE:-}
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+for tool in jq openssl; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "live-check: $tool is not on PATH"; exit 1; }
+done
+[ -x "$YARDR" ] || { echo "live-check: no yardr ($YARDR)"; exit 1; }
+[ -f "$key" ] || { echo "live-check: the key file is not there"; exit 1; }
+
+# A short path: a unix socket's is held to 100 bytes.
+core=$(mktemp -d /tmp/snowlive.XXXXXX) || exit 1
+mkdir -p "$core/h" "$core/mine"
+yrun() { env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester "$@"; }
+cleanup() {
+  yrun server stop >/dev/null 2>&1
+  rm -rf "${core:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+fail=0
+no() { echo "   FAILED: $*"; fail=1; }
+
+# summ <json file> is what a ResultSet or a QueryStatus holds, without its values.
+summ() {
+  jq -c 'if has("error") then {error: .error} else {keys: keys, code: .code, message: .message, numRows: .resultSetMetaData.numRows, columns: [(.resultSetMetaData.rowType // [])[].name], rows: ((.data // []) | length)} end' "$1" 2>/dev/null || echo "(not JSON)"
+}
+# listed <json file> <column> <value> is true when the column holds the value.
+listed() {
+  jq -r --arg c "$2" --arg v "$3" '((.resultSetMetaData.rowType // []) | map(.name) | index($c)) as $i | if $i == null then "false" else ([.data[]?[$i]] | any(. == $v) | tostring) end' "$1" 2>/dev/null
+}
+# call <label> <call and parameters...> runs one call into $core/<label>.json and says how it went.
+call() {
+  label=$1
+  shift
+  yrun call snowflake "$@" --json >"$core/$label.json" 2>"$core/$label.err"
+  rc=$?
+  echo "-- $label: exit $rc $(summ "$core/$label.json")"
+}
+
+echo "== a scratch yard, the pack applied from its directory, and the operator's copy (base $base)"
+yrun init --harness claude --operator tester >"$core/init.out" 2>&1 || { echo "the scratch yard could not be made: $(tail -c 200 "$core/init.out")"; exit 1; }
+yrun pack apply "$here" --yes >"$core/out" 2>&1 || { echo "the pack did not apply: $(tail -c 200 "$core/out")"; exit 1; }
+cp -R "$here/snowflake" "$core/mine/"
+sed "s|^base: .*|base: $base|" "$here/snowflake.yaml" >"$core/mine/snowflake.yaml"
+yrun source add "$core/mine/snowflake.yaml" >"$core/out" 2>&1 || { echo "source add failed: $(tail -c 200 "$core/out")"; exit 1; }
+printf 'SNOWFLAKE_ACCOUNT=%s\nSNOWFLAKE_USER=%s\nSNOWFLAKE_KEY_FILE=%s\n' "$account" "$user" "$key" | yrun source key snowflake >"$core/out" 2>&1 ||
+  { echo "source key failed: $(tail -c 200 "$core/out")"; exit 1; }
+echo "account $account, user $user, key file given by its path"
+
+echo "== source check: the minted token, and SHOW DATABASES"
+yrun source check snowflake >"$core/check.out" 2>&1
+rc=$?
+echo "-- source check: exit $rc"
+grep -iE "answered|refused|held|is not set|check call" "$core/check.out" | cut -c1-240 | head -4
+[ "$rc" = 0 ] || no "the check call did not succeed, so Snowflake did not take the token (a 401 is Snowflake's: see SETUP.md step 4)"
+
+echo "== the reads"
+call databases databases
+[ "$(listed "$core/databases.json" name SNOWFLAKE_SAMPLE_DATA)" = true ] && echo "   SNOWFLAKE_SAMPLE_DATA is listed" || no "SNOWFLAKE_SAMPLE_DATA is not among the databases"
+call schemas schemas database=SNOWFLAKE_SAMPLE_DATA
+[ "$(listed "$core/schemas.json" name TPCH_SF1)" = true ] && echo "   TPCH_SF1 is listed" || no "TPCH_SF1 is not among the schemas"
+call tables tables database=SNOWFLAKE_SAMPLE_DATA schema=TPCH_SF1
+[ "$(listed "$core/tables.json" name CUSTOMER)" = true ] && echo "   CUSTOMER is listed" || no "CUSTOMER is not among the tables"
+call query query "statement=SELECT C_CUSTKEY, C_NAME, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 3" ${wh:+"warehouse=$wh"}
+[ "$(jq '(.data // []) | length' "$core/query.json" 2>/dev/null)" = 3 ] || no "the SELECT did not answer three rows"
+
+echo "== status of the finished statement"
+h=$(jq -r '.statementHandle // empty' "$core/query.json" 2>/dev/null)
+if [ -n "$h" ]; then
+  call status status "handle=$h"
+  [ "$(jq '(.data // []) | length' "$core/status.json" 2>/dev/null)" = 3 ] || no "status did not answer the three rows of the finished statement"
+else
+  no "the SELECT answered no statementHandle to read"
+fi
+
+echo "== async=true: the handle at once, then status until the rows are there"
+call async-query query "statement=SELECT C_CUSTKEY FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER LIMIT 2" async=true ${wh:+"warehouse=$wh"}
+ah=$(jq -r '.statementHandle // empty' "$core/async-query.json" 2>/dev/null)
+if [ -n "$ah" ]; then
+  n=0
+  while [ "$n" -lt 15 ]; do
+    n=$((n + 1))
+    yrun call snowflake status "handle=$ah" --json >"$core/poll.json" 2>"$core/poll.err"
+    jq -e '.data' "$core/poll.json" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  echo "-- status after $n poll(s): $(summ "$core/poll.json")"
+  [ "$(jq '(.data // []) | length' "$core/poll.json" 2>/dev/null)" = 2 ] || no "status never answered the two rows of the async statement"
+else
+  no "the async SELECT answered no statementHandle"
+fi
+
+echo "== what Snowflake should refuse (these are expected to fail)"
+call two-statements query "statement=SELECT 1; SELECT 2" ${wh:+"warehouse=$wh"}
+if [ "$(jq 'has("error")' "$core/two-statements.json" 2>/dev/null)" = true ]; then echo "   a second statement in a request is refused, as expected"; else no "a second statement was not refused"; fi
+call mistake query "statement=SELECT NOPE FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER LIMIT 1" ${wh:+"warehouse=$wh"}
+if [ "$(jq 'has("error")' "$core/mistake.json" 2>/dev/null)" = true ]; then echo "   a mistake is refused, as expected (the reason is not shown: $(jq -r '.error' "$core/mistake.json" 2>/dev/null | cut -c1-90))"; else no "a mistake was not refused"; fi
+
+if [ "$fail" = 0 ]; then echo "live-check: pass"; else echo "live-check: FAILED"; fi
+exit $fail

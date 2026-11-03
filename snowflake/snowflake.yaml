@@ -1,0 +1,221 @@
+# Snowflake as a declared source: what an agent may ask of one Snowflake
+# account through its SQL API, by one declared HTTPS request per thing, with
+# a key-pair JWT as the credential. Six calls: a SELECT with a bounded answer,
+# the lists of databases, schemas and tables, a statement read back by its
+# handle, and, apart from them, one that runs any other statement. Jira's
+# declaration (jira in this repository) is the pattern, and Snowflake
+# differs where noted.
+#
+# Checked against Snowflake's documentation on 3 November 2026 (the SQL API
+# pages: authenticating, submitting requests, handling responses, handling
+# errors, and the reference), against the real yardr in a scratch yard with a
+# stand-in for Snowflake, and, the same day, against a trial account
+# (README.md, "What was checked", says what was and was not):
+#
+#   POST /api/v2/statements takes the JSON body {statement, timeout, database,
+#     schema, warehouse, role}. timeout is in seconds, and 0 is the most
+#     Snowflake allows, 604800; left out, the STATEMENT_TIMEOUT_IN_SECONDS
+#     parameter applies (2 days unless set). database, schema,
+#     warehouse and role are case-sensitive, and left out they are the
+#     user's defaults (DEFAULT_NAMESPACE, DEFAULT_WAREHOUSE, DEFAULT_ROLE),
+#     so this file gives none. A request with more than one statement needs
+#     MULTI_STATEMENT_COUNT, which this file does not set, so a second
+#     statement is Snowflake's refusal.
+#   The query parameter async=true runs the statement asynchronously and
+#     answers its handle at once. Without it Snowflake answers the result if
+#     the statement is done in 45 seconds, and a handle (202) if it is not.
+#   200 answers a ResultSet {code, sqlState, message, statementHandle,
+#     createdOn, statementStatusUrl, resultSetMetaData, data, stats}: data is
+#     the first partition of the rows, every value a string; stats is there
+#     for DML. 202 answers a QueryStatus {code, sqlState, message,
+#     statementHandle, createdOn, statementStatusUrl}. 408 (the timeout cut
+#     the statement) and 422 (the statement failed) answer a QueryStatus and a
+#     QueryFailureStatus, which yardr does not keep of a refused request.
+#   GET /api/v2/statements/{statementHandle} answers 202 and a QueryStatus
+#     while the statement runs, and 200 and the ResultSet when it is done; one
+#     the timeout cut answers 408 there too (seen on an account, the pages say
+#     it of the POST). The other partitions of a large result are fetched with
+#     ?partition=N, which this file does not declare.
+#   Headers: Authorization: Bearer <JWT>, Accept and Content-Type
+#     application/json, and a User-Agent, which yardr sets to yardr.
+#     X-Snowflake-Authorization-Token-Type is optional: "if you omit it,
+#     Snowflake determines the token type by examining the token", and a
+#     declared header takes one value, so none is declared.
+#
+# The account settled what the pages leave open: databases, schemas and tables
+# are SHOW statements, which the pages neither list as taken nor leave out,
+# and the API takes them; and it takes yardr's bare User-Agent for the
+# "name/version" the pages ask for. Not checked live: execute, which the
+# trial's read-only role could not run, and an account named by its locator.
+#
+# The name is snowflake: a pack is named after the service it talks to.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: snowflake
+about: Snowflake SQL API. Runs a SELECT with a bounded answer, lists databases, schemas and tables, reads a statement by its handle; execute runs any other statement.
+
+# The names of the variables, never the values. Snowflake takes a key-pair
+# login as a JWT, which lives an hour at most, signed with the user's
+# private key. A call's header takes one {credential}, so the three names
+# below select the credential and snowflake/mint makes it, SNOWFLAKE_JWT,
+# once an hour: the account identifier, the user's name, and the path of
+# the file that holds the private key. All three are asked in the clear
+# because none is a secret: the key itself is never a variable, and no
+# command, event or note holds it, since the mint reads it from its path.
+# They live in the source's env file.
+credential:
+  env: SNOWFLAKE_JWT
+  header: "Authorization: Bearer {credential}"
+  mint:
+    - name: SNOWFLAKE_ACCOUNT
+      secret: false
+    - name: SNOWFLAKE_USER
+      secret: false
+    - name: SNOWFLAKE_KEY_FILE
+      secret: false
+  mint_command: [snowflake/mint]
+
+# ---- what an agent may ask of it, through `yardr call` --------------------
+# Declared HTTPS requests, granted one by one. A command is never something
+# an agent calls.
+#
+# base is the account's address, and an account is per operator, so this is
+# a placeholder that SETUP.md has the operator replace in the yard's copy of
+# this file: the credential goes to the hosts a file names and to no others.
+# A pack applied again replaces the yard's copy and puts this one back, and
+# the credential then goes nowhere until the copy is added again (SETUP.md
+# says how to notice).
+#
+# No update call carries an idempotency key. Snowflake takes one as the
+# requestId of the request's query (with retry=true), and a declared header
+# cannot carry a query, so idempotency is not named: an update tried again
+# after a lost answer may run twice. The way out is async=true on execute,
+# which answers the handle at once, and status, which says what became of
+# the statement.
+#
+# Every call goes to the one path, /api/v2/statements, and the one account.
+# What the user's role may read or change is Snowflake's to bound: the
+# pattern on query is a guard against a mistaken statement, not a fence.
+base: https://example.snowflakecomputing.com
+check: databases
+calls:
+  query:
+    kind: read
+    about: >-
+      Run one SELECT and read the first page of its rows. Give the statement a
+      LIMIT: only the first partition comes back (numRows and partitionInfo in
+      resultSetMetaData say how much more there is), and an answer over 256 KB
+      is refused, not cut. The statement must begin with SELECT, and what the
+      role may read is Snowflake's to enforce. An answer that is a
+      statementHandle and nothing else is a statement still running: read it
+      from status. The call ends after 30 s, so pass async=true for a long
+      statement and get the handle at once. timeout is the seconds Snowflake
+      lets the statement run, 60 unless given; 0 is seven days, not none.
+    params:
+      # Free SQL, held to a SELECT at its start: a mistaken INSERT or DROP
+      # does not reach Snowflake, and one a role would not allow anyway is
+      # refused there. A comment, a WITH or a bracket in front is refused
+      # too: put a WITH in a subquery.
+      statement: { type: string, pattern: '(?i)^\s*select\b', max: 8000 }
+      # Seconds Snowflake lets the statement run before it cancels it. 60
+      # unless given; 0 is Snowflake's maximum of seven days, so give a
+      # number. The call itself ends after 30 s whatever this is.
+      timeout: { type: int, default: 60 }
+      # The user's own defaults when left out. Names as SHOW lists them,
+      # case and all, as plain identifiers.
+      database: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      schema: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      warehouse: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      role: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      async: { type: bool, optional: true }
+    request:
+      method: POST
+      path: /api/v2/statements
+      query: { async: "{async}" }
+      body: { statement: "{statement}", timeout: "{timeout}", database: "{database}", schema: "{schema}", warehouse: "{warehouse}", role: "{role}" }
+    # Not the code, message and times: the rows and what describes them. A
+    # statement still running has a handle and no data.
+    answer: { select: [statementHandle, resultSetMetaData, data], max: 262144 }
+  databases:
+    kind: read
+    about: List the databases the role can see. The check call.
+    params:
+      warehouse: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      role: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+    request:
+      method: POST
+      path: /api/v2/statements
+      body: { statement: "SHOW DATABASES", warehouse: "{warehouse}", role: "{role}" }
+    answer: { select: [statementHandle, resultSetMetaData, data], max: 262144 }
+  schemas:
+    kind: read
+    about: >-
+      List the schemas of one database, named as databases gives it. A name
+      that needs quotes is not accepted; use query on its INFORMATION_SCHEMA.
+    params:
+      # An unquoted identifier: no space, quote, dot or semicolon can reach
+      # the statement it is written into.
+      database: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, log: true }
+    request:
+      method: POST
+      path: /api/v2/statements
+      body: { statement: "SHOW SCHEMAS IN DATABASE {database}" }
+    answer: { select: [statementHandle, resultSetMetaData, data], max: 262144 }
+  tables:
+    kind: read
+    about: >-
+      List the tables of one schema. Their columns are query's to read, from
+      the database's INFORMATION_SCHEMA.COLUMNS or a SELECT with LIMIT 1 and
+      its rowType.
+    params:
+      database: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, log: true }
+      schema: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, log: true }
+    request:
+      method: POST
+      path: /api/v2/statements
+      body: { statement: "SHOW TABLES IN SCHEMA {database}.{schema}" }
+    answer: { select: [statementHandle, resultSetMetaData, data], max: 262144 }
+  status:
+    kind: read
+    about: >-
+      Read one statement by the statementHandle an earlier call answered with.
+      Running: a code and a message and no data. Done: the first partition of
+      its rows, as query answers. Failed: the call is refused with 422, or with
+      408 where its timeout cut it, and the reason is not shown.
+    params:
+      handle: { type: string, pattern: "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", max: 36, log: true }
+    request:
+      method: GET
+      path: "/api/v2/statements/{handle}"
+    # The six fields of a QueryStatus, which is what a running statement
+    # answers, and with them the result, because a statement that is done
+    # answers the same request with its ResultSet.
+    answer: { select: [code, sqlState, message, statementHandle, createdOn, statementStatusUrl, resultSetMetaData, data], max: 262144 }
+  execute:
+    kind: update
+    about: >-
+      Run one statement that is not a SELECT (insert, create, drop, grant) as
+      the role allows. It changes something, and a call tried again after a
+      lost answer may run twice: async=true answers the statementHandle at
+      once, and status says what became of the statement. timeout is in
+      seconds, 60 unless given, and 0 is seven days, not none.
+    params:
+      # Free SQL: this is the call that is not held to a SELECT, and the
+      # reason it is an update. Snowflake runs one statement unless the
+      # request sets a statement count, which this file does not.
+      statement: { type: string, max: 8000 }
+      timeout: { type: int, default: 60 }
+      database: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      schema: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      warehouse: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      role: { type: string, pattern: "^[A-Za-z_][A-Za-z0-9_$]*$", max: 255, optional: true, log: true }
+      async: { type: bool, optional: true }
+    request:
+      method: POST
+      path: /api/v2/statements
+      query: { async: "{async}" }
+      body: { statement: "{statement}", timeout: "{timeout}", database: "{database}", schema: "{schema}", warehouse: "{warehouse}", role: "{role}" }
+    # stats is there for DML: the rows inserted, updated and deleted.
+    answer: { select: [statementHandle, resultSetMetaData, data, stats], max: 262144 }

@@ -1,0 +1,14 @@
+--- requests
+POST /api/v2/statements?async=true
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"database":"SNOWFLAKE_SAMPLE_DATA","role":"YARDR_READ","schema":"TPCH_SF1","statement":"SELECT C_CUSTKEY, C_NAME, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 3","timeout":10,"warehouse":"YARDR_WH"}
+--- status
+0
+--- stdout
+{
+  "statementHandle": "01b8c4e2-0000-8f3a-0000-0013001a2b4d"
+}
+--- stderr

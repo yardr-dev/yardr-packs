@@ -1,0 +1,14 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"INSERT INTO SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER (C_CUSTKEY) VALUES (1)","timeout":60}
+--- status
+1
+--- stdout
+{
+  "error": "source snowflake, call execute: the service answered 422"
+}
+--- stderr

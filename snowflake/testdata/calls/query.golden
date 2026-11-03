@@ -1,0 +1,87 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"SELECT C_CUSTKEY, C_NAME, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 3","timeout":60}
+--- status
+0
+--- stdout
+{
+  "data": [
+    [
+      "60001",
+      "Customer#000060001",
+      "9957.56"
+    ],
+    [
+      "60002",
+      "Customer#000060002",
+      "742.46"
+    ],
+    [
+      "60003",
+      "Customer#000060003",
+      "1747.29"
+    ]
+  ],
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 5,
+    "partitionInfo": [
+      {
+        "rowCount": 3,
+        "uncompressedSize": 128
+      },
+      {
+        "compressedSize": 71,
+        "rowCount": 2,
+        "uncompressedSize": 86
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": null,
+        "name": "C_CUSTKEY",
+        "nullable": false,
+        "precision": 38,
+        "scale": 0,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "fixed"
+      },
+      {
+        "byteLength": 100,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": 25,
+        "name": "C_NAME",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "text"
+      },
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": null,
+        "name": "C_ACCTBAL",
+        "nullable": false,
+        "precision": 12,
+        "scale": 2,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "fixed"
+      }
+    ]
+  },
+  "statementHandle": "01b8c4e1-0000-8f3a-0000-0013001a2b3c"
+}
+--- stderr

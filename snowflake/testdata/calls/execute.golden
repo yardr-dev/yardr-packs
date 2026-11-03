@@ -1,0 +1,50 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"database":"YARDR_DEMO","schema":"PUBLIC","statement":"INSERT INTO YARDR_DEMO.PUBLIC.NOTES VALUES (1, 'hello')","timeout":60}
+--- status
+0
+--- stdout
+{
+  "data": [
+    [
+      "1"
+    ]
+  ],
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 1,
+    "partitionInfo": [
+      {
+        "rowCount": 1,
+        "uncompressedSize": 2
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "",
+        "length": null,
+        "name": "number of rows inserted",
+        "nullable": false,
+        "precision": 19,
+        "scale": 0,
+        "schema": "",
+        "table": "",
+        "type": "fixed"
+      }
+    ]
+  },
+  "statementHandle": "01b8c4e4-0000-8f3a-0000-0013001a2b6f",
+  "stats": {
+    "numDuplicateRowsUpdated": 0,
+    "numRowsDeleted": 0,
+    "numRowsInserted": 1,
+    "numRowsUpdated": 0
+  }
+}
+--- stderr

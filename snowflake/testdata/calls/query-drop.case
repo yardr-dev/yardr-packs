@@ -1,0 +1,3 @@
+=== args
+query
+statement=DROP TABLE T

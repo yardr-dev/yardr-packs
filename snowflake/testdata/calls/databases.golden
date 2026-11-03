@@ -1,0 +1,107 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"SHOW DATABASES"}
+--- status
+0
+--- stdout
+{
+  "data": [
+    [
+      "1762200000.000000000",
+      "SNOWFLAKE",
+      "N",
+      "",
+      "APPLICATION"
+    ],
+    [
+      "1762200060.000000000",
+      "SNOWFLAKE_SAMPLE_DATA",
+      "N",
+      "ACCOUNTADMIN",
+      "IMPORTED DATABASE"
+    ]
+  ],
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 2,
+    "partitionInfo": [
+      {
+        "rowCount": 2,
+        "uncompressedSize": 196
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "",
+        "length": null,
+        "name": "created_on",
+        "nullable": false,
+        "precision": 0,
+        "scale": 9,
+        "schema": "",
+        "table": "",
+        "type": "timestamp_ltz"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "is_default",
+        "nullable": true,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "owner",
+        "nullable": true,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "kind",
+        "nullable": true,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      }
+    ]
+  },
+  "statementHandle": "01b8c4e5-0000-8f3a-0000-0013001a2b70"
+}
+--- stderr

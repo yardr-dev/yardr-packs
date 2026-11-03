@@ -1,0 +1,130 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"SHOW TABLES IN SCHEMA SNOWFLAKE_SAMPLE_DATA.TPCH_SF1"}
+--- status
+0
+--- stdout
+{
+  "data": [
+    [
+      "1762200060.000000000",
+      "CUSTOMER",
+      "SNOWFLAKE_SAMPLE_DATA",
+      "TPCH_SF1",
+      "TABLE",
+      "150000"
+    ],
+    [
+      "1762200060.000000000",
+      "LINEITEM",
+      "SNOWFLAKE_SAMPLE_DATA",
+      "TPCH_SF1",
+      "TABLE",
+      "6001215"
+    ],
+    [
+      "1762200060.000000000",
+      "ORDERS",
+      "SNOWFLAKE_SAMPLE_DATA",
+      "TPCH_SF1",
+      "TABLE",
+      "1500000"
+    ]
+  ],
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 3,
+    "partitionInfo": [
+      {
+        "rowCount": 3,
+        "uncompressedSize": 240
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "",
+        "length": null,
+        "name": "created_on",
+        "nullable": false,
+        "precision": 0,
+        "scale": 9,
+        "schema": "",
+        "table": "",
+        "type": "timestamp_ltz"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "database_name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "schema_name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "kind",
+        "nullable": true,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "",
+        "length": null,
+        "name": "rows",
+        "nullable": true,
+        "precision": 19,
+        "scale": 0,
+        "schema": "",
+        "table": "",
+        "type": "fixed"
+      }
+    ]
+  },
+  "statementHandle": "01b8c4e7-0000-8f3a-0000-0013001a2b92"
+}
+--- stderr

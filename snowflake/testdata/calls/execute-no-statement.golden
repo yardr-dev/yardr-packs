@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source snowflake, call execute: parameter statement is missing"
+}
+--- stderr

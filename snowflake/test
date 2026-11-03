@@ -1,0 +1,269 @@
+#!/bin/sh
+# The snowflake pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds. Needs jq, openssl,
+# python3 and yardr, and fails without any of them: a part that was skipped
+# would leave the pack unpinned.
+#
+#   mint   snowflake/mint against a key pair made here and thrown away. The
+#          claims for each form of account identifier (uppercase, the
+#          period of organization.account a hyphen, a locator's region
+#          dropped); the header, the fingerprint (computed apart, in
+#          python), iat and exp 59 minutes apart; the signature verified
+#          against the public key; the answer's shape and expiry. Then what
+#          it refuses: a missing, empty or malformed input, a key path that
+#          is no absolute, readable, regular file, a key that is encrypted,
+#          not RSA or no key, and a PATH without jq or openssl. Each
+#          refusal is one fixed line that quotes no input, with nothing on
+#          stdout. No run writes a file, and no key byte, key path or
+#          input reaches an output.
+#   core   testdata/core.sh: the real yardr in a scratch yard. The
+#          declaration as the yard reads it, the presets and the grants
+#          SETUP.md teaches, the check, and each testdata/calls/*.case, one
+#          `yardr call` against a stand-in for Snowflake on a loopback port
+#          (testdata/standin.py) that answers recorded-style ResultSet and
+#          QueryStatus bodies. A case's golden holds the request the
+#          stand-in saw, the exit status, what the call kept of the answer
+#          and what it said on stderr; a call the declaration should turn
+#          away shows as no request at all. The token the yard sent is
+#          checked against the public key, so the whole way, from the env
+#          file through the real mint to the request, is held.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the programs
+# print; read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+
+for tool in jq openssl python3; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
+
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn comes,
+# and the yard's server, which its first command starts, would outlive the
+# directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# ---- the key pair, made here and thrown away ---------------------------------
+keys=$tmp/keys
+mkdir "$keys" "$tmp/work" "$tmp/home"
+(
+  umask 077
+  openssl genrsa -out "$keys/k.pem" 2048 >/dev/null 2>&1 &&
+    openssl pkcs8 -topk8 -inform PEM -in "$keys/k.pem" -nocrypt -out "$keys/k.p8" &&
+    openssl rsa -in "$keys/k.p8" -pubout -out "$keys/pub.pem" 2>/dev/null &&
+    openssl pkcs8 -topk8 -inform PEM -in "$keys/k.pem" -v2 aes256 -passout pass:throwaway -out "$keys/encrypted.p8" &&
+    openssl ecparam -name prime256v1 -genkey -noout -out "$keys/ec.pem" 2>/dev/null &&
+    openssl pkcs8 -topk8 -inform PEM -in "$keys/ec.pem" -nocrypt -out "$keys/ec.p8" &&
+    printf 'this is no key\n' >"$keys/junk.p8" &&
+    : >"$keys/empty.p8" &&
+    cp "$keys/k.p8" "$keys/locked.p8" &&
+    chmod 000 "$keys/locked.p8"
+) || { echo "test: the throwaway keys could not be made"; exit 1; }
+mkdir "$keys/dir.p8"
+
+# What the key is looked for by: a line of its body, which no output of the
+# mint may hold.
+needle=$(sed -n 2p "$keys/k.p8")
+[ "${#needle}" -ge 20 ] || { echo "test: the throwaway key has no body line to look for"; exit 1; }
+
+# The fingerprint of the public key, worked out apart from the mint: the
+# SHA-256 of the DER, which is the PEM's body decoded.
+fp=$(python3 -I -c '
+import base64, hashlib, sys
+body = "".join(l for l in open(sys.argv[1]).read().splitlines() if not l.startswith("-----"))
+print("SHA256:" + base64.b64encode(hashlib.sha256(base64.b64decode(body)).digest()).decode())' "$keys/pub.pem")
+case $fp in SHA256:*=) ;; *) echo "test: no fingerprint worked out: $fp"; exit 1 ;; esac
+
+# ---- a JWT, taken apart -------------------------------------------------------
+# b64url_decode <text> writes the bytes that base64url text stands for.
+b64url_decode() {
+  _s=$(printf '%s' "$1" | tr '_-' '/+')
+  case $((${#_s} % 4)) in 2) _s="$_s==" ;; 3) _s="$_s=" ;; esac
+  printf '%s' "$_s" | openssl base64 -d -A
+}
+# jwt_part <token> <1 | 2> is the header or the payload, decoded.
+jwt_part() {
+  _r=${1#*.}
+  if [ "$2" = 1 ]; then b64url_decode "${1%%.*}"; else b64url_decode "${_r%%.*}"; fi
+}
+# jwt_signed <token> <public key> is 0 when the third part is RS256 over the
+# first two: RSASSA-PKCS1-v1_5 with SHA-256, which is what openssl dgst
+# -sha256 -verify checks of an RSA key.
+jwt_signed() {
+  _r=${1#*.}
+  b64url_decode "${_r#*.}" >"$tmp/sig.bin"
+  printf '%s' "${1%.*}" | openssl dgst -sha256 -verify "$2" -signature "$tmp/sig.bin" >/dev/null 2>&1
+}
+
+# holding <tokens file> <dir>... lists the files under the dirs that hold any
+# of the tokens, one token to a line of the file. There are one or two tokens
+# in a run of core.sh: the check is made by the command line's process and the
+# calls by the server's, each with a cache of its own, so a second boundary
+# between them makes a second token. The helper is tried here with both.
+holding() {
+  _f=$1
+  shift
+  while IFS= read -r _t; do
+    [ -z "$_t" ] || grep -rlF -e "$_t" "$@" 2>/dev/null
+  done <"$_f"
+}
+mkdir "$tmp/held"
+printf 'aaa.bbb.ccc\nddd.eee.fff\n' >"$tmp/held.tokens"
+printf 'nothing to find\n' >"$tmp/held/clean"
+[ -z "$(holding "$tmp/held.tokens" "$tmp/held")" ]
+ok "the search for tokens in files finds none where there are none, with two tokens" $?
+printf 'x ddd.eee.fff y\n' >"$tmp/held/leak"
+[ "$(holding "$tmp/held.tokens" "$tmp/held")" = "$tmp/held/leak" ]
+ok "the search for tokens in files finds the second of two" $?
+
+# ---- mint ----------------------------------------------------------------------
+# mint_input <account> <user> <key file> is what the core writes on stdin.
+mint_input() {
+  jq -cn --arg a "$1" --arg u "$2" --arg k "$3" '{inputs: {SNOWFLAKE_ACCOUNT: $a, SNOWFLAKE_USER: $u, SNOWFLAKE_KEY_FILE: $k}, scope: ""}'
+}
+# mint_run <stdin> [PATH] runs the mint as the core does, in a bare
+# environment, from a directory of its own: stdout is in $tmp/m.out, stderr
+# in $tmp/m.err, the status in $rc.
+mint_run() {
+  printf '%s' "$1" | (cd "$tmp/work" && env -i PATH="${2:-$PATH}" HOME="$tmp/home" "$here/snowflake/mint") >"$tmp/m.out" 2>"$tmp/m.err"
+  rc=$?
+}
+# mint_leaks says, on stdout, what of the key or the inputs the last run
+# let out.
+mint_leaks() {
+  if [ -s "$tmp/m.out" ] && grep -qF -e "$needle" "$tmp/m.out"; then echo " the key's bytes are in stdout;"; fi
+  if grep -qF -e "$needle" -e "$keys" -e CANARY "$tmp/m.err"; then echo " an input or the key is in stderr;"; fi
+  if [ -n "$(find "$tmp/work" "$tmp/home" -type f 2>/dev/null)" ]; then echo " a file was written;"; fi
+}
+
+# mint_claims <account in> <user in> <account in the claims> <user in the claims>
+mint_claims() {
+  t0=$(date +%s)
+  mint_run "$(mint_input "$1" "$2" "$keys/k.p8")"
+  t1=$(date +%s)
+  bad=$(mint_leaks)
+  [ "$rc" = 0 ] || bad="$bad exit $rc;"
+  [ ! -s "$tmp/m.err" ] || bad="$bad stderr is not empty;"
+  tok=$(jq -r '.token // empty' "$tmp/m.out" 2>/dev/null)
+  if [ -z "$tok" ]; then
+    bad="$bad no token;"
+  else
+    jq -e '(keys == ["expires_at", "token"]) and (.token | test("^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"))' "$tmp/m.out" >/dev/null 2>&1 ||
+      bad="$bad the answer is not {expires_at, token} with a token of three base64url parts;"
+    jwt_part "$tok" 1 | jq -e '. == {alg: "RS256", typ: "JWT"}' >/dev/null 2>&1 || bad="$bad the header is not RS256 JWT;"
+    payload=$(jwt_part "$tok" 2)
+    printf '%s' "$payload" | jq -e --arg iss "$3.$4.$fp" --arg sub "$3.$4" --argjson t0 "$t0" --argjson t1 "$t1" \
+      '(keys == ["exp", "iat", "iss", "sub"]) and .iss == $iss and .sub == $sub and .iat >= $t0 and .iat <= $t1 and (.exp - .iat) == 3540' >/dev/null 2>&1 ||
+      bad="$bad the claims are not iss $3.$4.<fingerprint>, sub $3.$4, iat now and exp 59 minutes on: $payload;"
+    jq -e --argjson e "$(printf '%s' "$payload" | jq '.exp // 0')" '.expires_at == ($e | todate)' "$tmp/m.out" >/dev/null 2>&1 ||
+      bad="$bad expires_at is not exp as RFC 3339;"
+    jwt_signed "$tok" "$keys/pub.pem" || bad="$bad the signature does not hold against the public key;"
+  fi
+  [ -z "$bad" ]
+  ok "mint claims for account $1, user $2" $? "$bad"
+}
+mint_claims myorg-acct1 yardr MYORG-ACCT1 YARDR
+mint_claims MyOrg-Acct_2 Ada.Lovelace@Example.com MYORG-ACCT_2 ADA.LOVELACE@EXAMPLE.COM
+mint_claims myorg.acct1 yardr MYORG-ACCT1 YARDR
+mint_claims xy12345 yardr XY12345 YARDR
+mint_claims xy12345.us-east-1 yardr XY12345 YARDR
+mint_claims xy12345.us-east-2.aws yardr XY12345 YARDR
+mint_claims xy12345.west-europe.azure yardr XY12345 YARDR
+mint_claims xy12345.us-central1.gcp yardr XY12345 YARDR
+
+# mint_refuses <what> <stdin> <the one line wanted on stderr> [PATH]
+mint_refuses() {
+  mint_run "$2" "${4:-}"
+  bad=$(mint_leaks)
+  [ "$rc" = 1 ] || bad="$bad exit $rc, wanted 1;"
+  [ ! -s "$tmp/m.out" ] || bad="$bad stdout is not empty;"
+  [ "$(cat "$tmp/m.err")" = "$3" ] || bad="$bad stderr is '$(cat "$tmp/m.err")';"
+  [ -z "$bad" ]
+  ok "mint refuses $1 with one fixed line that quotes no input" $? "$bad"
+}
+want_inputs='snowflake/mint: want SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER and SNOWFLAKE_KEY_FILE among the inputs'
+want_account='snowflake/mint: SNOWFLAKE_ACCOUNT is no account identifier: letters, digits, hyphens, underscores and periods'
+want_user='snowflake/mint: SNOWFLAKE_USER is no user name: it has a space or a control character'
+want_path='snowflake/mint: SNOWFLAKE_KEY_FILE is no absolute path: a ~ is not expanded'
+want_file='snowflake/mint: SNOWFLAKE_KEY_FILE names no readable regular file'
+want_key='snowflake/mint: the key in SNOWFLAKE_KEY_FILE is no RSA private key without a passphrase (PEM, as openssl pkcs8 -nocrypt writes it)'
+good=$(mint_input acct yardr "$keys/k.p8")
+mint_refuses "no input at all" '' "$want_inputs"
+mint_refuses "an input that is no JSON" 'not json CANARY' "$want_inputs"
+mint_refuses "inputs that are a string" '{"inputs":"CANARY"}' "$want_inputs"
+mint_refuses "no inputs" '{"scope":""}' "$want_inputs"
+mint_refuses "no account" "$(printf '%s' "$good" | jq -c 'del(.inputs.SNOWFLAKE_ACCOUNT)')" "$want_inputs"
+mint_refuses "no user" "$(printf '%s' "$good" | jq -c 'del(.inputs.SNOWFLAKE_USER)')" "$want_inputs"
+mint_refuses "no key file" "$(printf '%s' "$good" | jq -c 'del(.inputs.SNOWFLAKE_KEY_FILE)')" "$want_inputs"
+mint_refuses "an empty user" "$(mint_input acct '' "$keys/k.p8")" "$want_inputs"
+mint_refuses "an account that is a number" "$(printf '%s' "$good" | jq -c '.inputs.SNOWFLAKE_ACCOUNT = 5')" "$want_inputs"
+mint_refuses "an account with a space" "$(mint_input 'CANARY acct' yardr "$keys/k.p8")" "$want_account"
+mint_refuses "an account with a slash" "$(mint_input 'CANARY/acct' yardr "$keys/k.p8")" "$want_account"
+mint_refuses "an account that starts with a hyphen" "$(mint_input '-CANARY' yardr "$keys/k.p8")" "$want_account"
+mint_refuses "a user with a space" "$(mint_input acct 'CANARY user' "$keys/k.p8")" "$want_user"
+mint_refuses "a user with a tab" "$(mint_input acct "$(printf 'CANARY\tuser')" "$keys/k.p8")" "$want_user"
+mint_refuses "a key path that is relative" "$(mint_input acct yardr CANARY/key.p8)" "$want_path"
+# The ~ is the point: the env file holds it as typed, and nothing expands it.
+# shellcheck disable=SC2088
+mint_refuses "a key path that starts with a ~" "$(mint_input acct yardr '~/CANARY.p8')" "$want_path"
+mint_refuses "a key path that names nothing" "$(mint_input acct yardr /CANARY/nothing.p8)" "$want_file"
+mint_refuses "a key path that is a directory" "$(mint_input acct yardr "$keys/dir.p8")" "$want_file"
+if [ "$(id -u)" != 0 ]; then
+  mint_refuses "a key file that cannot be read" "$(mint_input acct yardr "$keys/locked.p8")" "$want_file"
+fi
+mint_refuses "a key with a passphrase, without asking for it" "$(mint_input acct yardr "$keys/encrypted.p8")" "$want_key"
+mint_refuses "a key that is not RSA" "$(mint_input acct yardr "$keys/ec.p8")" "$want_key"
+mint_refuses "a file that is no key" "$(mint_input acct yardr "$keys/junk.p8")" "$want_key"
+mint_refuses "an empty key file" "$(mint_input acct yardr "$keys/empty.p8")" "$want_key"
+
+# A PATH that holds what the mint runs besides the program under test.
+for tool in jq openssl; do
+  mkdir "$tmp/without-$tool"
+  for p in cat tr date jq openssl; do
+    [ "$p" = "$tool" ] || ln -s "$(command -v "$p")" "$tmp/without-$tool/$p"
+  done
+  mint_refuses "a PATH without $tool" "$good" "snowflake/mint: needs $tool on PATH" "$tmp/without-$tool"
+done
+
+# ---- core ------------------------------------------------------------------------
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: snowflake: all ok"; else echo "test: snowflake: FAILED"; fi
+exit $fail

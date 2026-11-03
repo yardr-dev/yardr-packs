@@ -1,0 +1,6 @@
+=== args
+databases
+warehouse=YARDR_WH
+role=YARDR_READ
+=== answer
+@show-databases

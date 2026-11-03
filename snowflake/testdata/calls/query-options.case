@@ -1,0 +1,13 @@
+=== args
+query
+statement=SELECT C_CUSTKEY, C_NAME, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 3
+timeout=10
+database=SNOWFLAKE_SAMPLE_DATA
+schema=TPCH_SF1
+warehouse=YARDR_WH
+role=YARDR_READ
+async=true
+=== answer
+@running
+=== status
+202

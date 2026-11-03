@@ -1,0 +1,3 @@
+=== args
+schemas
+database=SNOWFLAKE_SAMPLE_DATA; DROP DATABASE X

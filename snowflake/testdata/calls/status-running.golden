@@ -1,0 +1,17 @@
+--- requests
+GET /api/v2/statements/01b8c4e2-0000-8f3a-0000-0013001a2b4d
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "code": "333334",
+  "createdOn": 1762207260000,
+  "message": "Asynchronous execution in progress. Use provided query id to perform query monitoring and management.",
+  "sqlState": "00000",
+  "statementHandle": "01b8c4e2-0000-8f3a-0000-0013001a2b4d",
+  "statementStatusUrl": "/api/v2/statements/01b8c4e2-0000-8f3a-0000-0013001a2b4d"
+}
+--- stderr

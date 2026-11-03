@@ -1,0 +1,325 @@
+{
+  "about": "Snowflake SQL API. Runs a SELECT with a bounded answer, lists databases, schemas and tables, reads a statement by its handle; execute runs any other statement.",
+  "base": "https://example.snowflakecomputing.com",
+  "calls": [
+    {
+      "about": "Run one SELECT and read the first page of its rows. Give the statement a LIMIT: only the first partition comes back (numRows and partitionInfo in resultSetMetaData say how much more there is), and an answer over 256 KB is refused, not cut. The statement must begin with SELECT, and what the role may read is Snowflake's to enforce. An answer that is a statementHandle and nothing else is a statement still running: read it from status. The call ends after 30 s, so pass async=true for a long statement and get the handle at once. timeout is the seconds Snowflake lets the statement run, 60 unless given; 0 is seven days, not none.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "statementHandle",
+          "resultSetMetaData",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "query",
+      "params": [
+        {
+          "max": 8000,
+          "name": "statement",
+          "pattern": "(?i)^\\s*select\\b",
+          "type": "string"
+        },
+        {
+          "default": 60,
+          "name": "timeout",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "database",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "schema",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "warehouse",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "role",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "name": "async",
+          "optional": true,
+          "type": "bool"
+        }
+      ],
+      "request": {
+        "body": {
+          "database": "{database}",
+          "role": "{role}",
+          "schema": "{schema}",
+          "statement": "{statement}",
+          "timeout": "{timeout}",
+          "warehouse": "{warehouse}"
+        },
+        "method": "POST",
+        "path": "/api/v2/statements",
+        "query": [
+          {
+            "key": "async",
+            "value": "{async}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List the databases the role can see. The check call.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "statementHandle",
+          "resultSetMetaData",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "databases",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "warehouse",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "role",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "role": "{role}",
+          "statement": "SHOW DATABASES",
+          "warehouse": "{warehouse}"
+        },
+        "method": "POST",
+        "path": "/api/v2/statements"
+      }
+    },
+    {
+      "about": "List the schemas of one database, named as databases gives it. A name that needs quotes is not accepted; use query on its INFORMATION_SCHEMA.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "statementHandle",
+          "resultSetMetaData",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "schemas",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "database",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "statement": "SHOW SCHEMAS IN DATABASE {database}"
+        },
+        "method": "POST",
+        "path": "/api/v2/statements"
+      }
+    },
+    {
+      "about": "List the tables of one schema. Their columns are query's to read, from the database's INFORMATION_SCHEMA.COLUMNS or a SELECT with LIMIT 1 and its rowType.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "statementHandle",
+          "resultSetMetaData",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "tables",
+      "params": [
+        {
+          "log": true,
+          "max": 255,
+          "name": "database",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "schema",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "statement": "SHOW TABLES IN SCHEMA {database}.{schema}"
+        },
+        "method": "POST",
+        "path": "/api/v2/statements"
+      }
+    },
+    {
+      "about": "Read one statement by the statementHandle an earlier call answered with. Running: a code and a message and no data. Done: the first partition of its rows, as query answers. Failed: the call is refused with 422, or with 408 where its timeout cut it, and the reason is not shown.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "code",
+          "sqlState",
+          "message",
+          "statementHandle",
+          "createdOn",
+          "statementStatusUrl",
+          "resultSetMetaData",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "status",
+      "params": [
+        {
+          "log": true,
+          "max": 36,
+          "name": "handle",
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/statements/{handle}"
+      }
+    },
+    {
+      "about": "Run one statement that is not a SELECT (insert, create, drop, grant) as the role allows. It changes something, and a call tried again after a lost answer may run twice: async=true answers the statementHandle at once, and status says what became of the statement. timeout is in seconds, 60 unless given, and 0 is seven days, not none.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "statementHandle",
+          "resultSetMetaData",
+          "data",
+          "stats"
+        ]
+      },
+      "kind": "update",
+      "name": "execute",
+      "params": [
+        {
+          "max": 8000,
+          "name": "statement",
+          "type": "string"
+        },
+        {
+          "default": 60,
+          "name": "timeout",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "database",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "schema",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "warehouse",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 255,
+          "name": "role",
+          "optional": true,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+          "type": "string"
+        },
+        {
+          "name": "async",
+          "optional": true,
+          "type": "bool"
+        }
+      ],
+      "request": {
+        "body": {
+          "database": "{database}",
+          "role": "{role}",
+          "schema": "{schema}",
+          "statement": "{statement}",
+          "timeout": "{timeout}",
+          "warehouse": "{warehouse}"
+        },
+        "method": "POST",
+        "path": "/api/v2/statements",
+        "query": [
+          {
+            "key": "async",
+            "value": "{async}"
+          }
+        ]
+      }
+    }
+  ],
+  "check": "databases",
+  "credential": {
+    "env": "SNOWFLAKE_JWT",
+    "header": "Authorization: Bearer {credential}",
+    "mint": [
+      "SNOWFLAKE_ACCOUNT",
+      "SNOWFLAKE_USER",
+      "SNOWFLAKE_KEY_FILE"
+    ],
+    "mint_command": [
+      "snowflake/mint"
+    ],
+    "not_secret": [
+      "SNOWFLAKE_ACCOUNT",
+      "SNOWFLAKE_USER",
+      "SNOWFLAKE_KEY_FILE"
+    ]
+  },
+  "name": "snowflake"
+}

@@ -1,0 +1,5 @@
+=== args
+schemas
+database=SNOWFLAKE_SAMPLE_DATA
+=== answer
+@show-schemas

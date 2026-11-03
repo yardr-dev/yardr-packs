@@ -1,0 +1,8 @@
+=== args
+execute
+statement=CREATE TABLE YARDR_DEMO.PUBLIC.NOTES (ID NUMBER, TEXT STRING)
+async=true
+=== answer
+@running
+=== status
+202

@@ -1,0 +1,7 @@
+=== args
+execute
+statement=INSERT INTO YARDR_DEMO.PUBLIC.NOTES VALUES (1, 'hello')
+database=YARDR_DEMO
+schema=PUBLIC
+=== answer
+@dml

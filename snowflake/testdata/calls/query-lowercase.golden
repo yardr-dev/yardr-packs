@@ -1,0 +1,14 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"  select count(*) from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS","timeout":60}
+--- status
+0
+--- stdout
+{
+  "statementHandle": "01b8c4e2-0000-8f3a-0000-0013001a2b4d"
+}
+--- stderr

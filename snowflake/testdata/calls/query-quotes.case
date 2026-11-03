@@ -1,0 +1,5 @@
+=== args
+query
+statement=SELECT 'it''s' AS "Q" LIMIT 1
+=== answer
+@select-done

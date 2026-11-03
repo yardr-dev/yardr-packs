@@ -1,0 +1,7 @@
+=== args
+execute
+statement=INSERT INTO SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER (C_CUSTKEY) VALUES (1)
+=== answer
+@failed
+=== status
+422

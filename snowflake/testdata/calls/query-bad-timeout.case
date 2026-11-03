@@ -1,0 +1,4 @@
+=== args
+query
+statement=SELECT 1
+timeout=soon

@@ -1,0 +1,12 @@
+--- requests
+GET /api/v2/statements/01b8c4e2-0000-8f3a-0000-0013001a2b4d
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source snowflake, call status: the service answered 404"
+}
+--- stderr

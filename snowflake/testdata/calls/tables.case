@@ -1,0 +1,6 @@
+=== args
+tables
+database=SNOWFLAKE_SAMPLE_DATA
+schema=TPCH_SF1
+=== answer
+@show-tables

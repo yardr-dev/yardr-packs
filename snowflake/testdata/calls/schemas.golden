@@ -1,0 +1,98 @@
+--- requests
+POST /api/v2/statements
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"statement":"SHOW SCHEMAS IN DATABASE SNOWFLAKE_SAMPLE_DATA"}
+--- status
+0
+--- stdout
+{
+  "data": [
+    [
+      "1762200060.000000000",
+      "INFORMATION_SCHEMA",
+      "SNOWFLAKE_SAMPLE_DATA",
+      ""
+    ],
+    [
+      "1762200060.000000000",
+      "TPCH_SF1",
+      "SNOWFLAKE_SAMPLE_DATA",
+      ""
+    ],
+    [
+      "1762200060.000000000",
+      "TPCH_SF10",
+      "SNOWFLAKE_SAMPLE_DATA",
+      ""
+    ]
+  ],
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 3,
+    "partitionInfo": [
+      {
+        "rowCount": 3,
+        "uncompressedSize": 210
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "",
+        "length": null,
+        "name": "created_on",
+        "nullable": false,
+        "precision": 0,
+        "scale": 9,
+        "schema": "",
+        "table": "",
+        "type": "timestamp_ltz"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "database_name",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      },
+      {
+        "byteLength": 16777216,
+        "collation": null,
+        "database": "",
+        "length": 16777216,
+        "name": "owner",
+        "nullable": true,
+        "precision": null,
+        "scale": null,
+        "schema": "",
+        "table": "",
+        "type": "text"
+      }
+    ]
+  },
+  "statementHandle": "01b8c4e6-0000-8f3a-0000-0013001a2b81"
+}
+--- stderr

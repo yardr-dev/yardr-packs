@@ -1,0 +1,85 @@
+--- requests
+GET /api/v2/statements/01b8c4e2-0000-8f3a-0000-0013001a2b4d
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "code": "090001",
+  "createdOn": 1762207260000,
+  "data": [
+    [
+      "60001",
+      "Customer#000060001",
+      "9957.56"
+    ],
+    [
+      "60002",
+      "Customer#000060002",
+      "742.46"
+    ],
+    [
+      "60003",
+      "Customer#000060003",
+      "1747.29"
+    ]
+  ],
+  "message": "Statement executed successfully.",
+  "resultSetMetaData": {
+    "format": "jsonv2",
+    "numRows": 3,
+    "partitionInfo": [
+      {
+        "rowCount": 3,
+        "uncompressedSize": 128
+      }
+    ],
+    "rowType": [
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": null,
+        "name": "C_CUSTKEY",
+        "nullable": false,
+        "precision": 38,
+        "scale": 0,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "fixed"
+      },
+      {
+        "byteLength": 100,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": 25,
+        "name": "C_NAME",
+        "nullable": false,
+        "precision": null,
+        "scale": null,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "text"
+      },
+      {
+        "byteLength": null,
+        "collation": null,
+        "database": "SNOWFLAKE_SAMPLE_DATA",
+        "length": null,
+        "name": "C_ACCTBAL",
+        "nullable": false,
+        "precision": 12,
+        "scale": 2,
+        "schema": "TPCH_SF1",
+        "table": "CUSTOMER",
+        "type": "fixed"
+      }
+    ]
+  },
+  "sqlState": "00000",
+  "statementHandle": "01b8c4e2-0000-8f3a-0000-0013001a2b4d",
+  "statementStatusUrl": "/api/v2/statements/01b8c4e2-0000-8f3a-0000-0013001a2b4d"
+}
+--- stderr

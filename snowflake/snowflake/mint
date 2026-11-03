@@ -1,0 +1,102 @@
+#!/bin/sh
+# mint: the credential Snowflake's SQL API takes, made from the user's
+# private key. stdin {"inputs": {"SNOWFLAKE_ACCOUNT": …, "SNOWFLAKE_USER": …,
+# "SNOWFLAKE_KEY_FILE": …}, "scope": …}, stdout {"token": …,
+# "expires_at": …}, as a source's mint_command is run.
+#
+# A key-pair login is a JWT signed with the private key (RS256). Its claims
+# name the account, the user and the key by its fingerprint:
+#
+#   iss  <ACCOUNT>.<USER>.SHA256:<fingerprint>
+#   sub  <ACCOUNT>.<USER>
+#   iat  now           exp  now + 59 minutes (Snowflake takes an hour at most)
+#
+# The fingerprint is the base64 of the SHA-256 of the public key's DER, the
+# value `DESCRIBE USER` shows as RSA_PUBLIC_KEY_FP. ACCOUNT and USER are
+# uppercase. The account is written as Snowflake wants it in a claim:
+#   myorg-acct1      organization and account, as the host writes them: as it is
+#   myorg.acct1      the same with a period: the period becomes a hyphen
+#   xy12345          an account locator: as it is
+#   xy12345.us-east-1, xy12345.us-east-2.aws
+#                    a locator with its region (and cloud): the region goes
+# A period is read as a region when a second period or a hyphen follows it:
+# an account name has no hyphen, and a region always has one.
+#
+# The key is read by openssl from its path, which is all that reaches an
+# argument; the key's bytes pass through no variable, no argument and no
+# file of ours. The token is built in the shell and printed by printf, a
+# builtin, so it is on no argument list either. Nothing but a fixed line
+# reaches stderr, and none quotes an input: openssl's and jq's own messages
+# can name a path or a value, so both are dropped. Needs openssl and jq.
+set -eu
+
+fail() { echo "snowflake/mint: $*" >&2; exit 1; }
+
+command -v jq >/dev/null 2>&1 || fail "needs jq on PATH"
+command -v openssl >/dev/null 2>&1 || fail "needs openssl on PATH"
+
+input=$(cat)
+
+# field <name> is the string the inputs hold under name, and nothing if
+# they hold none (or the input is no JSON).
+field() { printf '%s' "$input" | jq -j --arg n "$1" '.inputs[$n] | strings' 2>/dev/null || true; }
+
+account=$(field SNOWFLAKE_ACCOUNT)
+user=$(field SNOWFLAKE_USER)
+keyfile=$(field SNOWFLAKE_KEY_FILE)
+[ -n "$account" ] && [ -n "$user" ] && [ -n "$keyfile" ] ||
+  fail "want SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER and SNOWFLAKE_KEY_FILE among the inputs"
+
+case $account in
+  [!A-Za-z0-9]* | *[!A-Za-z0-9._-]*)
+    fail "SNOWFLAKE_ACCOUNT is no account identifier: letters, digits, hyphens, underscores and periods" ;;
+esac
+case $user in
+  *[[:space:]]* | *[[:cntrl:]]*) fail "SNOWFLAKE_USER is no user name: it has a space or a control character" ;;
+esac
+case $account in
+  *.*.* | *.*-*) account=${account%%.*} ;;
+  *.*) account=${account%%.*}-${account#*.} ;;
+esac
+# ASCII capitals only, on purpose (the C locale and the ranges): that is what a
+# claim holds, and a locale's idea of upper case could change a name.
+# shellcheck disable=SC2018,SC2019
+account=$(printf '%s' "$account" | LC_ALL=C tr 'a-z' 'A-Z')
+# shellcheck disable=SC2018,SC2019
+user=$(printf '%s' "$user" | LC_ALL=C tr 'a-z' 'A-Z')
+
+# The core runs a command in a directory of its own choosing, so only a
+# whole path names the key.
+case $keyfile in
+  /*) ;;
+  *) fail "SNOWFLAKE_KEY_FILE is no absolute path: a ~ is not expanded" ;;
+esac
+[ -f "$keyfile" ] && [ -r "$keyfile" ] || fail "SNOWFLAKE_KEY_FILE names no readable regular file"
+
+# -passin pass: gives a key that wants a passphrase an empty one, so it is
+# refused here instead of asked for on a terminal; rsa also refuses a key
+# of another kind, which would sign something Snowflake does not read.
+openssl rsa -in "$keyfile" -passin pass: -noout >/dev/null 2>&1 </dev/null ||
+  fail "the key in SNOWFLAKE_KEY_FILE is no RSA private key without a passphrase (PEM, as openssl pkcs8 -nocrypt writes it)"
+
+# A pipeline's status is its last command's, so what the first one made is
+# looked at: the hash of nothing is a fingerprint too, and must not pass.
+der=$(openssl rsa -in "$keyfile" -passin pass: -pubout -outform DER 2>/dev/null </dev/null | openssl base64 -A)
+[ -n "$der" ] || fail "cannot read the public key from the key in SNOWFLAKE_KEY_FILE"
+fp=$(printf '%s' "$der" | openssl base64 -d -A | openssl dgst -sha256 -binary | openssl base64 -A)
+
+# b64url is base64 without padding in the URL alphabet, as a JWT writes it.
+b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
+now=$(date +%s)
+exp=$((now + 3540))
+header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)
+payload=$(jq -cjn --arg iss "$account.$user.SHA256:$fp" --arg sub "$account.$user" --argjson iat "$now" --argjson exp "$exp" \
+  '{iss: $iss, sub: $sub, iat: $iat, exp: $exp}' | b64url)
+sig=$(printf '%s' "$header.$payload" | openssl dgst -sha256 -sign "$keyfile" -passin pass: 2>/dev/null | b64url)
+[ -n "$sig" ] || fail "cannot sign with the key in SNOWFLAKE_KEY_FILE"
+
+# The expiry is the token's own, to the second; the core stops using the
+# token five minutes before it.
+expires_at=$(jq -nr --argjson t "$exp" '$t | todate')
+printf '{"token":"%s.%s.%s","expires_at":"%s"}\n' "$header" "$payload" "$sig" "$expires_at"

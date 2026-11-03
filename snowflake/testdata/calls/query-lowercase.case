@@ -1,0 +1,7 @@
+=== args
+query
+statement=  select count(*) from SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS
+=== answer
+@running
+=== status
+202

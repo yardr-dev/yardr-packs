@@ -1,0 +1,7 @@
+=== args
+query
+statement=SELECT 1; SELECT 2
+=== answer
+@failed
+=== status
+422

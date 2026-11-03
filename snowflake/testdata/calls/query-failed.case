@@ -1,0 +1,7 @@
+=== args
+query
+statement=SELECT AFAF FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER LIMIT 1
+=== answer
+@failed
+=== status
+422
