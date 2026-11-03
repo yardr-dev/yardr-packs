@@ -9,10 +9,65 @@
 # whatever language it is written: the gate knows nothing of languages. A
 # pack's test must need no network and no secret, and must exit 0 in seconds.
 # An empty repository passes: there is nothing to check.
+#
+# A pack that names a depot's own things (flows, groups, crew) is refused by a
+# bare pack check, which wants the depot the pack would be imported into. The
+# gate does not tell which packs those are: it checks every pack bare, and only
+# when yardr answers with that very refusal checks the pack again with --depot
+# scratch, in a yard of its own. That yard is made once, in a temporary
+# directory, by the first pack that needs it, and removed when the gate exits.
+# Any other failure, and the second check's, fails the pack. The operator's
+# yard is never named.
 set -e
 cd "$(dirname "$0")/.."
 YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
 rc=0 n=0
+
+# The scratch yard: one short directory (a unix socket's path is held to 100
+# bytes) with its home, its repository and its state in it. What runs there
+# gets an environment of nothing but HOME and PATH, so that none of this
+# session's YARDR_* variables lead back to a real yard and git reads none of
+# the operator's configuration.
+scratch='' scratch_up='' scratch_why=''
+scratchenv() { env -i HOME="$scratch/h" PATH="$PATH" "$@"; }
+yrun() { scratchenv "$YARDR" --home "$scratch/y" --actor tester "$@"; }
+
+# The yard's server starts on its first command and would outlive the
+# directory it owns: stop it first. A trap runs under set -e, and a stop that
+# fails (no server was started) would end it before the rm, so the stop is
+# guarded. The trap runs this, which shellcheck does not see.
+# shellcheck disable=SC2329
+cleanup() {
+  if [ -n "$scratch" ]; then
+    yrun server stop >/dev/null 2>&1 || true
+    rm -rf "${scratch:?}"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# scratch_yard makes the scratch yard if no pack has needed it yet, and says
+# whether it is there. It tries once: a pack that comes after a try that failed
+# is told the same reason ($scratch_why), and no second yard is made.
+scratch_yard() {
+  case $scratch_up in yes) return 0 ;; no) return 1 ;; esac
+  scratch_up=no
+  scratch=$(mktemp -d /tmp/packcheck.XXXXXX) || { scratch=''; scratch_why="mktemp -d /tmp/packcheck.XXXXXX failed"; return 1; }
+  # The repository is one empty commit: depot add wants a base to name.
+  if {
+    mkdir "$scratch/h" &&
+      yrun init --harness claude --operator tester &&
+      scratchenv git init -q -b main "$scratch/repo" &&
+      scratchenv git -C "$scratch/repo" -c user.name=scratch -c user.email=scratch@localhost commit -q --allow-empty -m seed &&
+      yrun depot add scratch "$scratch/repo" --base main
+  } >"$scratch/out" 2>&1; then
+    scratch_up=yes
+  else
+    scratch_why=$(tail -c 300 "$scratch/out")
+  fi
+  [ "$scratch_up" = yes ]
+}
+
 for p in */pack.yaml; do
   [ -e "$p" ] || continue
   d=${p%/pack.yaml}
@@ -21,6 +76,20 @@ for p in */pack.yaml; do
   # directory is named with its separator (pack check --help).
   if "$YARDR" pack check "./$d" >/dev/null 2>"$d/.check.err"; then
     echo "test: $d: pack check ok"
+  elif grep -qFx 'yardr: required flag(s) "depot" not set' "$d/.check.err"; then
+    # yardr's refusal to check bare a pack that names a depot's own things
+    # (checkDepot, internal/cli/pack.go in yardr), which is no fault of the
+    # pack. Only that line, whole and as yardr prints it, goes on to the second
+    # check: a refusal reworded, or any other failure, stands as the bare
+    # check's.
+    if ! scratch_yard; then
+      echo "test: $d: pack check needs a depot, and the scratch yard for it could not be made:"
+      printf '%s\n' "$scratch_why" | sed 's/^/  /'; rc=1
+    elif yrun pack check "./$d" --depot scratch >/dev/null 2>"$d/.check.err"; then
+      echo "test: $d: pack check ok (with --depot scratch)"
+    else
+      echo "test: $d: pack check --depot scratch failed:"; sed 's/^/  /' "$d/.check.err"; rc=1
+    fi
   else
     echo "test: $d: pack check failed:"; sed 's/^/  /' "$d/.check.err"; rc=1
   fi
