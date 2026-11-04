@@ -31,7 +31,7 @@ picked terminal
 | stage | worked by | what happens |
 |---|---|---|
 | `backlog` | `backlog`, people | the bead waits until its brief says the subject, the audience, the primary job, the page, the reference sites, what is fixed and what is not wanted |
-| `mockups` | `designers` | an agent commits three standalone pages, `mockups/<n>-<name>.html`, on the bead's branch, shoots each at 1280x800, and puts the three shots on one note that names each direction's family, type pairing and palette |
+| `mockups` | `designers` | an agent commits three standalone pages, `mockups/<n>-<name>.html`, on the bead's branch, shoots each at 1280x800 (an app screen also at 390 wide), and puts the shots on one note that names each direction's family, type pairing and palette |
 | `pick` | `decisions`, people | a person reads the shots and moves the bead to `picked`, back to `mockups` with a note, or to `backlog`; the yard puts a card on the bead offering these moves, and the person's words with the pick name the direction |
 | `picked` | | the end: the bead closes |
 
@@ -60,6 +60,16 @@ with `display=swap` and with `display=block`), two were wrong, one in a fallback
 face and one blank, because Chrome took the shot before the font arrived. Both
 passed the size check.
 
+**App screens.** The designer first decides whether the brief is for a page,
+which people read, or an app screen, which people work in: a dashboard, a
+back-office or reporting view, settings or billing, an inbox. For an app screen
+the role adds rules (the screen's question first, quiet panels, aligned figures,
+colour spent on data, believable data, a phone layout where the navigation folds
+away) beside its families and house style, and the three directions still differ
+by family, type pairing and palette. An app screen is shot twice, always: at
+1280x800 and, with `SHOT_WIDTH=390`, at phone width, so the note carries six
+shots and the stage's exit does not depend on a judgement call.
+
 ## What it needs
 
 - **An agent for `<depot>-designers`.** The import asks for its kind, model and
@@ -75,8 +85,11 @@ passed the size check.
   the events that need someone. The pack carries no role for it, so the
   yardmaster keeps its prompt.
 - **On the yard's machine**, for the shots: headless Chrome (or `SHOT_CHROME`),
-  `curl`, `python3` and a yardr checkout. The mockups load their typefaces and
-  libraries from CDNs, so the machine needs the network while a designer works.
+  `curl`, `python3` and a yardr checkout. An app screen's phone shots need a
+  checkout whose `contrib/shot/shot` takes `SHOT_WIDTH` (yardr 9c94ab8, 4
+  November 2026, and after); an older script ignores it and shoots 1280 wide. The
+  mockups load their typefaces and libraries from CDNs, so the machine needs the
+  network while a designer works.
 
 ## What the import asks
 
@@ -93,7 +106,8 @@ takes `yardmaster` (`--crew yardmaster=<name>`).
 - `flows/mockup/`: a stage file for each stage a bead waits or is worked in.
   What a stage needs to be true is here, and how a designer works is in the role.
 - `roles/designer.md`: the designer's role. It holds the work in five steps,
-  the families, the house style, the shot mechanics, and the vendored baseline.
+  the families, the house style, the rules for an app screen, the shot
+  mechanics, and the vendored baseline.
 - `SETUP.md`: the operator's cards.
 - `THIRD_PARTY_NOTICES.md`: the two projects the role draws on, their pins and
   copyright lines, and both licence texts in full.
@@ -112,9 +126,13 @@ notice of its name, URL, pin and licence.
   (`anthropics/skills@ca45fc4`, Apache-2.0): the body of its `SKILL.md`, whole
   and unmodified, as the baseline of the craft. Its frontmatter is left out.
 - **taste-skill** by Leonxlnx (`Leonxlnx/taste-skill@12af471`, MIT): its method
-  in this pack's own words. A device it bans outright stays allowed here when a
+  in this pack's own words, and the rules of its app-screens reference for
+  dashboards, admin, settings and the like, also in this pack's own words, under
+  a notice of their own. A device it bans outright stays allowed here when a
   direction chooses it, so that three directions keep their range. Its library,
-  references and scripts are not in this pack.
+  its other references and its scripts are not in this pack, and neither are the
+  stylesheet and chart script the app-screens reference builds on
+  (`assets/app.css`, `assets/charts.js`).
 
 THIRD_PARTY_NOTICES.md has the rest.
 
@@ -131,12 +149,14 @@ headless Chrome.
 `webdesign/test`. The test needs no network and no secret and takes well under a
 second. It is text, so it pins what a later edit could lose without a sound:
 
-- the role carries both one-line notices with their pins and licences;
+- the role carries both one-line notices with their pins and licences, a third
+  for the app-screen rules, and the rules and the phone shot themselves;
 - the vendored frontend-design block is the upstream body, byte for byte, by its
   sha256;
 - THIRD_PARTY_NOTICES.md holds both licence texts byte for byte, by their
   sha256, with the full commits and the copyright line;
-- each stage file has its exit line, and `pick.md` the card of its moves;
+- each stage file has its exit line, `mockups.md` names the phone shots, and
+  `pick.md` has the card of its moves;
 - the decisions of `pack.yaml`: the pack's own type and group, no script group,
   the yardmaster hearing `pick` and carrying no role;
 - no role or stage file points at a file the import does not install.
@@ -167,15 +187,42 @@ nothing but `PATH` and no daemon, so that no agent could start:
   the vendored block, a pin, a licence text, an exit line, the type, the group,
   an added script group, and others.
 
+Checked for the app-screen rules, after those:
+
+- The test breaks on each of 12 more changes made to a copy, one at a time: the
+  URL in the app-screens notice, the section's heading, each of the six rules by
+  its lead, the phone shot's width setting and its `file` line, the exit's 390
+  shots, and the notices' record of the reference.
+- The words are the pack's own. Everything the change added shares no run of more
+  than six words with taste-skill's `SKILL.md` or `references/app-screens.md` at
+  the pin, and what it does share is file names, a CSS property and the role's
+  own earlier wording.
+- On a throwaway page, with this machine's Chrome (156) and the `contrib/shot/shot`
+  of yardr 9c94ab8: `SHOT_WIDTH=390` writes `PNG image data, 390 x 800`, a shot
+  without it still writes 1280 x 800, and a width that is not a number is refused
+  by name before Chrome runs. What the 390 picture holds is the question under
+  "Not checked".
+
 Not checked:
 
-- No designer agent has run this role. Whether one follows it to three pages that
-  differ, and how good they are, is not known. The first real bead is that test.
+- No designer agent has run this role, and none has run its app-screen rules.
+  Whether one follows it to three pages that differ, or three screens that read
+  as working product, and how good they are, is not known. The first real bead
+  of each kind is that test.
 - Shots on a machine other than a Mac with Google Chrome. `contrib/shot/shot`
   looks for Chrome and Chromium elsewhere, and the role has not been run there.
-- A viewport other than 1280x800. The role asks for CSS that holds at phone width,
-  as the baseline does, and says in the note that only the first screen at
-  1280x800 was looked at.
+- A page at any viewport but 1280x800. The role asks for CSS that holds at phone
+  width, as the baseline does, and says in the note that only the first screen at
+  1280x800 was looked at. An app screen is shot at 390 as well, which the next
+  item qualifies.
+- A phone layout at 390 wide, with the Chrome on this machine (Google Chrome 156
+  for macOS). Chrome will not open a window narrower than 500, so it lays the
+  page out 500 wide and `SHOT_WIDTH=390` writes the left 390px of that, in a PNG
+  that `file` still calls 390 x 800. A menu button at the right edge, the second
+  column of figures and a table's last cells fall outside the picture, and a
+  media query under 500px never fires. Filed against yardr as yardr-68n8, with a
+  framed-page shot that does lay out at 390. Until that lands, the phone shots
+  are crops, and the role tells the designer what to say when one shows it.
 
 ## Left out
 
@@ -186,6 +233,14 @@ Not checked:
 - **The scripts and engines of taste-skill and impeccable.** They need Node 22,
   Chrome and the network, and a pack has no key to install them with. That is a
   change to yardr, and so a bead of the yardr depot.
+- **The app-screen stylesheet and chart script of taste-skill** (`assets/app.css`,
+  `assets/charts.js`), and its inspector (`scripts/inspect.mjs`). A pack installs
+  roles, stage files, scripts for script groups and setup notes, and has no way
+  to put a stylesheet or a script in a designer's worktree; the inspector needs
+  Node and Chrome as well. The rules they serve are in the role in this pack's
+  own words, and the designer draws its own panels and charts.
+- **A bead type or a flow of its own for app screens.** An app screen is a
+  mockup bead like a page: the designer decides which it is from the brief.
 - **Landing the picked mockup.** There is no assembly by design.
 - **A build bead filed from the pick.** It is filed by hand when asked for.
 - **The type `design`.** One type follows one flow, so it stays the design

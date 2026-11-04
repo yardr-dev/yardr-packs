@@ -208,11 +208,13 @@ The licence text, as at the pin:
 - Pin: `Leonxlnx/taste-skill@12af471`, full commit `12af471f627f866411b4bd785b19646d3672784c`, committed 24 October 2026.
 - Licence: MIT. The text is the repository's `LICENSE` at the pin, below.
 - Copyright line: Copyright (c) 2026 Leonxlnx
-- Taken: the method of `skills/taste-skill/SKILL.md`, in this pack's own words: choosing three directions that differ and one idea for each, a house style that keeps stock devices out of a page, and the look-and-fix round on screenshots. It is in steps 2 and 4 and the house style section of `roles/designer.md`, under a one-line notice of its source. The skill's library, references and scripts are not in this pack.
-- Changed: reworded and condensed, and bent to the pack's purpose. A device the skill bans outright stays allowed when a direction chooses it, so that three directions keep their range.
-- Recorded bytes: at the pin, `skills/taste-skill/SKILL.md` is 39,537 bytes with sha256 `3435ed963b15a1b6447746ec8844ab2cd38d8d2e8ead3451937f42df01e408c4`, and `LICENSE` is 1,065 bytes with sha256 `4575a543ab88dad12ccea7d97e563d0bce5b448b06072e65d3264497dad326df`.
+- Taken: the method of `skills/taste-skill/SKILL.md`, in this pack's own words: choosing three directions that differ and one idea for each, a house style that keeps stock devices out of a page, and the look-and-fix round on screenshots. It is in steps 2 and 4 and the house style section of `roles/designer.md`, under a one-line notice of its source.
+- Also taken, from the skill's "Page or app screen" section and from `skills/taste-skill/references/app-screens.md`, in this pack's own words: the rules for a screen people work in. They are to tell it from a page first, to let the biggest block answer one question, to keep panels quiet, to align figures, to spend colour on data, to use believable data, and to fold the navigation away on a phone. They are in the app screens section of `roles/designer.md`, under a one-line notice of their source.
+- Not in this pack: the skill's library, its other references and its scripts, and the stylesheet and chart script that the app-screens reference builds on (`skills/taste-skill/assets/app.css` and `skills/taste-skill/assets/charts.js`), with its inspector (`skills/taste-skill/scripts/inspect.mjs`).
+- Changed: reworded and condensed, and bent to the pack's purpose. A device the skill bans outright stays allowed when a direction chooses it, so that three directions keep their range. Of the app-screens reference the pack keeps a handful of its rules, and none of its study of real screens, its tables or its library of styles.
+- Recorded bytes: at the pin, `skills/taste-skill/SKILL.md` is 39,537 bytes with sha256 `3435ed963b15a1b6447746ec8844ab2cd38d8d2e8ead3451937f42df01e408c4`, `skills/taste-skill/references/app-screens.md` is 85,358 bytes with sha256 `55e937ec30de605b53a11310b446f328a3ce7403de24fff008920a00be1a5ed4`, and `LICENSE` is 1,065 bytes with sha256 `4575a543ab88dad12ccea7d97e563d0bce5b448b06072e65d3264497dad326df`.
 
-The method is reworded, not copied. MIT asks that its copyright and permission notice go with copies and substantial portions of the work, and this file keeps both with the pack regardless.
+The method and the rules are reworded, not copied. MIT asks that its copyright and permission notice go with copies and substantial portions of the work, and this file keeps both with the pack regardless.
 
 The licence text, as at the pin:
 

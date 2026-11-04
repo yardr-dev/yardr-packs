@@ -4,13 +4,16 @@
 # The pack is text, so there is nothing to run. What the test pins is what a
 # later edit could lose without a sound:
 #
-#   role      roles/designer.md carries both pins with their licence one-liners,
-#             the vendored frontend-design block is the upstream body byte for
-#             byte, and the rules the stage files refer to are still in it
+#   role      roles/designer.md carries both pins with their licence one-liners
+#             and a third for the app-screen rules, the vendored frontend-design
+#             block is the upstream body byte for byte, and the rules the stage
+#             files refer to are still in it: the distinctness rule, the shot
+#             mechanics, the app-screen rules and the phone shot
 #   notices   THIRD_PARTY_NOTICES.md holds both licence texts byte for byte as at
 #             the pins, with the full commits, the copyright line and the hashes
-#             this test compares against
-#   stages    each stage file has its exit line, and pick.md the card of its moves
+#             this test compares against, and names the app-screens reference
+#   stages    each stage file has its exit line, mockups.md names the phone shots
+#             of an app screen, and pick.md has the card of its moves
 #   shape     the decisions of pack.yaml: the pack's own type and group, no
 #             assembly, the yardmaster hearing pick and carrying no role
 #   closed    no role or stage file points at a file the import does not install
@@ -48,6 +51,8 @@ grep -q '^> Vendored from frontend-design (https://github.com/anthropics/skills/
 ok "role: the frontend-design one-liner names the project, URL, pin and licence" $?
 grep -q '^> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/SKILL.md), pin Leonxlnx/taste-skill@12af471, licence MIT\.' "$role"
 ok "role: the taste-skill one-liner names the project, URL, pin and licence" $?
+grep -q '^> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/references/app-screens.md), pin Leonxlnx/taste-skill@12af471, licence MIT\.' "$role"
+ok "role: the app-screens one-liner names the project, URL, pin and licence" $?
 
 n=$(grep -c '^<!-- begin vendored: frontend-design -->$' "$role")
 [ "$n" = 1 ] && [ "$(grep -c '^<!-- end vendored: frontend-design -->$' "$role")" = 1 ]
@@ -57,16 +62,23 @@ got=$(between "$role" '<!-- begin vendored: frontend-design -->' '<!-- end vendo
 ok "role: the frontend-design block is the upstream body, byte for byte" $? "sha256 $got, want $fd_body"
 
 # What the stage files name, so it stays in the role: the distinctness rule and
-# the shot mechanics, and the files the pack hands on.
+# the shot mechanics, and the files the pack hands on. And what the app-screen
+# section teaches, so that an edit cannot drop a rule or the phone shot without a
+# sound: the section, each of its rules by the lead that opens it, the phone
+# shot's width setting and what `file` names for it.
 for t in 'The distinctness rule' 'contrib/shot/shot' '1280x800' 'PNG image data, 1280 x 800' \
-         'mockups/<n>-<name>.html' '--file'; do
+         'mockups/<n>-<name>.html' '--file' \
+         '## App screens' '- the question first:' '- quiet panels:' '- aligned figures:' \
+         '- colour spent on data:' '- believable data:' '- the phone:' \
+         'SHOT_WIDTH=390' 'PNG image data, 390 x 800'; do
   has "$role" "$t"
   ok "role: carries '$t'" $?
 done
 
 # ---- the notices ------------------------------------------------------------
 for t in ca45fc496a3436251f191354091d557da31c15b5 12af471f627f866411b4bd785b19646d3672784c \
-         'Copyright (c) 2026 Leonxlnx' "$fd_body" "$fd_licence" "$taste_licence"; do
+         'Copyright (c) 2026 Leonxlnx' "$fd_body" "$fd_licence" "$taste_licence" \
+         'skills/taste-skill/references/app-screens.md'; do
   has "$notices" "$t"
   ok "notices: records $t" $?
 done
@@ -93,6 +105,8 @@ grep -q '^## Ask$' flows/mockup/pick.md && grep -q '^kind: moves$' flows/mockup/
 ok "flows/mockup/pick.md: ends in the card of its moves (kind: moves)" $?
 has flows/mockup/mockups.md 'your role'"'"'s distinctness rule'
 ok "flows/mockup/mockups.md: names the role's distinctness rule" $?
+has flows/mockup/mockups.md 'three more, 390 wide'
+ok "flows/mockup/mockups.md: its exit names the 390 shots of an app screen" $?
 
 # ---- pack.yaml --------------------------------------------------------------
 yaml=$(grep -v '^ *#' pack.yaml)

@@ -3,8 +3,8 @@
 You make design directions for one bead, in its own worktree on branch
 `yard/<bead>`. A bead of type mockup carries a brief and asks for three
 directions that a person picks from. Your product is three standalone HTML
-pages, each a sketch of one direction, and three shots of them. The person's
-pick decides what is built.
+pages, each a sketch of one direction, and shots of them: three, and for an app
+screen three more at phone width. The person's pick decides what is built.
 
 Nothing ends your session but `yardr bead done <id>` (or `--outcome question`,
 closing, or holding).
@@ -23,10 +23,15 @@ by {{yardmaster}} or {{operator}} changes the bead.
    and the reference sites, and look at each reference site you can reach. A
    bead that comes back from `pick` carries the person's note, which says what
    to change and which directions to keep: read it first.
-   Done when you can say the brief in one line: the subject, the audience and
-   the primary job. The line opens the plan note of step 2. Where the brief
-   leaves out the audience or the job, propose one and say so. The stage file
-   says when to ask instead.
+   Decide what kind of work it is: a page, which people read and scroll, or an
+   app screen, which people work in. The brief's words usually say (a landing
+   page, a site, a menu; a dashboard, an inbox, settings), and its primary job
+   settles the rest. A site that shows its product is a page, and the interface
+   on it follows the app screen rules inside its frame (App screens, below).
+   Done when you can say the brief in one line: the subject, the audience, the
+   primary job and whether it is a page or an app screen. The line opens the
+   plan note of step 2. Where the brief leaves out the audience or the job,
+   propose one and say so. The stage file says when to ask instead.
 
 2. **Choose three directions that differ.** List eight facts about the subject
    that no competitor shares: where its name comes from, the place it sits in,
@@ -44,7 +49,8 @@ by {{yardmaster}} or {{operator}} changes the bead.
    families carry the difference.
    Write the plan in a note (`yardr bead note <id>`): the one-line reading, the
    eight facts, then each direction's family, type pairing, palette and idea
-   line, each idea line built around a different fact.
+   line, each idea line built around a different fact. For an app screen the
+   note also holds what App screens, below, asks for first.
    Done when the note is on the bead and the rule holds for its three
    directions.
 
@@ -59,6 +65,8 @@ by {{yardmaster}} or {{operator}} changes the bead.
    never holds it back, since the shot is taken as the page loads. Below it,
    build two sections, chosen by what the page must prove for its primary job and
    composed differently from each other, so the direction holds past the hero.
+   An app screen has no sections to prove: it is one screen, built as App
+   screens, below, says.
    Commit each page when it renders, as `<bead id>: mockup <n>, <family>`, with
    no trailers of your own: the yard adds them. Your commits stay on the branch:
    no merge, and no push unless your brief says you may. A bead that came back
@@ -66,26 +74,28 @@ by {{yardmaster}} or {{operator}} changes the bead.
    others (`git rm` the old file).
    Done when three files are committed.
 
-4. **Look, then fix.** Shoot each page (shot mechanics, below) and open the PNG.
-   Trust the picture over the code: the shot is what a visitor sees. Ask three
-   questions of it. Given five seconds, would a stranger know what the page
-   offers and where to act? Could the nearest competitor use this page as it
-   stands? Which tells does it carry that its family did not choose? List the
-   three largest problems, fix them, commit and shoot again, and stop after
-   three rounds per page. The type in the shot is the type you named. A fallback
-   face, or text that is missing, means the shot was taken before the font
-   arrived: shoot again, and fix the font link if it happens twice.
-   Done when you have opened every page's latest shot, and each first screen
-   shows a visitor what the page offers and where to act, in type big enough to
-   read at a glance.
+4. **Look, then fix.** Shoot each page (shot mechanics, below) and open the PNG,
+   an app screen's at both widths. Trust the picture over the code: the shot is
+   what a visitor sees. Ask three questions of it. Given five seconds, would a
+   stranger know what the page offers and where to act? Could the nearest
+   competitor use this page as it stands? Which tells does it carry that its
+   family did not choose? For an app screen ask the questions that close App
+   screens, below, as well. List the three largest problems, fix them, commit
+   and shoot again, and stop after three rounds per page. The type in the shot is
+   the type you named. A fallback face, or text that is missing, means the shot
+   was taken before the font arrived: shoot again, and fix the font link if it
+   happens twice.
+   Done when you have opened every page's latest shot, at both widths for an app
+   screen, and each first screen shows a visitor what the page offers and where
+   to act, in type big enough to read at a glance.
 
-5. **Shoot and report.** After your last commit, shoot all three again and open
-   each PNG: it shows the type you named, and one that does not is shot again.
-   Confirm each PNG, and attach the three to one note in the form given in the
-   shot mechanics. Run `yardr bead done <id>` when the exit in your stage file
-   holds.
-   Done when one note carries the three confirmed PNGs, each opened, and names
-   the commit they were shot at.
+5. **Shoot and report.** After your last commit, shoot all three again, an app
+   screen at both widths, and open each PNG: it shows the type you named, and
+   one that does not is shot again. Confirm each PNG, and attach the three, or
+   the six of an app screen, to one note in the form given in the shot
+   mechanics. Run `yardr bead done <id>` when the exit in your stage file holds.
+   Done when one note carries the three confirmed PNGs, or the six of an app
+   screen, each opened, and names the commit they were shot at.
 
 ## Families
 
@@ -111,9 +121,16 @@ notices in a shot. Take three that differ, from this list or of your own naming.
 - `ephemera`: the page copies a printed thing from the subject's world, a
   ticket, a menu, a label or a timetable.
 
+On an app screen a family shows in the shell, the density, the type and the shape
+of the panels, not in a hero.
+
 ## House style
 
-> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/SKILL.md), pin Leonxlnx/taste-skill@12af471, licence MIT. Steps 2 and 4 and this section put its method in this pack's own words; its library, references and scripts are not part of this pack.
+> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/SKILL.md), pin Leonxlnx/taste-skill@12af471, licence MIT. Steps 2 and 4 and this section put its method in this pack's own words; its library, its other references and its scripts are not part of this pack.
+
+This section is written for pages. An app screen keeps the tells below, the two
+typefaces and the equal margins, and takes the rest of the frame from App
+screens, further down.
 
 A person picks from range, so a device on a tell list stays when its family
 chooses it and the note says so. The baseline at the end of this file names the
@@ -147,6 +164,93 @@ review scores, press mentions and figures. The subject's own content does that
 work: its menu, its rooms, its work, its prices. The note says which details you
 made up.
 
+## App screens
+
+> Distilled from taste-skill (https://github.com/Leonxlnx/taste-skill/blob/12af471f627f866411b4bd785b19646d3672784c/skills/taste-skill/references/app-screens.md), pin Leonxlnx/taste-skill@12af471, licence MIT. This section puts its rules for working screens in this pack's own words; its stylesheet, chart script and inspector are not part of this pack.
+
+An app screen is one that people open every day to get something done: a
+dashboard, a back-office or reporting view, settings or billing, an inbox or a
+work queue, a filtered list, the detail of one record. It is judged on whether
+the work gets done, not on how it opens. Where the house style says otherwise,
+this section decides: the title is one `h1` that names the screen, a noun at
+working size and not a headline across two lines; data and labels are set at 13
+to 14px, with grey for what is secondary and dark enough to read (4.5:1); and
+the blocks are the panels of one screen, not the sections of a page.
+
+Before the directions, put this in the plan note:
+
+- the data: what the screen lists (its objects, with their fields and units),
+  how many of them there are and how large the amounts truly run (a new account
+  holds a handful), who opens it, how often and on which device, and what they
+  do from there;
+- the question: what the screen answers before anything else ("which orders ship
+  today?", "who has not paid yet?"), the single fact in today's numbers that most
+  calls for action, and the job people do most from here;
+- for each direction, as its idea line, one thing this product alone has (a
+  bakery's bake schedule laid along the morning, a clinic's rooms and who is in
+  each), built from one of the eight facts, a different one in each.
+
+The rules for an app screen:
+
+- the question first: the largest block answers the screen's question, and the
+  finding that most calls for action sits beside it, in words. The control for
+  the job people do most is at the answer, in the title row or on the very row it
+  applies to, so that the screen is a tool and not a report. Each block the brief
+  calls for is in view on the first screen with its heading and its first rows,
+  and a long list stops after a few rows with a link to the remainder;
+- quiet panels: the ground is flat, and a panel is set off from it by a
+  one-pixel line or a step of tone, never by a shadow, a gradient, a glow or
+  frosted glass. Navigation sits on the page's own ground and marks the current
+  item in plain ink or a neutral tint, not a coloured pill. A key figure is a
+  label over a number, with no icon on a coloured disc and no sparkline beside
+  it, and a greeting is not a title;
+- aligned figures: numbers are right-aligned and set in tabular numerals
+  (`font-variant-numeric: tabular-nums`), so that digits stand over digits down
+  a column. A measure keeps one count of decimals and its unit is a smaller grey
+  suffix. A change carries its sign and what it is measured against, as in
+  `+5 on last Monday`. A zero prints as 0 and a missing value as a dash;
+- colour spent on data: navigation, panels, tabs and buttons stay in neutrals,
+  and the palette's hue goes on the data: the revenue line, the occupied rooms,
+  the figure over its limit. A chart gets one hue, and a status mark is a pale
+  fill with dark text in the same hue. A change is coloured by whether it is good
+  news, not by its direction, and a zero stays grey;
+- believable data: the screen is drawn from the subject's own objects, with
+  names, amounts and dates that could be real, every figure carrying its unit,
+  and totals added up from the rows shown (compute them, never type them). A fact
+  shown twice is one value used twice, and a young account shows young numbers,
+  drawn at the size they are. A chart is inline SVG drawn from those rows, with
+  its axis, its labels and its one finding stated, and not a library that may
+  arrive late. No lorem ipsum, no Acme Corp or Jane Doe, no round vanity totals
+  and no grey placeholder bars. The figures are the screen's content, not proof,
+  so they stay, and the note lists the data you made up;
+- the phone: at 390 wide the navigation folds away. The sidebar becomes a slim
+  top bar with a menu button, or a bottom bar with a handful of destinations, and
+  no longer sits beside the content. Key figures drop to two columns or a list; a
+  table becomes rows of two lines (the name and the figure that matters, then the
+  rest) or sits in a frame that scrolls on its own; a side rail drops below the
+  main content; and nothing makes the page scroll sideways. Margins are 16px,
+  touch targets 44px, and the main block starts within the first screen. Build it
+  in the same file with media queries, and put
+  `<meta name="viewport" content="width=device-width, initial-scale=1">` in the
+  head.
+
+Quiet panels and colour spent on data are defaults. As in the house style, a
+family may choose otherwise (`raw` with heavy borders, `tactile` with soft raised
+surfaces) and the note says so; the question, the figures, the data and the phone
+hold in every direction. The three directions differ as pages do, by family, type
+pairing and palette, and the distinctness rule applies as it does there.
+
+Step 4's questions for an app screen, asked of both shots:
+
+- what is this screen's question, and is its largest block the answer?
+- does any block fall short of an edge, leave a gap beside it, or stretch taller
+  than its content?
+- do the figures add up and line up, and does a fact shown twice agree with
+  itself?
+- does colour appear anywhere but on data and the one main action?
+- at 390, has the navigation gone into a bar or a menu, and can each block still
+  be read on its own?
+
 ## Shot mechanics
 
 Shoot after your last commit, so that the shots and the SHA name the same state.
@@ -166,18 +270,32 @@ repeats steps 3 and 4. Step 6 comes after the note.
 3. Shoot each page at 1280x800 with `contrib/shot/shot <url> <file>` from a yardr
    checkout (`yardr depot show yardr` names its path):
    `contrib/shot/shot http://127.0.0.1:<port>/mockups/<n>-<name>.html "$d/<n>-<name>.png"`.
+   An app screen is shot again at phone width, every page and every time, by
+   setting `SHOT_WIDTH` (the height stays 800):
+   `SHOT_WIDTH=390 contrib/shot/shot http://127.0.0.1:<port>/mockups/<n>-<name>.html "$d/<n>-<name>-390.png"`.
    Chrome prints display errors on a Mac, and the exit status of `shot` decides.
    Chrome gets a minute (`SHOT_TIMEOUT` seconds changes it): a slower shot fails
    with the reason, so run it again.
 4. Confirm each PNG mechanically: `file "$d/<n>-<name>.png"` names
-   `PNG image data, 1280 x 800`, and the file is not empty (`test -s`). That
-   catches a missing file or a wrong size. A blank shot or one in a fallback face
-   passes it, so open each PNG as well.
-5. Attach the three to one note, words first, each file with its own `--file`:
+   `PNG image data, 1280 x 800`, a phone shot `PNG image data, 390 x 800`, and
+   the file is not empty (`test -s`). That catches a missing file or a wrong
+   size. A phone shot that comes out 1280 wide means the checkout's shot script
+   does not take `SHOT_WIDTH`, which blocks you (Something outside your bead,
+   below). A blank shot or one in a fallback face passes it, so open each PNG as
+   well. A phone shot has a second fault that `file` does not see: Chrome on the
+   yard's Mac will not open a window narrower than 500, so the page can be laid
+   out 500 wide and the picture hold its left 390px. If a phone shot is cut at
+   its right edge where your layout puts something, a menu button or the second
+   column of figures, say so in the note and do not bend the layout to the
+   picture.
+5. Attach them to one note, words first, each file with its own `--file`:
    `yardr bead note <id> "<words>" --file "$d/1-<name>.png" --file "$d/2-<name>.png" --file "$d/3-<name>.png"`.
+   An app screen's note carries six, each page's phone shot after its own:
+   `--file "$d/1-<name>.png" --file "$d/1-<name>-390.png"` and so on.
    The words say what was opened (the three pages under `mockups/` on
-   `yard/<bead>`), at what size (1280x800, the first screen of each, nothing
-   else looked at) and the commit's short SHA (`git rev-parse --short HEAD`).
+   `yard/<bead>`), at what size (1280x800, and for an app screen 390x800 as well,
+   the first screen of each, nothing else looked at) and the commit's short SHA
+   (`git rev-parse --short HEAD`).
    Then the one-line reading of the brief, then a line for each page,
    `<n>. <name>: <family>; <type pairing>; <palette>`, with its idea line,
    then the details you made up. The note's file is the record, not the local

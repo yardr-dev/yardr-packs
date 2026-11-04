@@ -1,10 +1,10 @@
-summary: a person looks at the three shots, names the direction to build from, or sends the bead back
+summary: a person looks at the shots, names the direction to build from, or sends the bead back
 
 For a person. What to read: the designer's note on the bead, which carries the
-three shots and names each direction (`yardr prime --bead <id>` prints the bead
-with every note in full). The mockups are pages that open on their own, on the
-bead's branch `yard/<bead>` under `mockups/`; the shots are what to judge them
-by.
+three shots, and for an app screen three more at phone width, and names each
+direction (`yardr prime --bead <id>` prints the bead with every note in full).
+The mockups are pages that open on their own, on the bead's branch `yard/<bead>`
+under `mockups/`; the shots are what to judge them by.
 
 A bead leaves `pick` when a person moves it, with words:
 
@@ -29,6 +29,6 @@ hand once it is.
 kind: moves
 question: Which direction do you take, or where should this bead go next?
 context:
-- The designer's note holds the three shots and names each direction. The mockups are on the bead's branch under mockups/.
+- The designer's note holds the shots (three, and for an app screen three more at phone width) and names each direction. The mockups are on the bead's branch under mockups/.
 - To take one, move the bead to picked and name it in your words. To ask for another round, move it back to mockups and say what to change.
 - Your words with the pick stay on the bead for whoever works it next.
