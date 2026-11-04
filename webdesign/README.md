@@ -31,7 +31,7 @@ picked terminal
 | stage | worked by | what happens |
 |---|---|---|
 | `backlog` | `backlog`, people | the bead waits until its brief says the subject, the audience, the primary job, the page, the reference sites, what is fixed and what is not wanted |
-| `mockups` | `designers` | an agent commits three standalone pages, `mockups/<n>-<name>.html`, on the bead's branch, shoots each at 1280x800 (an app screen also at 390 wide), and puts the shots on one note that names each direction's family, type pairing and palette |
+| `mockups` | `designers` | an agent commits three standalone pages, `mockups/<n>-<name>.html`, on the bead's branch, starts a watch on the folder so the person can open the pages while they are built, shoots each at 1280x800 (an app screen also at 390 wide), and puts the shots on one note that names each direction's family, type pairing and palette and each page's address on the watch |
 | `pick` | `decisions`, people | a person reads the shots and moves the bead to `picked`, back to `mockups` with a note, or to `backlog`; the yard puts a card on the bead offering these moves, and the person's words with the pick name the direction |
 | `picked` | | the end: the bead closes |
 
@@ -59,6 +59,20 @@ each page with `contrib/shot/shot` from a yardr checkout, confirms each PNG is
 with `display=swap` and with `display=block`), two were wrong, one in a fallback
 face and one blank, because Chrome took the shot before the font arrived. Both
 passed the size check.
+
+**The watch.** Once the first page exists the designer starts
+`yardr preview watch $YARDR_BEAD mockups`. The yard serves the folder's files
+read-only through its preview endpoint, and a page reloads in the browser
+whenever a file in the folder changes, so the person sees the three pages take
+shape. The command prints the address they open at on its `opens at` line: the
+host the yard's edge gave the watch, or the path `/preview/<app>/` on the yard
+where the edge gives none. `mockups/` holds no `index.html`, so the folder's own
+address answers 404, and so does the Open button of the watch's card on the
+Previews page. The designer therefore names each page's address, the printed
+address followed by the file name, and puts the three on a note as soon as the
+watch is up, so the person has them while the designer builds. The note with the
+shots gives them again. The watch ends by itself when the bead leaves
+`mockups`, so the shots are the record of what the person picks from.
 
 **App screens.** The designer first decides whether the brief is for a page,
 which people read, or an app screen, which people work in: a dashboard, a
@@ -90,6 +104,15 @@ shots and the stage's exit does not depend on a judgement call.
   November 2026, and after); an older script ignores it and shoots 1280 wide. The
   mockups load their typefaces and libraries from CDNs, so the machine needs the
   network while a designer works.
+- **A yardr with `yardr preview watch`**, for the watch (yardr 26b2a52, 4
+  November 2026, and after). `yardr docs watch` prints its page on a yardr that
+  has the command and names the pages it has on one that does not. On an older
+  yardr `yardr preview watch` prints the help of `preview` and ends 0, so the
+  designer goes by the `opens at` line: with none, it puts what the command
+  printed on its note and goes on, and the shots are as before. The address is
+  the path on the yard until the yard is linked to an edge that gives the watch
+  a host (yardr ec29917, 4 November 2026, and after). Where the yard is linked
+  and the edge refuses, the command prints the edge's words under the path.
 
 ## What the import asks
 
@@ -151,12 +174,15 @@ second. It is text, so it pins what a later edit could lose without a sound:
 
 - the role carries both one-line notices with their pins and licences, a third
   for the app-screen rules, and the rules and the phone shot themselves;
+- the role starts the watch with the bead's id, says how a page's address is
+  made and what to do when the command prints none, and has the designer put the
+  addresses on a note while it builds and again in the note with the shots;
 - the vendored frontend-design block is the upstream body, byte for byte, by its
   sha256;
 - THIRD_PARTY_NOTICES.md holds both licence texts byte for byte, by their
   sha256, with the full commits and the copyright line;
-- each stage file has its exit line, `mockups.md` names the phone shots, and
-  `pick.md` has the card of its moves;
+- each stage file has its exit line, `mockups.md` names the phone shots and the
+  address of each page on the watch, and `pick.md` has the card of its moves;
 - the decisions of `pack.yaml`: the pack's own type and group, no script group,
   the yardmaster hearing `pick` and carrying no role;
 - no role or stage file points at a file the import does not install.
@@ -202,12 +228,29 @@ Checked for the app-screen rules, after those:
   without it still writes 1280 x 800, and a width that is not a number is refused
   by name before Chrome runs.
 
+Checked for the watch, after those:
+
+- The test breaks on each of 6 more changes made to a copy, one at a time: the
+  command loses the bead's id, the address rule, the `opens at` fallback, the
+  early note's rule, the shots note's line of addresses, and the exit's bullet.
+- The words follow yardr ec29917 as landed: `yardr docs watch`, the help of
+  `yardr preview watch`, and the code that prints the command's output
+  (`opens at https://<host>/` or `opens at /preview/<app>/`, with the edge's
+  words on the next line). The watch card's Open button links the folder, as its
+  template shows. `yardr docs watch` ends 0 here and `yardr docs nosuchpage`
+  ends 1, naming the pages it has.
+- `yardr preview nosuchsub` prints the help of `preview` and ends 0. A yardr
+  without the watch treats `watch` the same way, which is why the role goes by
+  the `opens at` line and not by the exit status. That older yardr was not run.
+
 Not checked:
 
-- No designer agent has run this role, and none has run its app-screen rules.
-  Whether one follows it to three pages that differ, or three screens that read
-  as working product, and how good they are, is not known. The first real bead
-  of each kind is that test.
+- No designer agent has run this role, and none has run its app-screen rules or
+  started its watch. Whether one follows it to three pages that differ, or three
+  screens that read as working product, and how good they are, is not known. The
+  first real bead of each kind is that test. The watch command was read and not
+  run against a bead, so what a person sees in a browser, and whether the
+  addresses reach the person in time, is as the docs describe.
 - Shots on a machine other than a Mac with Google Chrome. `contrib/shot/shot`
   looks for Chrome and Chromium elsewhere, and the role has not been run there.
 - A page at any viewport but 1280x800. The role asks for CSS that holds at phone
@@ -233,6 +276,11 @@ Not checked:
   mockup bead like a page: the designer decides which it is from the brief.
 - **Landing the picked mockup.** There is no assembly by design.
 - **A build bead filed from the pick.** It is filed by hand when asked for.
+- **An `index.html` in `mockups/`.** It would be a fourth file for each bead and
+  a change to the exit, for what three lines of a note already carry. The note
+  names each page's address, since the folder's own address answers 404.
+- **A build step for the mockups.** A watch serves plain files and a mockup is a
+  standalone page, so there is nothing to build.
 - **The type `design`.** One type follows one flow, so it stays the design
   pack's.
 - **shadcn, 21st.dev Magic, Vercel's accessibility skill and superpowers

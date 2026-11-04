@@ -11,6 +11,10 @@ Before the bead leaves as `done`:
 - one note on the bead carries three shots of them, 1280x800, taken at the
   last commit, and says that commit's short SHA; for an app screen (your role
   says what that is) it carries three more, 390 wide, one for each file;
+- the same note gives each page's address on the watch (the address
+  `yardr preview watch` printed, then the file name), or what the command
+  printed when it gave none; the watch ends when the bead leaves `mockups`, so
+  the shots are the record;
 - the same note names each mockup's direction family, type pairing and palette,
   and your role's distinctness rule holds for the three.
 

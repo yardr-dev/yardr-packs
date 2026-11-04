@@ -72,7 +72,24 @@ by {{yardmaster}} or {{operator}} changes the bead.
    no merge, and no push unless your brief says you may. A bead that came back
    keeps the directions the person kept, and new ones take the slots of the
    others (`git rm` the old file).
-   Done when three files are committed.
+   Choose the three file names before you build the first. As soon as the first
+   file is there, start a watch on the folder with
+   `yardr preview watch $YARDR_BEAD mockups` (`$YARDR_BEAD` is your bead's id).
+   The yard serves the files of `mockups/` as they stand, and a page reloads in
+   the person's browser when a file in the folder changes, so the person sees
+   the pages take shape. The command prints the address the pages open at, on
+   its `opens at` line. The folder itself answers 404, so a page's address is
+   the printed address followed by its file name, as in
+   `/preview/<app>/1-<name>.html` for `opens at /preview/<app>/`.
+   Put the three addresses on a note at once (`yardr bead note <id>`), so that
+   the person can open them while you build; a page opens once its file exists.
+   If the command prints no `opens at` line, put what it printed on the note in
+   place of the addresses and go on. The watch ends by itself when the bead
+   leaves `mockups`, and `yardr docs watch` says what it serves and what else
+   ends it. The watch is for the person to look at; the shots still come from
+   your own server (Shot mechanics, below).
+   Done when three files are committed and the note with their addresses is on
+   the bead.
 
 4. **Look, then fix.** Shoot each page (shot mechanics, below) and open the PNG,
    an app screen's at both widths. Trust the picture over the code: the shot is
@@ -292,9 +309,9 @@ repeats steps 3 and 4. Step 6 comes after the note.
    the first screen of each, nothing else looked at) and the commit's short SHA
    (`git rev-parse --short HEAD`).
    Then the one-line reading of the brief, then a line for each page,
-   `<n>. <name>: <family>; <type pairing>; <palette>`, with its idea line,
-   then the details you made up. The note's file is the record, not the local
-   path.
+   `<n>. <name>: <family>; <type pairing>; <palette>`, with its idea line and
+   its address on the watch (step 3), then the details you made up. The note's
+   file is the record, not the local path.
 6. Stop the server by its pid (`kill "$(cat "$d/server.pid")"`), never by
    pattern. Then remove the directory as a command of its own, with the variable
    set on the line that deletes: `d=<dir>; rm -rf "${d:?}"`.

@@ -19,11 +19,22 @@ A brief for an app screen (a dashboard, an admin view, settings, an inbox) is
 shot a second time at phone width, which needs a shot script that takes a width
 (`SHOT_WIDTH`, in yardr from 4 November 2026).
 
+A designer starts a watch on the mockups while it builds (`yardr preview watch`,
+in yardr from 4 November 2026), so that a person can open the pages in a
+browser as they take shape. The designer's notes give the address of each page:
+the address the command prints, followed by the page's file name. The command
+prints the host the yard's edge gave the watch where the yard is linked to an
+edge that gives one, and the path `/preview/<app>/` on the yard otherwise.
+
 1. **The machine.** Each command below is one thing to type, in a block of its
    own. The first prints the yardr checkout's path, which holds
    `contrib/shot/shot`. The second finds the two programs. The third, with that
    path put in, counts the lines of the shot script that name `SHOT_WIDTH`: 0
-   means an older script, whose phone shots would come out 1280 wide:
+   means an older script, whose phone shots would come out 1280 wide. The fourth
+   prints the first line of the page on the watch, and on a yardr that has no
+   watch says `no doc named "watch"`. Its designers get no `opens at` line from
+   the command, and put what it printed on their notes in place of the
+   addresses:
    ```sh
    yardr depot show yardr
    ```
@@ -32,6 +43,9 @@ shot a second time at phone width, which needs a shot script that takes a width
    ```
    ```sh
    grep -c SHOT_WIDTH <yardr checkout>/contrib/shot/shot
+   ```
+   ```sh
+   yardr docs watch | head -1
    ```
 2. **What the import would do.** Nothing is written:
    ```sh
@@ -78,7 +92,20 @@ shot a second time at phone width, which needs a shot script that takes a width
    ```sh
    yardr bead advance <id> --to mockups
    ```
-5. **The pick.** When the designer is done the bead waits in `pick`, and the yard
+5. **Watch it built.** Once the designer has written its first page it starts
+   the watch and puts the three addresses on a note, which appears on the bead
+   as any note does:
+   ```sh
+   yardr prime --bead <id>
+   ```
+   Open the addresses in a browser; one that starts with a slash is a path on the
+   yard's web view, so put the view's address in front of it. A page reloads when
+   its file changes, and a page the designer has not built yet answers 404 until
+   it has. The Previews page of the web view lists the watch as well, but its
+   Open button opens the folder, which answers 404: the pages are at the
+   addresses in the note. The watch ends when the bead leaves `mockups`, and the
+   shots on the last note are the record.
+6. **The pick.** When the designer is done the bead waits in `pick`, and the yard
    puts a card on it that offers the moves. The person reads the shots on the
    designer's note (`yardr prime --bead <id>` prints it, and the web view shows
    the images), then picks. The same move by hand, with the pick in words:
@@ -88,7 +115,7 @@ shot a second time at phone width, which needs a shot script that takes a width
    The other two moves are `--to mockups`, for another round with a note that
    says what to change, and `--to backlog`, to park the bead or reshape its
    brief.
-6. **After the pick.** The bead is closed at `picked`. The mockups stay on the
+7. **After the pick.** The bead is closed at `picked`. The mockups stay on the
    branch `yard/<id>`, under `mockups/`, and the shots on the note. Nothing lands
    on the base. A build from the pick is a bead of its own, filed by hand when
    someone asks for one.

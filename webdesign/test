@@ -8,12 +8,15 @@
 #             and a third for the app-screen rules, the vendored frontend-design
 #             block is the upstream body byte for byte, and the rules the stage
 #             files refer to are still in it: the distinctness rule, the shot
-#             mechanics, the app-screen rules and the phone shot
+#             mechanics, the app-screen rules, the phone shot and the watch (the
+#             command with the bead's id, how a page's address is made, and the
+#             two notes that carry the addresses)
 #   notices   THIRD_PARTY_NOTICES.md holds both licence texts byte for byte as at
 #             the pins, with the full commits, the copyright line and the hashes
 #             this test compares against, and names the app-screens reference
 #   stages    each stage file has its exit line, mockups.md names the phone shots
-#             of an app screen, and pick.md has the card of its moves
+#             of an app screen and the address of each page on the watch, and
+#             pick.md has the card of its moves
 #   shape     the decisions of pack.yaml: the pack's own type and group, no
 #             assembly, the yardmaster hearing pick and carrying no role
 #   closed    no role or stage file points at a file the import does not install
@@ -65,12 +68,19 @@ ok "role: the frontend-design block is the upstream body, byte for byte" $? "sha
 # the shot mechanics, and the files the pack hands on. And what the app-screen
 # section teaches, so that an edit cannot drop a rule or the phone shot without a
 # sound: the section, each of its rules by the lead that opens it, the phone
-# shot's width setting and what `file` names for it.
+# shot's width setting and what `file` names for it. And the watch the designer
+# starts for the person: the command with the bead's id, how a page's address is
+# made from what the command prints, what to do when it prints none (a yardr
+# without the watch ends 0 on it), the note that carries the addresses while the
+# designer builds, and the line of the shots note that carries them after.
 for t in 'The distinctness rule' 'contrib/shot/shot' '1280x800' 'PNG image data, 1280 x 800' \
          'mockups/<n>-<name>.html' '--file' \
          '## App screens' '- the question first:' '- quiet panels:' '- aligned figures:' \
          '- colour spent on data:' '- believable data:' '- the phone:' \
-         'SHOT_WIDTH=390' 'PNG image data, 390 x 800'; do
+         'SHOT_WIDTH=390' 'PNG image data, 390 x 800' \
+         'yardr preview watch $YARDR_BEAD mockups' 'followed by its file name' \
+         'If the command prints no `opens at` line' \
+         'Put the three addresses on a note at once' 'its address on the watch (step 3)'; do
   has "$role" "$t"
   ok "role: carries '$t'" $?
 done
@@ -107,6 +117,8 @@ has flows/mockup/mockups.md 'your role'"'"'s distinctness rule'
 ok "flows/mockup/mockups.md: names the role's distinctness rule" $?
 has flows/mockup/mockups.md 'three more, 390 wide'
 ok "flows/mockup/mockups.md: its exit names the 390 shots of an app screen" $?
+has flows/mockup/mockups.md 'address on the watch'
+ok "flows/mockup/mockups.md: its exit names the address of each page on the watch" $?
 
 # ---- pack.yaml --------------------------------------------------------------
 yaml=$(grep -v '^ *#' pack.yaml)
