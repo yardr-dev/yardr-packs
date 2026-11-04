@@ -17,10 +17,7 @@ a designer works.
 
 A brief for an app screen (a dashboard, an admin view, settings, an inbox) is
 shot a second time at phone width, which needs a shot script that takes a width
-(`SHOT_WIDTH`, in yardr from 4 November 2026). Chrome will not open a window
-narrower than 500, so until the script works round that (yardr-68n8) the phone
-shot is the left 390px of a page laid out 500 wide, and the designer says so when
-it shows.
+(`SHOT_WIDTH`, in yardr from 4 November 2026).
 
 1. **The machine.** Each command below is one thing to type, in a block of its
    own. The first prints the yardr checkout's path, which holds

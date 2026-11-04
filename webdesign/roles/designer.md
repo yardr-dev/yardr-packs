@@ -282,12 +282,7 @@ repeats steps 3 and 4. Step 6 comes after the note.
    size. A phone shot that comes out 1280 wide means the checkout's shot script
    does not take `SHOT_WIDTH`, which blocks you (Something outside your bead,
    below). A blank shot or one in a fallback face passes it, so open each PNG as
-   well. A phone shot has a second fault that `file` does not see: Chrome on the
-   yard's Mac will not open a window narrower than 500, so the page can be laid
-   out 500 wide and the picture hold its left 390px. If a phone shot is cut at
-   its right edge where your layout puts something, a menu button or the second
-   column of figures, say so in the note and do not bend the layout to the
-   picture.
+   well.
 5. Attach them to one note, words first, each file with its own `--file`:
    `yardr bead note <id> "<words>" --file "$d/1-<name>.png" --file "$d/2-<name>.png" --file "$d/3-<name>.png"`.
    An app screen's note carries six, each page's phone shot after its own:

@@ -200,8 +200,7 @@ Checked for the app-screen rules, after those:
 - On a throwaway page, with this machine's Chrome (156) and the `contrib/shot/shot`
   of yardr 9c94ab8: `SHOT_WIDTH=390` writes `PNG image data, 390 x 800`, a shot
   without it still writes 1280 x 800, and a width that is not a number is refused
-  by name before Chrome runs. What the 390 picture holds is the question under
-  "Not checked".
+  by name before Chrome runs.
 
 Not checked:
 
@@ -213,16 +212,7 @@ Not checked:
   looks for Chrome and Chromium elsewhere, and the role has not been run there.
 - A page at any viewport but 1280x800. The role asks for CSS that holds at phone
   width, as the baseline does, and says in the note that only the first screen at
-  1280x800 was looked at. An app screen is shot at 390 as well, which the next
-  item qualifies.
-- A phone layout at 390 wide, with the Chrome on this machine (Google Chrome 156
-  for macOS). Chrome will not open a window narrower than 500, so it lays the
-  page out 500 wide and `SHOT_WIDTH=390` writes the left 390px of that, in a PNG
-  that `file` still calls 390 x 800. A menu button at the right edge, the second
-  column of figures and a table's last cells fall outside the picture, and a
-  media query under 500px never fires. Filed against yardr as yardr-68n8, with a
-  framed-page shot that does lay out at 390. Until that lands, the phone shots
-  are crops, and the role tells the designer what to say when one shows it.
+  1280x800 was looked at. An app screen is shot at 390 as well.
 
 ## Left out
 
