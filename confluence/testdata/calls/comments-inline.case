@@ -1,0 +1,6 @@
+=== args
+comments
+id=98404
+kind=inline
+=== answer
+{"results":[{"id":"131310","status":"current","title":"Re: Runbooks","pageId":"98404","version":{"number":1,"message":"","minorEdit":false,"authorId":"5b6c2f1a9d4e3b0c7a8d1e22","createdAt":"2026-10-17T08:41:12.040Z","contributorIds":[]},"resolutionStatus":"open","properties":{"inlineMarkerRef":"4d8f2c1e-7a3b-4b6e-9c5d-0e1f2a3b4c5d","inlineOriginalSelection":"Keep this page short & current"},"body":{"storage":{"representation":"storage","value":"<p>Who keeps it current?</p>"}},"_links":{"webui":"/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131310"}}],"_links":{"base":"https://example.atlassian.net/wiki"}}

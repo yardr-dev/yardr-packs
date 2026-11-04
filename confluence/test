@@ -121,7 +121,7 @@ fi
 # credential and every call's parameters, request and answer.
 yrun source show confluence --json | jq -S .declaration >"$core/declaration.json"
 check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
-jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 4' "$core/declaration.json" >/dev/null
+jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 8' "$core/declaration.json" >/dev/null
 ok "the shipped host is the placeholder, and every call is a read by GET" $?
 yrun pack show confluence >"$core/packshow.out" 2>&1
 grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out"

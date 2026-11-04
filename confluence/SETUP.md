@@ -2,9 +2,11 @@
 
 The pack wires Confluence Cloud into the yard as the declared source
 `confluence`. An agent lists the site's spaces, finds pages by CQL, reads one
-page and lists the children of a page, folder, whiteboard, database or embed. It
-only reads. What it reads a page as is Confluence's storage format, which is
-markup and not text: turning it into text is the reader's.
+page, lists the children of a page, folder, whiteboard, database or embed, and
+lists a page's comments, the replies to a comment, its labels and its attached
+files. It only reads. A page and a comment come as Confluence's storage format,
+which is markup and not text: turning it into text is the reader's. An attached
+file comes as its metadata, and its contents are not read.
 
 **The yard reads as one Atlassian account.** Every agent granted a call of this
 source reads what that account can read, in every space it can view, and the
@@ -44,10 +46,12 @@ written, so a screen may be named otherwise than here.
      https://id.atlassian.com/manage-profile/security/api-tokens and choose
      Create API token with scopes.
 
-   Choose Confluence and the four scopes the calls need, which are the ones
-   Atlassian's API description lists for the four requests: `read:space:confluence`
-   (spaces), `read:page:confluence` (page), `read:hierarchical-content:confluence`
-   (children, of any kind) and `search:confluence` (search). Atlassian shows the
+   Choose Confluence and the six scopes the calls need, which are the ones
+   Atlassian's API description lists for their requests: `read:space:confluence`
+   (spaces), `read:page:confluence` (page and labels),
+   `read:hierarchical-content:confluence` (children, of any kind),
+   `search:confluence` (search), `read:comment:confluence` (comments and
+   replies) and `read:attachment:confluence` (attachments). Atlassian shows the
    token once. A token lasts 1 to 365 days, a year unless you choose otherwise, so
    note the day it ends. Step 6 says what to do then.
 
@@ -138,8 +142,8 @@ written, so a screen may be named otherwise than here.
    yardr bead ask <bead> "Let the reviewers read Confluence" --run "source grant confluence read --group reviewers" --context "The reviewers read the team's pages to check a bead's work; the card names each call it covers."
    ```
    One caller may make 60 calls of a source in an hour, and an agent that walks
-   a page tree uses them quickly. The operator raises the limit where the work
-   needs it:
+   a page tree, or reads the replies of each comment on a page, uses them
+   quickly. The operator raises the limit where the work needs it:
    ```sh
    yardr source set confluence calls_per_hour=300
    ```
@@ -182,12 +186,44 @@ written, so a screen may be named otherwise than here.
    names the space; `_links.base` and the `webui` path together are the link a
    person opens.
 
-   `spaces`, `children` and `search` answer one page of 25, and `limit` asks for
-   another size (250 at most for the first two). An answer that has another page
-   keeps it as `_links.next`, whose `cursor=` value is `cursor` in the same call
-   again (for `children`, with the same `id` and `kind`). Search writes it
-   percent-encoded (`%2B`, `%3D`), and the call encodes what it is given, so give
-   it decoded:
+   A page has footer comments, under the page, and inline comments, on a passage
+   of its text. `kind` says which, and has no default, so read both:
+   ```sh
+   yardr call confluence comments id=98404 kind=footer
+   ```
+   ```sh
+   yardr call confluence comments id=98404 kind=inline
+   ```
+   `comments` lists the first comment of each thread and no reply. The replies to
+   a comment are found by its `id`, with the same `kind`, and a reply may have
+   replies of its own:
+   ```sh
+   yardr call confluence replies id=131201 kind=footer
+   ```
+   A `kind` that is not the comment's is no error: `replies` answers an empty list,
+   so check the kind before reading it as "no replies". An inline comment gives
+   `properties.inlineOriginalSelection`, the passage it is on, and a comment of
+   either kind may give `resolutionStatus`. Its author is `version.authorId`, an
+   Atlassian account id, which no call here turns into a name. Then the labels of
+   a page, and the files attached to it:
+   ```sh
+   yardr call confluence labels id=98404
+   ```
+   ```sh
+   yardr call confluence attachments id=98404
+   ```
+   `attachments` gives each file's `title` (its name), `mediaType`, `fileSize` in
+   bytes and `downloadLink`, and never the file. The link is a path on the site:
+   `_links.base` and the path together are what a person opens. No call here
+   fetches it.
+
+   `spaces`, `children`, `search`, `comments`, `replies`, `labels` and
+   `attachments` answer one page of 25, and `limit` asks for another size (250 at
+   most for all but `search`). An answer that has another page keeps it as
+   `_links.next`, whose `cursor=` value is `cursor` in the same call again (for
+   `children`, `comments` and `replies`, with the same `id` and `kind`). Search
+   writes it percent-encoded (`%2B`, `%3D`), and the call encodes what it is
+   given, so give it decoded:
    ```sh
    yardr call confluence children id=98400 cursor=eyJpZCI6Ijk4NDExIiwiY29udGVudE9yZGVyIjoiY2hpbGQtcG9zaXRpb24iLCJjb250ZW50T3JkZXJWYWx1ZSI6MjAwMH0=
    ```
@@ -195,9 +231,13 @@ written, so a screen may be named otherwise than here.
    `page` answers the body as `body.storage.value`, in storage format: XHTML with
    Confluence's own tags (`ac:structured-macro`, `ac:link`, `ri:page`). It is
    markup and not text, and the answer is at most 256 KiB, refused and not cut
-   when a page is longer. A failed call tells the agent the status alone: a 404
-   is a page that is not there, or one the account may not view (Confluence
-   answers both so), and a 400 from `search` is a CQL it cannot parse.
+   when a page is longer. A comment is the same markup in the same place, and
+   `comments`, `replies` and `attachments` answer at most 256 KiB too. A failed
+   call tells the agent the status alone: a 404 is a page that is not there, or
+   one the account may not view (Confluence answers both so), and a 400 from
+   `search` is a CQL it cannot parse. A 400 from `comments` or `replies` can also
+   be an id that is not there: Atlassian's pages say 404, and the public site
+   that was tried answered 400.
 
 6. **Updating the pack, and when the token ends.** A pack applied again replaces
    the source's declaration whole, and the placeholder address comes back with
@@ -214,6 +254,16 @@ written, so a screen may be named otherwise than here.
    the copy again from the new `confluence.yaml` with step 2's `sed`, and add it
    with `yardr source add`. The source then never points at the placeholder.
 
+   An update from a version that had only `spaces`, `page`, `children` and
+   `search` adds `comments`, `replies`, `labels` and `attachments`. The plan lists
+   them and names each crew member who gets them through a grant of `read`
+   already held. Nobody is asked, and `yardr source revoke confluence read --crew
+   <name>` takes the grant back. A token with scopes made for that version lacks
+   `read:comment:confluence` and `read:attachment:confluence`, so Atlassian
+   answers the new calls with a 401 until a token with all six scopes is made
+   (step 1) and given again with `yardr source key confluence`. A token made
+   without scopes needs nothing.
+
    When the token ends, make a new one as in step 1 and give it again with
    `yardr source key confluence`. A token that expired or was revoked shows as a
    401 from `yardr source check confluence`.
@@ -225,10 +275,11 @@ written, so a screen may be named otherwise than here.
    Revoke the token at id.atlassian.com, or delete the service account's
    credential in Atlassian Administration, and take the account out of the spaces.
 
-What is not there, on purpose: comments, labels and the list of a page's
-attachments (the next bead); an attachment's contents; blogposts; reading a
-folder, whiteboard, database or embed itself (`children` lists them, with their
-titles, and `page` takes a page's id only); any write; turning storage format
-into text; and Confluence Data Center and Server, whose API and login are others.
+What is not there, on purpose: an attachment's contents; blogposts, and the
+comments, labels and attachments of anything but a page; a name for an author's
+account id; reading a folder, whiteboard, database or embed itself (`children`
+lists them, with their titles, and `page` takes a page's id only); any write;
+turning storage format into text; and Confluence Data Center and Server, whose
+API and login are others.
 The yard's source format cannot express what is not listed, and the pack does not
 change yardr.

@@ -1,0 +1,20 @@
+--- requests
+GET /wiki/api/v2/pages/98404/labels?cursor=eyJsYWJlbElkIjoxNTk1ODEzOSwibGFiZWxPcmRlciI6ImlkIiwibGFiZWxPcmRlclZhbHVlIjoxNTk1ODEzOX0%3D&limit=1
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "id": "17301691",
+      "name": "on-call",
+      "prefix": "global"
+    }
+  ]
+}
+--- stderr

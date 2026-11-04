@@ -1,0 +1,7 @@
+=== args
+attachments
+id=98404
+limit=2
+cursor=eyJpZCI6ImF0dDEzMTUwMiIsImF0dGFjaG1lbnRTb3J0T3JkZXIiOnsiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIiwiZmllbGQiOiJJRCJ9LCJhdHRhY2htZW50T3JkZXJWYWx1ZSI6ImF0dDEzMTUwMiJ9
+=== answer
+{"results":[{"mediaTypeDescription":"CSV File","webuiLink":"/pages/viewpageattachments.action?pageId=98404&preview=%2F98404%2F131509%2Fpager-rota.csv","mediaType":"text/csv","downloadLink":"/rest/api/content/98404/child/attachment/att131509/download","createdAt":"2026-10-19T07:45:03.000Z","version":{"number":1,"message":"","minorEdit":false,"authorId":"5b6c2f1a9d4e3b0c7a8d1e22","createdAt":"2026-10-19T07:45:03.000Z"},"comment":"","pageId":"98404","fileId":"03cce3d3-f7d0-425e-99e3-6c9f27999f11","status":"current","title":"pager-rota.csv","fileSize":1204,"id":"att131509","_links":{"download":"/rest/api/content/98404/child/attachment/att131509/download","webui":"/pages/viewpageattachments.action?pageId=98404&preview=%2F98404%2F131509%2Fpager-rota.csv"}}],"_links":{"base":"https://example.atlassian.net/wiki"}}

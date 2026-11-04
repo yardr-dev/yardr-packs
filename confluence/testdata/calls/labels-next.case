@@ -1,0 +1,7 @@
+=== args
+labels
+id=98404
+limit=1
+cursor=eyJsYWJlbElkIjoxNTk1ODEzOSwibGFiZWxPcmRlciI6ImlkIiwibGFiZWxPcmRlclZhbHVlIjoxNTk1ODEzOX0=
+=== answer
+{"results":[{"prefix":"global","name":"on-call","id":"17301691"}],"_links":{"base":"https://example.atlassian.net/wiki"}}

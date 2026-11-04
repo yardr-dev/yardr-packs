@@ -1,9 +1,11 @@
 # Confluence Cloud as a pack of kind source: the integration, imported
 # into the yard and into no depot. What Confluence is here: the declared
 # source confluence, which lists spaces, finds content by CQL, reads a
-# page and lists the children of a page, folder, whiteboard, database or
-# embed, all through the REST API as one Atlassian account. Read only.
-# Every agent granted a call reads what that account may read.
+# page, lists the children of a page, folder, whiteboard, database or
+# embed, and lists a page's comments, the replies to a comment, its labels
+# and its attached files, all through the REST API as one Atlassian
+# account. Read only. Every agent granted a call reads what that account
+# may read.
 #
 #   yardr pack apply /Users/mckean/projects/repos/yardr-packs/confluence
 #
@@ -28,6 +30,6 @@ sources:
 # terminal pack apply ignores them.
 presets:
   read:
-    about: List spaces, find content by CQL, read a page and list the children of a page, folder, whiteboard, database or embed; change nothing
+    about: List spaces, find content by CQL, read a page, list the children of a page, folder, whiteboard, database or embed, and list a page's comments, replies, labels and attached files; change nothing
     grants:
       confluence: [read]

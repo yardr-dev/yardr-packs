@@ -1,0 +1,40 @@
+--- requests
+GET /wiki/api/v2/pages/98404/attachments?cursor=eyJpZCI6ImF0dDEzMTUwMiIsImF0dGFjaG1lbnRTb3J0T3JkZXIiOnsiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIiwiZmllbGQiOiJJRCJ9LCJhdHRhY2htZW50T3JkZXJWYWx1ZSI6ImF0dDEzMTUwMiJ9&limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "download": "/rest/api/content/98404/child/attachment/att131509/download",
+        "webui": "/pages/viewpageattachments.action?pageId=98404&preview=%2F98404%2F131509%2Fpager-rota.csv"
+      },
+      "comment": "",
+      "createdAt": "2026-10-19T07:45:03.000Z",
+      "downloadLink": "/rest/api/content/98404/child/attachment/att131509/download",
+      "fileId": "03cce3d3-f7d0-425e-99e3-6c9f27999f11",
+      "fileSize": 1204,
+      "id": "att131509",
+      "mediaType": "text/csv",
+      "mediaTypeDescription": "CSV File",
+      "pageId": "98404",
+      "status": "current",
+      "title": "pager-rota.csv",
+      "version": {
+        "authorId": "5b6c2f1a9d4e3b0c7a8d1e22",
+        "createdAt": "2026-10-19T07:45:03.000Z",
+        "message": "",
+        "minorEdit": false,
+        "number": 1
+      },
+      "webuiLink": "/pages/viewpageattachments.action?pageId=98404&preview=%2F98404%2F131509%2Fpager-rota.csv"
+    }
+  ]
+}
+--- stderr

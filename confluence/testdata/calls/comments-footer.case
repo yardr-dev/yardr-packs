@@ -1,0 +1,7 @@
+=== args
+comments
+id=98404
+kind=footer
+limit=2
+=== answer
+{"results":[{"id":"131201","status":"current","title":"Re: Runbooks","pageId":"98404","version":{"number":1,"message":"","minorEdit":false,"authorId":"5b10ac8d82e05b22cc7d4ef5","createdAt":"2026-10-15T09:12:44.318Z","contributorIds":[]},"resolutionStatus":"open","body":{"storage":{"representation":"storage","value":"<p>Is the rollback step still right after the <ac:link><ri:page ri:content-title=\"On-call rota\" /></ac:link> change?</p>"}},"_links":{"webui":"/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131201"}},{"id":"131207","status":"current","title":"Re: Runbooks","pageId":"98404","version":{"number":1,"message":"","minorEdit":false,"authorId":"5b6c2f1a9d4e3b0c7a8d1e22","createdAt":"2026-10-16T14:03:09.771Z","contributorIds":[]},"resolutionStatus":"open","body":{"storage":{"representation":"storage","value":"<p>Typo in the deploy list &amp; the &quot;Rollbacks&quot; item, déploiements too.</p>"}},"_links":{"webui":"/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131207"}}],"_links":{"next":"/wiki/api/v2/pages/98404/footer-comments?body-format=storage&limit=2&cursor=eyJpZCI6IjEzMTIwNyIsImNvbW1lbnRTb3J0T3JkZXIiOnsiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIiwiZmllbGQiOiJDUkVBVEVEX0RBVEUifSwiY29tbWVudE9yZGVyVmFsdWUiOjE3NjA2MjQ1ODk3NzF9","base":"https://example.atlassian.net/wiki"}}

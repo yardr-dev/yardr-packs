@@ -1,0 +1,39 @@
+--- requests
+GET /wiki/api/v2/footer-comments/131201/children?body-format=storage&limit=25
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131204"
+      },
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<p>Yes. Nothing in the rollback changed, see <a href=\"https://example.atlassian.net/wiki/spaces/ENG/pages/98411\">the archive</a>.</p>"
+        }
+      },
+      "id": "131204",
+      "pageId": "98404",
+      "parentCommentId": "131201",
+      "status": "current",
+      "title": "Re: Runbooks",
+      "version": {
+        "authorId": "5b6c2f1a9d4e3b0c7a8d1e22",
+        "contributorIds": [],
+        "createdAt": "2026-10-15T10:30:02.114Z",
+        "message": "",
+        "minorEdit": false,
+        "number": 1
+      }
+    }
+  ]
+}
+--- stderr

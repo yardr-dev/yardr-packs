@@ -1,0 +1,6 @@
+=== args
+replies
+id=131201
+kind=footer
+=== answer
+{"results":[{"id":"131204","status":"current","title":"Re: Runbooks","pageId":"98404","version":{"number":1,"message":"","minorEdit":false,"authorId":"5b6c2f1a9d4e3b0c7a8d1e22","createdAt":"2026-10-15T10:30:02.114Z","contributorIds":[]},"parentCommentId":"131201","body":{"storage":{"representation":"storage","value":"<p>Yes. Nothing in the rollback changed, see <a href=\"https://example.atlassian.net/wiki/spaces/ENG/pages/98411\">the archive</a>.</p>"}},"_links":{"webui":"/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131204"}}],"_links":{"base":"https://example.atlassian.net/wiki"}}

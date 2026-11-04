@@ -1,0 +1,39 @@
+--- requests
+GET /wiki/api/v2/pages/98404/footer-comments?body-format=storage&cursor=eyJpZCI6IjEzMTIwNyIsImNvbW1lbnRTb3J0T3JkZXIiOnsiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIiwiZmllbGQiOiJDUkVBVEVEX0RBVEUifSwiY29tbWVudE9yZGVyVmFsdWUiOjE3NjA2MjQ1ODk3NzF9&limit=2
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131215"
+      },
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<p>Done, thanks.</p>"
+        }
+      },
+      "id": "131215",
+      "pageId": "98404",
+      "resolutionStatus": "resolved",
+      "status": "current",
+      "title": "Re: Runbooks",
+      "version": {
+        "authorId": "5b10ac8d82e05b22cc7d4ef5",
+        "contributorIds": [],
+        "createdAt": "2026-10-18T11:20:31.902Z",
+        "message": "",
+        "minorEdit": false,
+        "number": 1
+      }
+    }
+  ]
+}
+--- stderr

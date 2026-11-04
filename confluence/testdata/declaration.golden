@@ -1,5 +1,5 @@
 {
-  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed.",
+  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, and a page's comments, replies, labels and attached files listed.",
   "base": "https://example.atlassian.net/wiki",
   "calls": [
     {
@@ -192,6 +192,220 @@
             "key": "cql",
             "value": "{cql}"
           },
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List the comments on a page, given by its id, 25 at a time, of one kind. kind=footer is the discussion under the page and kind=inline is the comments on a passage of its text, so a page is read with both. Only the first comment of each thread is listed here; its replies are the call replies, by the comment's id. Answers each comment's id, status, pageId, version (number, authorId, createdAt) and its body, in Confluence storage format, in body.storage.value, markup and not text. A comment may have resolutionStatus (open, reopened, resolved or dangling), and an inline comment has properties.inlineOriginalSelection, the passage it is on. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "comments",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "name": "kind",
+          "type": "enum",
+          "values": [
+            "footer",
+            "inline"
+          ]
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/pages/{id}/{kind}-comments",
+        "query": [
+          {
+            "key": "body-format",
+            "value": "storage"
+          },
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List the replies to one comment, 25 at a time. Give the comment's id and its kind, footer or inline, as comments lists it. A kind that is not the comment's is no error and answers an empty list. Answers each reply as a comment is answered, with parentCommentId, the id of the comment it answers. A reply may have replies of its own, and its id with the same kind goes down a level. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "replies",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "name": "kind",
+          "type": "enum",
+          "values": [
+            "footer",
+            "inline"
+          ]
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/{kind}-comments/{id}/children",
+        "query": [
+          {
+            "key": "body-format",
+            "value": "storage"
+          },
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List the labels on a page, given by its id, 25 at a time. Answers each label's id, name and prefix. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "labels",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/pages/{id}/labels",
+        "query": [
+          {
+            "key": "limit",
+            "value": "{limit}"
+          },
+          {
+            "key": "cursor",
+            "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List the files attached to a page, given by its id, 25 at a time. Answers the metadata of each file and not the file. That is its id, title (the file's name), mediaType, fileSize in bytes, status, createdAt, version, comment, and downloadLink and webuiLink, which are paths on the site that go after _links.base. Nothing here fetches a file. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "results",
+          "_links"
+        ]
+      },
+      "kind": "read",
+      "name": "attachments",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "default": 25,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "max": 1000,
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v2/pages/{id}/attachments",
+        "query": [
           {
             "key": "limit",
             "value": "{limit}"

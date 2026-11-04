@@ -1,6 +1,7 @@
 # Confluence Cloud as a declared source: spaces listed, content found by
-# CQL, one page read and the children of a page, folder, whiteboard,
-# database or embed listed. Reads only. Jira's declaration (the jira
+# CQL, one page read, the children of a page, folder, whiteboard,
+# database or embed listed, and a page's comments, replies, labels and
+# attachments listed. Reads only. Jira's declaration (the jira
 # pack, beside this one) is the pattern for the login and the site's
 # address, and yardr's google-docs for a read call whose answer is
 # bounded; Confluence differs where noted.
@@ -45,6 +46,44 @@
 #     that address writes it percent-encoded, and the call encodes it
 #     again. Its start is echoed and ignored, so none is declared.
 #
+# The comments, labels and attachments of a page were checked the same
+# way on 4 November 2026: the OpenAPI description of v2, and GET requests
+# without a login to a public Confluence Cloud site. The site had no
+# inline comment to show, so the inline shapes are the description's.
+#   comments: GET /wiki/api/v2/pages/{id}/footer-comments and
+#     /wiki/api/v2/pages/{id}/inline-comments take read:comment:confluence
+#     and answer {results, _links}, paged as spaces is. Both list the root
+#     comments of the page and no reply: the description says root, and on
+#     a page whose comment has a reply the list gave the comment alone. A
+#     comment has no body unless body-format is named, so it is fixed to
+#     storage as page's is, and the body is at body.storage.value, markup
+#     and not text. A footer comment belongs to the page. An inline comment
+#     is on a passage of its text, and adds properties.inlineOriginalSelection,
+#     the passage. Either may carry resolutionStatus (open, reopened,
+#     resolved or dangling): the footer comments of the public site did,
+#     though the description lists it for inline comments only. The two are
+#     one call because only a segment of the path differs, and that segment
+#     is kind, an enum, the only check on it. It has no default: with footer
+#     for one, a call that left kind out would read the footer comments and
+#     look complete. A page id that does not exist answered 400 here, though
+#     the description says 404; labels and attachments answered 404.
+#   replies:  GET /wiki/api/v2/footer-comments/{id}/children and
+#     /wiki/api/v2/inline-comments/{id}/children take the same scope and
+#     answer the replies to one comment, each with parentCommentId. A reply
+#     may have replies of its own, so a thread is walked down by id, with
+#     the kind of the comment it started from. The other kind is no error:
+#     a footer comment's id asked as inline answered 200 and an empty list.
+#   labels:   GET /wiki/api/v2/pages/{id}/labels takes read:page:confluence,
+#     which page needs already, and answers {results, _links}. A label is
+#     {id, name, prefix}.
+#   attachments: GET /wiki/api/v2/pages/{id}/attachments takes
+#     read:attachment:confluence and answers the files attached to a page
+#     as metadata: id, title (the file's name), mediaType, fileSize,
+#     status, createdAt, version, comment, downloadLink and webuiLink. Both
+#     links are paths on the site, which _links.base completes. Nothing
+#     here follows one: what a file holds is yardr-racg's to settle. A
+#     file's entry is about a kilobyte, so 250 may pass the bound of 256 KiB.
+#
 # The credential. Atlassian takes an API token as HTTP Basic, the base64 of
 # "email:token". A declared call's header takes one {credential}, so the
 # email and the token are two mint inputs and confluence/mint makes the one
@@ -65,7 +104,7 @@
 # pack applied again replaces the yard's copy and puts this one back
 # (SETUP.md, step 6).
 name: confluence
-about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed.
+about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, and a page's comments, replies, labels and attached files listed.
 base: https://example.atlassian.net/wiki
 credential:
   env: CONFLUENCE_AUTH
@@ -124,3 +163,53 @@ calls:
       path: /rest/api/content/search
       query: { cql: "{cql}", limit: "{limit}", cursor: "{cursor}" }
     answer: { select: [results, size, limit, _links], max: 262144 }   # a hit is about 800 bytes, most of it empty keys
+  comments:
+    kind: read
+    about: List the comments on a page, given by its id, 25 at a time, of one kind. kind=footer is the discussion under the page and kind=inline is the comments on a passage of its text, so a page is read with both. Only the first comment of each thread is listed here; its replies are the call replies, by the comment's id. Answers each comment's id, status, pageId, version (number, authorId, createdAt) and its body, in Confluence storage format, in body.storage.value, markup and not text. A comment may have resolutionStatus (open, reopened, resolved or dangling), and an inline comment has properties.inlineOriginalSelection, the passage it is on. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the page's id, from its address (/spaces/ENG/pages/123456/Title)
+      kind: { type: enum, values: [footer, inline], log: true }   # no default: a call that leaves it out is refused, not taken for all the comments
+      limit: { type: int, default: 25 }   # comments in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/pages/{id}/{kind}-comments
+      query: { body-format: storage, limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links], max: 262144 }   # the bodies are bounded as page's is
+  replies:
+    kind: read
+    about: List the replies to one comment, 25 at a time. Give the comment's id and its kind, footer or inline, as comments lists it. A kind that is not the comment's is no error and answers an empty list. Answers each reply as a comment is answered, with parentCommentId, the id of the comment it answers. A reply may have replies of its own, and its id with the same kind goes down a level. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the comment's id
+      kind: { type: enum, values: [footer, inline], log: true }   # the comment's kind, as comments takes it
+      limit: { type: int, default: 25 }   # replies in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/{kind}-comments/{id}/children
+      query: { body-format: storage, limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links], max: 262144 }   # the bodies are bounded as page's is
+  labels:
+    kind: read
+    about: List the labels on a page, given by its id, 25 at a time. Answers each label's id, name and prefix. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the page's id
+      limit: { type: int, default: 25 }   # labels in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/pages/{id}/labels
+      query: { limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links] }   # a label is about 60 bytes, so 250 fit the default bound
+  attachments:
+    kind: read
+    about: List the files attached to a page, given by its id, 25 at a time. Answers the metadata of each file and not the file. That is its id, title (the file's name), mediaType, fileSize in bytes, status, createdAt, version, comment, and downloadLink and webuiLink, which are paths on the site that go after _links.base. Nothing here fetches a file. When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the page's id
+      limit: { type: int, default: 25 }   # attachments in the page, 250 at most
+      cursor: { type: string, max: 1000, optional: true }   # the cursor= of the last answer's _links.next
+    request:
+      method: GET
+      path: /api/v2/pages/{id}/attachments
+      query: { limit: "{limit}", cursor: "{cursor}" }
+    answer: { select: [results, _links], max: 262144 }   # an attachment is about 1 KB, so 250 may pass this bound, and a smaller limit then fits

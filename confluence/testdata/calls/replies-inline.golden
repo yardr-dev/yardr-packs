@@ -1,0 +1,44 @@
+--- requests
+GET /wiki/api/v2/inline-comments/131310/children?body-format=storage&cursor=eyJpZCI6IjEzMTMxMSIsImNvbW1lbnRTb3J0T3JkZXIiOnsiZGlyZWN0aW9uIjoiQVNDRU5ESU5HIiwiZmllbGQiOiJDUkVBVEVEX0RBVEUifSwiY29tbWVudE9yZGVyVmFsdWUiOjE3NjA2OTE3NTA1MDB9&limit=1
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131311"
+      },
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<p>The on-call lead, each quarter.</p>"
+        }
+      },
+      "id": "131311",
+      "pageId": "98404",
+      "parentCommentId": "131310",
+      "properties": {
+        "inlineMarkerRef": "4d8f2c1e-7a3b-4b6e-9c5d-0e1f2a3b4c5d",
+        "inlineOriginalSelection": "Keep this page short & current"
+      },
+      "resolutionStatus": "open",
+      "status": "current",
+      "title": "Re: Runbooks",
+      "version": {
+        "authorId": "5b10ac8d82e05b22cc7d4ef5",
+        "contributorIds": [],
+        "createdAt": "2026-10-17T09:02:30.500Z",
+        "message": "",
+        "minorEdit": false,
+        "number": 1
+      }
+    }
+  ]
+}
+--- stderr

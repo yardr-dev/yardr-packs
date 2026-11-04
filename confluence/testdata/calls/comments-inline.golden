@@ -1,0 +1,43 @@
+--- requests
+GET /wiki/api/v2/pages/98404/inline-comments?body-format=storage&limit=25
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki"
+  },
+  "results": [
+    {
+      "_links": {
+        "webui": "/spaces/ENG/pages/98404/Runbooks?focusedCommentId=131310"
+      },
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<p>Who keeps it current?</p>"
+        }
+      },
+      "id": "131310",
+      "pageId": "98404",
+      "properties": {
+        "inlineMarkerRef": "4d8f2c1e-7a3b-4b6e-9c5d-0e1f2a3b4c5d",
+        "inlineOriginalSelection": "Keep this page short & current"
+      },
+      "resolutionStatus": "open",
+      "status": "current",
+      "title": "Re: Runbooks",
+      "version": {
+        "authorId": "5b6c2f1a9d4e3b0c7a8d1e22",
+        "contributorIds": [],
+        "createdAt": "2026-10-17T08:41:12.040Z",
+        "message": "",
+        "minorEdit": false,
+        "number": 1
+      }
+    }
+  ]
+}
+--- stderr

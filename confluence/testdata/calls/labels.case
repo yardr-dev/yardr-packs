@@ -1,0 +1,5 @@
+=== args
+labels
+id=98404
+=== answer
+{"results":[{"prefix":"global","name":"runbook","id":"15958139"},{"prefix":"global","name":"on-call","id":"17301691"}],"_links":{"base":"https://example.atlassian.net/wiki"}}
