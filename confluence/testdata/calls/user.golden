@@ -1,0 +1,13 @@
+--- requests
+GET /wiki/rest/api/user?accountId=5b10ac8d82e05b22cc7d4ef5
+  auth: ok
+  accept: application/json
+--- status
+0
+--- stdout
+{
+  "accountId": "5b10ac8d82e05b22cc7d4ef5",
+  "accountType": "atlassian",
+  "displayName": "Ada Lovelace"
+}
+--- stderr

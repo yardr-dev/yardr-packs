@@ -2,11 +2,12 @@
 
 The pack wires Confluence Cloud into the yard as the declared source
 `confluence`. An agent lists the site's spaces, finds pages by CQL, reads one
-page, lists the children of a page, folder, whiteboard, database or embed, and
-lists a page's comments, the replies to a comment, its labels and its attached
-files. It only reads. A page and a comment come as Confluence's storage format,
-which is markup and not text: turning it into text is the reader's. An attached
-file comes as its metadata, and its contents are not read.
+page, lists the children of a page, folder, whiteboard, database or embed, lists
+a page's comments, the replies to a comment, its labels and its attached files,
+and names an author from an account id. It only reads. A page and a comment come
+as Confluence's storage format, which is markup and not text: turning it into
+text is the reader's. An attached file comes as its metadata, and its contents
+are not read.
 
 **The yard reads as one Atlassian account.** Every agent granted a call of this
 source reads what that account can read, in every space it can view, and the
@@ -46,14 +47,15 @@ written, so a screen may be named otherwise than here.
      https://id.atlassian.com/manage-profile/security/api-tokens and choose
      Create API token with scopes.
 
-   Choose Confluence and the six scopes the calls need, which are the ones
+   Choose Confluence and the seven scopes the calls need, which are the ones
    Atlassian's API description lists for their requests: `read:space:confluence`
    (spaces), `read:page:confluence` (page and labels),
    `read:hierarchical-content:confluence` (children, of any kind),
    `search:confluence` (search), `read:comment:confluence` (comments and
-   replies) and `read:attachment:confluence` (attachments). Atlassian shows the
-   token once. A token lasts 1 to 365 days, a year unless you choose otherwise, so
-   note the day it ends. Step 6 says what to do then.
+   replies), `read:attachment:confluence` (attachments) and
+   `read:confluence-user` (user). Atlassian shows the token once. A token lasts 1
+   to 365 days, a year unless you choose otherwise, so note the day it ends. Step
+   6 says what to do then.
 
    A token made without scopes (Create API token, an ordinary account only) is
    the account's, serves Jira and Confluence alike, and can do everything the
@@ -142,8 +144,9 @@ written, so a screen may be named otherwise than here.
    yardr bead ask <bead> "Let the reviewers read Confluence" --run "source grant confluence read --group reviewers" --context "The reviewers read the team's pages to check a bead's work; the card names each call it covers."
    ```
    One caller may make 60 calls of a source in an hour, and an agent that walks
-   a page tree, or reads the replies of each comment on a page, uses them
-   quickly. The operator raises the limit where the work needs it:
+   a page tree, reads the replies of each comment on a page, or names each
+   author of a thread with `user` (one call for an account), uses them quickly.
+   The operator raises the limit where the work needs it:
    ```sh
    yardr source set confluence calls_per_hour=300
    ```
@@ -204,8 +207,8 @@ written, so a screen may be named otherwise than here.
    so check the kind before reading it as "no replies". An inline comment gives
    `properties.inlineOriginalSelection`, the passage it is on, and a comment of
    either kind may give `resolutionStatus`. Its author is `version.authorId`, an
-   Atlassian account id, which no call here turns into a name. Then the labels of
-   a page, and the files attached to it:
+   Atlassian account id, which `user` turns into a name (below). Then the labels
+   of a page, and the files attached to it:
    ```sh
    yardr call confluence labels id=98404
    ```
@@ -216,6 +219,21 @@ written, so a screen may be named otherwise than here.
    bytes and `downloadLink`, and never the file. The link is a path on the site:
    `_links.base` and the path together are what a person opens. No call here
    fetches it.
+
+   A comment, a reply and an attachment each name their author by
+   `version.authorId`, and `user` turns that id into a name:
+   ```sh
+   yardr call confluence user accountId=5b10ac8d82e05b22cc7d4ef5
+   ```
+   It answers `accountId`, `displayName` and `accountType`, which is `atlassian`
+   for an Atlassian account and `app` for the bot user of an app, and nothing
+   else of the account: its email, picture and time zone are not passed on. It
+   names one account, so an agent with several authors calls it for each, and
+   each call counts toward the hourly limit of step 4. A 404 is an id that is not
+   there. A 403 is an account that may not view users; Atlassian's description
+   asks for the 'Can use' permission on the site. Atlassian may limit what it
+   tells of a user by their profile visibility, so a name can be the public name
+   only.
 
    `spaces`, `children`, `search`, `comments`, `replies`, `labels` and
    `attachments` answer one page of 25, and `limit` asks for another size (250 at
@@ -255,12 +273,14 @@ written, so a screen may be named otherwise than here.
    with `yardr source add`. The source then never points at the placeholder.
 
    An update from a version that had only `spaces`, `page`, `children` and
-   `search` adds `comments`, `replies`, `labels` and `attachments`. The plan lists
-   them and names each crew member who gets them through a grant of `read`
-   already held. Nobody is asked, and `yardr source revoke confluence read --crew
-   <name>` takes the grant back. A token with scopes made for that version lacks
-   `read:comment:confluence` and `read:attachment:confluence`, so Atlassian
-   answers the new calls with a 401 until a token with all six scopes is made
+   `search` adds `comments`, `replies`, `labels`, `attachments` and `user`, and
+   one from a version without `user` adds that one. The plan lists them and names
+   each crew member who gets them through a grant of `read` already held. Nobody
+   is asked, and `yardr source revoke confluence read --crew <name>` takes the
+   grant back. A token with scopes made before a call was added lacks its scope:
+   `read:comment:confluence` and `read:attachment:confluence` for `comments`,
+   `replies` and `attachments`, and `read:confluence-user` for `user`. Atlassian
+   answers those calls with a 401 until a token with all seven scopes is made
    (step 1) and given again with `yardr source key confluence`. A token made
    without scopes needs nothing.
 
@@ -276,8 +296,9 @@ written, so a screen may be named otherwise than here.
    credential in Atlassian Administration, and take the account out of the spaces.
 
 What is not there, on purpose: an attachment's contents; blogposts, and the
-comments, labels and attachments of anything but a page; a name for an author's
-account id; reading a folder, whiteboard, database or embed itself (`children`
+comments, labels and attachments of anything but a page; several account ids
+named in one call, and an account's email, picture or time zone (`user` names
+one account); reading a folder, whiteboard, database or embed itself (`children`
 lists them, with their titles, and `page` takes a page's id only); any write;
 turning storage format into text; and Confluence Data Center and Server, whose
 API and login are others.

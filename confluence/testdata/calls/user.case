@@ -1,0 +1,5 @@
+=== args
+user
+accountId=5b10ac8d82e05b22cc7d4ef5
+=== answer
+{"type":"known","accountId":"5b10ac8d82e05b22cc7d4ef5","accountType":"atlassian","email":"ada@example.com","publicName":"Ada","profilePicture":{"path":"/wiki/aa-avatar/5b10ac8d82e05b22cc7d4ef5","width":48,"height":48,"isDefault":false},"displayName":"Ada Lovelace","timeZone":"Europe/London","externalCollaborator":false,"isExternalCollaborator":false,"isGuest":false,"_expandable":{"operations":"","details":"","personalSpace":""},"_links":{"self":"https://example.atlassian.net/wiki/rest/api/user?accountId=5b10ac8d82e05b22cc7d4ef5","base":"https://example.atlassian.net/wiki","context":"/wiki"}}

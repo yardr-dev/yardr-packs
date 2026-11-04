@@ -3,11 +3,11 @@
 Confluence Cloud pages through its REST API, read as one Atlassian account. As
 the declared source `confluence`, an agent lists a site's spaces, finds pages by
 CQL, reads one page, lists the children of a page, folder, whiteboard, database
-or embed, and lists a page's comments, the replies to a comment, its labels and
-its attached files. Calls are read-only. A page and a comment come back in
-Confluence's storage format, and the pack turns nothing into text. An attached
-file comes back as its metadata with a download link, and the pack fetches no
-file.
+or embed, lists a page's comments, the replies to a comment, its labels and its
+attached files, and names an author from an account id. Calls are read-only. A
+page and a comment come back in Confluence's storage format, and the pack turns
+nothing into text. An attached file comes back as its metadata with a download
+link, and the pack fetches no file.
 Nothing here is compiled into yardr; apply it with:
 
 ```sh
@@ -29,7 +29,7 @@ the operator give the account the spaces the yard should read and no others.
 
 All of kind read, and one preset, `read`, that suggests them. The scopes are the
 ones Atlassian's API descriptions list for each request, read on 2 November 2026
-(`spaces`, `page`, `children`, `search`) and 4 November (the other four).
+(`spaces`, `page`, `children`, `search`) and 4 November (the other five).
 
 | call | request | parameters | scope |
 |---|---|---|---|
@@ -41,6 +41,7 @@ ones Atlassian's API descriptions list for each request, read on 2 November 2026
 | `replies` | `GET /wiki/api/v2/{kind}-comments/{id}/children?body-format=storage` | `id` (a comment's), `kind`, `limit` (25), `cursor` | `read:comment:confluence` |
 | `labels` | `GET /wiki/api/v2/pages/{id}/labels` | `id`, `limit` (25), `cursor` | `read:page:confluence` |
 | `attachments` | `GET /wiki/api/v2/pages/{id}/attachments` | `id`, `limit` (25), `cursor` | `read:attachment:confluence` |
+| `user` | `GET /wiki/rest/api/user?accountId={accountId}` | `accountId` | `read:confluence-user` |
 
 What is behind the table:
 
@@ -83,8 +84,8 @@ What is behind the table:
   has no body unless a format is named, so both calls fix `body-format=storage`
   as `page` does. The body is at `body.storage.value`, markup and not text, and
   an answer is bounded at 256 KiB, refused and not cut. A comment names its
-  author by `version.authorId`, an Atlassian account id, and nothing here turns
-  that into a name. A `kind` that is not the comment's is no error on `replies`:
+  author by `version.authorId`, an Atlassian account id, which `user` turns into
+  a name. A `kind` that is not the comment's is no error on `replies`:
   a footer comment's id asked as inline answered 200 and an empty list, so an
   agent that mixes the two sees no replies where there are some.
 - `labels` takes `read:page:confluence`, the scope `page` has already. A label is
@@ -96,6 +97,27 @@ What is behind the table:
   Nothing here follows one. What a file holds is yardr-racg's to settle. An
   entry is about a kilobyte, so a page of 250 may pass the 256 KiB bound, and a
   smaller `limit` then fits.
+- `user` names one account from its id, which is `version.authorId` in a comment,
+  a reply and an attachment. It is the v1 endpoint, `GET /wiki/rest/api/user`,
+  because v2 has no GET for a user (its four `likes/users` reads answer ids
+  alone) and its one lookup by id is `POST /users-bulk`, a list of ids in a
+  body. Two forms of id are seen, 24 hex digits (`5b10ac8d82e05b22cc7d4ef5`) and
+  a number, a colon and a UUID (`712020:<uuid>`). The pattern of `accountId`,
+  letters, digits and `:` `.` `_` `-`, takes both and blocks `/`, `?`, `&` and a
+  space. The value is in the query, which the call encodes (the colon goes out
+  as `%3A`), so the pattern is a second guard and not the only one. The answer
+  keeps `accountId`, `displayName` and `accountType` (`atlassian` for an
+  Atlassian account, `app` for the bot user of an app, an empty string where
+  Confluence has none) and nothing else, about 150 bytes, under the default
+  bound. A user has more keys, `email`, `profilePicture`, `publicName` and
+  `timeZone` among them. Every agent granted `read` would see them and naming an
+  author needs none, so the `select` drops them, and the test checks the three
+  keys beside its golden. A 404 is an id that is not there and a 403 is an
+  account that may not view users. Atlassian says what comes back may be
+  restricted by the user's profile visibility, and a `displayName` may be the
+  same as the `publicName`. One call names one account and counts toward the
+  hourly limit of 60 (SETUP.md step 4), so an agent that has several authors
+  calls it for each and keeps the names.
 - Paging is by cursor. v2 gives the next page's address in a `Link` header, which
   a declared call cannot read, and also as `_links.next` in the body, which stays
   in the answer. Its `cursor=` value is `cursor` of the same call again. v1
@@ -130,13 +152,14 @@ two sources and one login. A token that is replaced is given to each.
 **Which token.** A service account has scoped tokens only, and the form for one
 has you choose the app and then its scopes. So where the account's token for
 `jira` was made for Jira, Confluence needs a second token for the same account,
-with the six scopes above. A token without scopes, which an ordinary account
+with the seven scopes above. A token without scopes, which an ordinary account
 can make, serves both apps and can do everything the account can. The pack's
 mint takes either, and SETUP.md says which goes where. A scope is fixed when a
 token is made and Atlassian answers a missing one with a 401, so a token made
-for the first four calls is made again with `read:comment:confluence` and
-`read:attachment:confluence` added before `comments`, `replies` and
-`attachments` work (SETUP.md step 6).
+before a call was added is made again with that call's scope before the call
+works: `read:comment:confluence` and `read:attachment:confluence` for
+`comments`, `replies` and `attachments`, and `read:confluence-user` for `user`
+(SETUP.md step 6).
 
 **The address.** Confluence is per site, so the declaration ships the placeholder
 `https://example.atlassian.net/wiki` and SETUP.md has the operator write their
@@ -192,12 +215,15 @@ in this directory, about five seconds, no network and no secret. The gate
   its first page and its next, its default and its given parameters (`children`
   once for each of the five kinds, each on a node and a path segment of its own,
   `comments` and `replies` once for each of their two), an answer over the bound
-  (`page`, `comments`, `replies` and `attachments`), the statuses 400, 401 and
-  404, and the parameters the call must refuse (an id with a slash on each call
-  that takes one, a missing id, a body format, a CQL of 2001 characters, a limit
-  that is no number, a `kind` in the singular or one from another call, no
-  `kind` on `comments`), each of which sends no request. A changed path, query,
-  select, bound, pattern or enum value is a changed golden.
+  (`page`, `comments`, `replies` and `attachments`), the statuses 400, 401, 403
+  and 404, and the parameters the call must refuse (an id with a slash on each
+  call that takes one in its path, an account id that brings a query of its own,
+  a missing id, a body format, a CQL of 2001 characters, a limit that is no
+  number, a `kind` in the singular or one from another call, no `kind` on
+  `comments`), each of which sends no request. A changed path, query, select,
+  bound, pattern or enum value is a changed golden. The case of `user` answers
+  with an email, an avatar and a time zone, and the test checks beside its
+  golden that the call keeps three keys and none of those.
 - the calls again through the gateway's address, whose base carries a path.
 - a pack applied again over an edited address: the plan names the address it
   takes away, the shipped address returns, and the env file and a grant stand.
@@ -231,6 +257,18 @@ comment with no body when no format is named; a page's labels and attachments;
 the cursors of a page's footer comments and of its attachments, followed to the
 next page; and the answers for a page or a comment that is not there (above).
 
+Checked on 4 November 2026 for `user`: in the OpenAPI description of v1, the
+request, its parameter (`accountId`, required, a string), its answers 200, 401,
+403 and 404, its scope (`read:confluence-user`, with
+`read:content-details:confluence` beside it as beta) and the keys of the answer,
+in the description's `User`, which has the three kept (`accountId`,
+`accountType`, `displayName`) among its 18 keys; in the description of v2, that
+no GET reads a user (the four `likes/users` answer ids alone) and that its one
+lookup by id is `POST /users-bulk`. Seen on the public site without a login: the
+endpoint answers 403 to an anonymous caller, for the two ids tried, which were no
+account, with `User not permitted to view user profiles`. So the 403 is seen, and
+the 404 and the shape of an answer are the description's.
+
 Not checked with a credential against a site of our own, because a person has to
 make one (a free Atlassian Cloud site serves this pack and the Jira one). The
 live proof is a later bead. It should settle:
@@ -255,17 +293,31 @@ live proof is a later bead. It should settle:
   fixtures of `comments` and `replies` with `kind=inline` are made from it. The
   live proof needs a page with an inline comment and a reply to it;
 - that `read:comment:confluence` and `read:attachment:confluence` are enough for
-  the four new calls, as the first four scopes are for theirs.
+  the four new calls, as the first four scopes are for theirs;
+- that `read:confluence-user` is enough for `user`. The description lists
+  `read:content-details:confluence` beside it as beta, as it does for `search`;
+  if `user` answers 401 under the first alone, the second is added to the token;
+- what a real account answers: the 404 for an id that is not there; whether
+  `displayName` is ever null (the description marks it nullable, and says
+  `publicName` always has a value); and what an account that limits its profile
+  visibility, a deactivated one and an app's bot user show. The `app` and the
+  empty `accountType` are the description's.
 
 ## Left out
 
 An attachment's contents (a file's bytes are yardr-racg's to settle);
 blogposts, and the comments, labels and attachments of one; the comments, labels
 and attachments of anything but a page (a space, an attachment, custom content);
-who an author is (v2 has no read that turns an account id into a name, and v1
-has one at `/wiki/rest/api/user`; yardr-packs-az2j); the `sort`, `status` and `resolution-status`
-filters of the comment lists, the `prefix` filter of labels and the `mediaType`
-and `filename` filters of attachments; comment likes, versions and properties;
+several accounts named in one call (`user` names one, and an agent calls it for
+each. v1's `GET /wiki/rest/api/user/bulk` takes `accountId` as a list that its
+description does not say how to write; OpenAPI's default for a query is one key
+for each value, and a declared call holds one value to a query key. v2's `POST
+/wiki/api/v2/users-bulk` takes up to 250 ids in a body, and no parameter is a
+list. yardr-packs-fjmg weighs it); what else of an account `user` could give
+(its email, picture, public name and time zone, which the `select` drops on
+purpose); the `sort`, `status` and `resolution-status` filters of the comment
+lists, the `prefix` filter of labels and the `mediaType` and `filename` filters
+of attachments; comment likes, versions and properties;
 reading a folder, whiteboard, database or embed itself (a walk lists one with
 its title, and `page` takes a page's id only); page history and versions; any
 write; turning storage format into text; and Confluence Data Center and Server,

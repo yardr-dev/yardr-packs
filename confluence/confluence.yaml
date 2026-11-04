@@ -1,10 +1,10 @@
 # Confluence Cloud as a declared source: spaces listed, content found by
 # CQL, one page read, the children of a page, folder, whiteboard,
-# database or embed listed, and a page's comments, replies, labels and
-# attachments listed. Reads only. Jira's declaration (the jira
-# pack, beside this one) is the pattern for the login and the site's
-# address, and yardr's google-docs for a read call whose answer is
-# bounded; Confluence differs where noted.
+# database or embed listed, a page's comments, replies, labels and
+# attachments listed, and an author named from an account id. Reads only.
+# Jira's declaration (the jira pack, beside this one) is the pattern for
+# the login and the site's address, and yardr's google-docs for a read
+# call whose answer is bounded; Confluence differs where noted.
 #
 # Checked against Atlassian's OpenAPI descriptions of the Confluence Cloud
 # REST API (v2 and v1) and its developer and support pages on 2 November
@@ -84,6 +84,28 @@
 #     here follows one: what a file holds is yardr-racg's to settle. A
 #     file's entry is about a kilobyte, so 250 may pass the bound of 256 KiB.
 #
+# The author of a comment or a file was checked on 4 November 2026 the same
+# way: the OpenAPI description of v1, and GET requests without a login to
+# the public site.
+#   user:     GET /wiki/rest/api/user takes read:confluence-user (the
+#     description lists read:content-details:confluence beside it as beta,
+#     as it does for search) and answers one account for the accountId in
+#     its query: 404 for an id that is not there, 403 for a caller who may
+#     not view users. That id is version.authorId in the answers of
+#     comments, replies and attachments, and is seen in two forms, 24 hex
+#     digits and a number, a colon and a UUID. The call is v1 because v2
+#     has no GET for a user (its likes/users answer ids alone), and its one
+#     lookup by id is POST /users-bulk, a list of ids in a body. A declared
+#     call takes no list, so no bulk is built: v1's /user/bulk takes a list
+#     of accountId that the description does not say how to write, and a
+#     query here holds one value to a key. One call names one account. Of a
+#     User's keys three are kept: accountId, displayName and accountType
+#     (atlassian, app, or empty). email, profilePicture, publicName and
+#     timeZone are among the rest, which every agent granted read would see
+#     and naming an author does not need. The public site answered 403 to a
+#     caller without a login, for the two ids tried, so the 404 is the
+#     description's.
+#
 # The credential. Atlassian takes an API token as HTTP Basic, the base64 of
 # "email:token". A declared call's header takes one {credential}, so the
 # email and the token are two mint inputs and confluence/mint makes the one
@@ -104,7 +126,7 @@
 # pack applied again replaces the yard's copy and puts this one back
 # (SETUP.md, step 6).
 name: confluence
-about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, and a page's comments, replies, labels and attached files listed.
+about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.
 base: https://example.atlassian.net/wiki
 credential:
   env: CONFLUENCE_AUTH
@@ -213,3 +235,13 @@ calls:
       path: /api/v2/pages/{id}/attachments
       query: { limit: "{limit}", cursor: "{cursor}" }
     answer: { select: [results, _links], max: 262144 }   # an attachment is about 1 KB, so 250 may pass this bound, and a smaller limit then fits
+  user:
+    kind: read
+    about: Name the author of a comment or a file, given an Atlassian account id, which is version.authorId in the answers of comments, replies and attachments. Answers that account's accountId, displayName and accountType (atlassian for an Atlassian account, app for the bot user of an app, or empty) and nothing else of it. Names one account a call, so several authors are several calls. A 404 is an id that is not there, and a 403 is an account that may not view users. The name may be limited by the user's profile visibility.
+    params:
+      accountId: { type: string, pattern: "^[A-Za-z0-9:._-]+$", max: 128, log: true }   # 24 hex digits, or a number, a colon and a UUID; the pattern blocks /, ?, & and a space
+    request:
+      method: GET
+      path: /rest/api/user
+      query: { accountId: "{accountId}" }
+    answer: { select: [accountId, displayName, accountType] }   # three keys of a user's many, about 150 bytes, so the default bound holds

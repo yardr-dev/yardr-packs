@@ -1,0 +1,7 @@
+=== args
+user
+accountId=712020:7c9e6679-7425-40de-944b-e07fc1f90ae7
+=== answer
+{"statusCode":403,"data":{"authorized":false,"valid":true,"errors":[],"successful":false},"message":"com.atlassian.confluence.api.service.exceptions.api.PermissionException: User not permitted to view user profiles"}
+=== status
+403

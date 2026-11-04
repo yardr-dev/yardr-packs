@@ -1,0 +1,11 @@
+--- requests
+GET /wiki/rest/api/user?accountId=712020%3A7c9e6679-7425-40de-944b-e07fc1f90ae7
+  auth: ok
+  accept: application/json
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call user: the service answered 404"
+}
+--- stderr

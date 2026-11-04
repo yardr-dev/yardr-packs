@@ -121,7 +121,7 @@ fi
 # credential and every call's parameters, request and answer.
 yrun source show confluence --json | jq -S .declaration >"$core/declaration.json"
 check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
-jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 8' "$core/declaration.json" >/dev/null
+jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 9' "$core/declaration.json" >/dev/null
 ok "the shipped host is the placeholder, and every call is a read by GET" $?
 yrun pack show confluence >"$core/packshow.out" 2>&1
 grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out"
@@ -206,6 +206,14 @@ rm -f "$core/answer.json.status"
 methods=$(awk '/^--- requests/ { r = 1; next } /^--- status/ { r = 0 } r && /^[A-Z]/ { print $1 }' "$core"/case_*/golden | sort -u)
 [ "$methods" = GET ]
 ok "no request of any case is anything but a GET" $? "methods seen: $methods"
+# The select is all that keeps an account's email, avatar and time zone from
+# every agent granted read: the case's answer carries them and the call keeps
+# three keys. A golden written again after a wider select would pass, so the
+# keys are checked here and not left to the golden.
+jq -e 'keys == ["accountId", "accountType", "displayName"]' "$core/case_user/stdout" >/dev/null
+ok "user keeps an account's id, name and type, and no email, avatar or time zone" $?
+grep -q '"email"' "$core/case_user/answer" && grep -q '"profilePicture"' "$core/case_user/answer" && grep -q '"timeZone"' "$core/case_user/answer"
+ok "(and the case's answer does carry them, so the check above looked at something)" $?
 
 # The same calls through the gateway a token with scopes is called at: the
 # base carries a path of its own, and the paths of the calls follow it.

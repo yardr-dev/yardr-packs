@@ -1,5 +1,5 @@
 {
-  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, and a page's comments, replies, labels and attached files listed.",
+  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.",
   "base": "https://example.atlassian.net/wiki",
   "calls": [
     {
@@ -413,6 +413,38 @@
           {
             "key": "cursor",
             "value": "{cursor}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Name the author of a comment or a file, given an Atlassian account id, which is version.authorId in the answers of comments, replies and attachments. Answers that account's accountId, displayName and accountType (atlassian for an Atlassian account, app for the bot user of an app, or empty) and nothing else of it. Names one account a call, so several authors are several calls. A 404 is an id that is not there, and a 403 is an account that may not view users. The name may be limited by the user's profile visibility.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "accountId",
+          "displayName",
+          "accountType"
+        ]
+      },
+      "kind": "read",
+      "name": "user",
+      "params": [
+        {
+          "log": true,
+          "max": 128,
+          "name": "accountId",
+          "pattern": "^[A-Za-z0-9:._-]+$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/rest/api/user",
+        "query": [
+          {
+            "key": "accountId",
+            "value": "{accountId}"
           }
         ]
       }
