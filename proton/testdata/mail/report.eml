@@ -1,0 +1,25 @@
+From: Alice Example <alice@example.com>
+To: Bob <bob@example.com>
+Cc: carol@example.com
+Subject: Quarterly report
+Date: Tue, 03 Nov 2026 09:30:00 +0100
+Message-ID: <q1@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Hi Bob,
+
+The numbers are attached. Revenue is up 12=25.
+
+Alice
+--b1
+Content-Type: application/pdf; name="report.pdf"
+Content-Disposition: attachment; filename="report.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBhIHN0dWIgcGRmIGZvciB0aGUgcHJvdG9uIHBhY2sncyB0ZXN0CiUlRU9GCg==
+--b1--

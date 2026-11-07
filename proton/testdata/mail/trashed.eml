@@ -1,0 +1,11 @@
+From: Eve <eve@example.net>
+To: Bob <bob@example.com>
+Subject: Re: Quarterly report
+Date: Thu, 05 Nov 2026 09:00:00 +0000
+Message-ID: <t1@example.net>
+In-Reply-To: <r1@example.com>
+References: <q1@example.com> <r1@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+I would have deleted this: it is in the thread, and in the trash.

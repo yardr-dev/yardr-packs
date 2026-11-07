@@ -1,0 +1,1012 @@
+#!/usr/bin/env python3
+# proton-imap: the three calls of the proton source, search, message and
+# thread, answered from Proton Mail Bridge's local IMAP. The yard runs it as
+# `proton-imap <call>` (the `run` of each call in proton.yaml): the call's
+# parameters are on stdin as {"params": {...}}, the Bridge login is in
+# PROTON_BRIDGE as <username>:<password>, and where Bridge listens is in
+# YARDR_SOURCE_BASE. One JSON object goes to stdout. A failure is one line on
+# stderr and a non-zero exit, which is what the yard shows whoever made the
+# call, so no line holds the login, and what Bridge or a message wrote is
+# flattened to one line before it is quoted.
+#
+# It reads and changes nothing, and is built so that it cannot do otherwise:
+# the only commands it sends are LIST, EXAMINE (a mailbox opened read-only,
+# never SELECT), UID SEARCH, UID FETCH of BODY.PEEK and LOGOUT, each from one
+# method of Bridge below, and nothing else in this file touches the socket.
+#
+# A message is named by an id, <mailbox, percent-encoded>:<UIDVALIDITY>:<UID>,
+# which is all IMAP needs to find it again, and which Bridge's renumbering of a
+# mailbox (a new UIDVALIDITY) turns into a refusal instead of another message.
+#
+# Bridge's IMAP engine, Gluon, is what this was written against (see
+# proton.yaml): STARTTLS, LOGIN, LIST with the \All attribute, EXAMINE, SEARCH
+# with CHARSET and literals, FETCH, and none of Gmail's X-GM-THRID or THREAD,
+# so a thread is built from References and In-Reply-To.
+#
+# Needs Python 3.9 or newer, and nothing beyond its standard library.
+import datetime
+import email
+import email.header
+import email.policy
+import email.utils
+import html.parser
+import imaplib
+import ipaddress
+import json
+import os
+import re
+import socket
+import ssl
+import sys
+import time
+import traceback
+import urllib.parse
+
+DEFAULT_PORT = 1143   # Bridge's, when the base names none
+TIMEOUT = 20          # seconds one command may take
+BUDGET = 25           # seconds a whole call may take: the yard stops a command at 30
+MAX_RESULTS = 50      # a page of search, and the messages of a thread
+OUTPUT = 60000        # bytes of answer: the yard takes 64 KB of a command's
+TEXT = 48000          # bytes of message text in an answer, shared by a thread's messages
+FULL_ONE = 25 << 20   # the largest message read in full
+FULL_EACH = 5 << 20   # the largest message of a thread whose text is read
+FULL_ALL = 25 << 20   # and the most of them a thread reads in all
+
+# imaplib refuses a response line over 1 MB, and the answer to a SEARCH is one
+# line: a mailbox of 150,000 messages is 1 MB of it. A literal has no such bound.
+imaplib._MAXLINE = 8 << 20
+
+
+class Refusal(Exception):
+    """What was wrong, in the one line the caller is shown."""
+
+
+def one_line(text, limit=300):
+    """text as one line of printable characters, at most limit of them. What
+    Bridge says and what a message holds reach stderr and the answer, and may
+    hold line breaks and terminal controls."""
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f  ]+", " ", str(text))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+IMAP_CONTROLS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def mailbox_name(text):
+    """A mailbox name safe to put in an IMAP quoted string."""
+    # Quoting escapes quotes and backslashes, but a line break would split the command.
+    if IMAP_CONTROLS.search(text):
+        raise Refusal("a mailbox name has a control character")
+    return text
+
+
+def words(error):
+    """What an error says as one line. imaplib's holds bytes where a server
+    spoke; an OSError's first argument is its number, so it is read whole."""
+    arg = error.args[0] if isinstance(error, imaplib.IMAP4.error) and error.args else error
+    if isinstance(arg, bytes):
+        arg = arg.decode("utf-8", "replace")
+    return one_line(arg)
+
+
+def clip_bytes(text, limit):
+    """(text cut on a character boundary to limit UTF-8 bytes, whether it was)."""
+    data = text.encode("utf-8", "replace")
+    if len(data) <= limit:
+        return text, False
+    return data[:limit].decode("utf-8", "ignore"), True
+
+
+# ---- the query ------------------------------------------------------------
+# q is Gmail's syntax in part, since that is what an agent knows, turned into
+# IMAP SEARCH keys before anything is sent: the terms are ANDed.
+
+class Atom(str):
+    """A search argument that goes as it is, a date. Any other is a string:
+    quoted, or sent as a literal when it holds more than printable ASCII."""
+
+
+OPERATORS = "from: to: cc: bcc: subject: after: before: newer_than: older_than: is: in: label:"
+HEADERS = {"from": "FROM", "to": "TO", "cc": "CC", "bcc": "BCC", "subject": "SUBJECT"}
+FLAGS = {"unread": "UNSEEN", "read": "SEEN", "starred": "FLAGGED", "flagged": "FLAGGED",
+         "answered": "ANSWERED", "draft": "DRAFT"}
+MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()  # not the locale's
+MAX_TERMS = 30
+KEY = re.compile(r"[A-Za-z_]+:")
+
+
+def terms(q):
+    """q as (negated, operator or None, value, quoted) for each term. A quote
+    that is never closed is refused: it would make the rest of q a phrase."""
+    out, i, n = [], 0, len(q)
+    while True:
+        while i < n and q[i].isspace():
+            i += 1
+        if i >= n:
+            return out
+        negated = q[i] == "-" and i + 1 < n and not q[i + 1].isspace()
+        if negated:
+            i += 1
+        key = None
+        m = KEY.match(q, i)
+        if m:
+            key, i = m.group()[:-1].lower(), m.end()
+        if i < n and q[i] == '"':
+            j, buf = i + 1, []
+            while j < n and q[j] != '"':
+                if q[j] == "\\" and j + 1 < n:
+                    j += 1
+                buf.append(q[j])
+                j += 1
+            if j >= n:
+                raise Refusal("q has a quote that is never closed")
+            value, quoted, i = "".join(buf), True, j + 1
+        else:
+            j = i
+            while j < n and not q[j].isspace():
+                j += 1
+            value, quoted, i = q[i:j], False, j
+        out.append((negated, key, value, quoted))
+        if len(out) > MAX_TERMS:
+            raise Refusal("q has more than %d terms" % MAX_TERMS)
+
+
+def imap_date(day):
+    return "%d-%s-%d" % (day.day, MONTHS[day.month - 1], day.year)
+
+
+def plan_search(q, today=None):
+    """q as ([(negated, IMAP key, argument or None)], the mailbox in: or label:
+    names or None). today is the date newer_than and older_than count back
+    from, UTC's when it is None."""
+    if today is None:
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+    q = q or ""
+    if "\x00" in q:
+        raise Refusal("q has a NUL in it")
+    crits, box = [], None
+    for negated, key, value, quoted in terms(q):
+        if key is None:
+            if value:
+                crits.append((negated, "TEXT", value))
+            continue
+        if key in HEADERS:
+            if not value:
+                raise Refusal("%s: needs something to look for" % key)
+            crits.append((negated, HEADERS[key], value))
+        elif key in ("after", "before"):
+            m = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", value)
+            try:
+                day = datetime.date(*map(int, m.groups())) if m else None
+            except ValueError:
+                day = None
+            if day is None:
+                raise Refusal("%s: wants a date, YYYY-MM-DD or YYYY/MM/DD" % key)
+            crits.append((negated, "SINCE" if key == "after" else "BEFORE", Atom(imap_date(day))))
+        elif key in ("newer_than", "older_than"):
+            m = re.fullmatch(r"(\d{1,4})([dwmy])", value.lower())
+            if not m:
+                raise Refusal("%s: wants a count and d, w, m or y, such as 7d or 1y" % key)
+            ago = today - datetime.timedelta(days=int(m.group(1)) * {"d": 1, "w": 7, "m": 30, "y": 365}[m.group(2)])
+            crits.append((negated, "SINCE" if key == "newer_than" else "BEFORE", Atom(imap_date(ago))))
+        elif key == "is":
+            if value.lower() not in FLAGS:
+                raise Refusal("is: knows %s, not %s" % (", ".join(sorted(FLAGS)), one_line(value, 40)))
+            crits.append((negated, FLAGS[value.lower()], None))
+        elif key in ("in", "label"):
+            if negated or box is not None or not value:
+                raise Refusal("%s: names one mailbox, once, and cannot be left out with a -" % key)
+            box = value
+        else:
+            raise Refusal("%s: is no operator of this search (%s): put it in quotes to look for it as text" % (key, OPERATORS))
+    return crits, box
+
+
+def quoted_string(text):
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def render(crit):
+    """(the SEARCH words of one criterion, the string that goes after them as
+    a literal or None). Bridge reads a literal only where a client sends one."""
+    negated, key, arg = crit
+    out = (["NOT"] if negated else []) + [key]
+    if arg is None:
+        return out, None
+    if isinstance(arg, Atom):
+        return out + [str(arg)], None
+    if all(" " <= c <= "~" for c in arg):
+        return out + [quoted_string(arg)], None
+    return out, arg
+
+
+def search(bridge, crits):
+    """The UIDs, ascending, of the open mailbox's messages that match every
+    criterion. imaplib sends one literal to a command, and it must be the
+    command's last word, so a criterion with one is a command of its own (the
+    last of them rides on the command of the plain criteria) and the answers
+    are intersected."""
+    plain, literals = [], []
+    for crit in crits:
+        key, literal = render(crit)
+        (literals if literal is not None else plain).append((key, literal))
+    head = [w for key, _ in plain for w in key] or ([] if literals else ["ALL"])
+    jobs = []
+    if literals:
+        key, literal = literals.pop()
+        jobs.append((head + key, literal))
+    else:
+        jobs.append((head, None))
+    jobs += literals
+    found = None
+    for key, literal in jobs:
+        uids = set(bridge.search(key, literal))
+        found = uids if found is None else found & uids
+    return sorted(found)
+
+
+# ---- the connection -------------------------------------------------------
+
+def loopback(host):
+    """Whether host is this machine: localhost, or an address in 127.0.0.0/8 or
+    ::1. No name is looked up, so a name that is not localhost is not it."""
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def tls_context(host):
+    """TLS for the connection to Bridge. Bridge makes itself a self-signed
+    certificate that no client can verify, so it is not verified, and only
+    where the connection cannot leave the machine. Any other host is verified
+    as the system verifies every server."""
+    if not loopback(host):
+        return ssl.create_default_context()
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
+class Box:
+    """One mailbox as LIST gives it."""
+
+    def __init__(self, name, attrs, delim):
+        self.name, self.attrs, self.delim = name, attrs, delim
+
+    @property
+    def selectable(self):
+        return "\\noselect" not in self.attrs and "\\nonexistent" not in self.attrs
+
+
+LIST_LINE = re.compile(rb'\((?P<attrs>[^)]*)\) (?P<delim>"(?:[^"\\]|\\.)*"|NIL) (?P<name>.*)', re.S)
+FETCH_START = re.compile(rb"\s*\d+ \(")
+
+
+def unquote_imap(text):
+    if len(text) >= 2 and text[:1] == b'"' and text[-1:] == b'"':
+        text = re.sub(rb"\\(.)", rb"\1", text[1:-1])
+    return text.decode("utf-8", "replace")
+
+
+def parse_list(data):
+    boxes = []
+    for item in data or []:
+        literal = None
+        if isinstance(item, tuple):
+            item, literal = item
+        m = LIST_LINE.match(item) if item else None
+        if not m:
+            continue
+        name = literal.decode("utf-8", "replace") if literal is not None else unquote_imap(m["name"].strip())
+        delim = None if m["delim"] == b"NIL" else unquote_imap(m["delim"])
+        attrs = {a.lower() for a in m["attrs"].decode("ascii", "replace").split()}
+        boxes.append(Box(name, attrs, delim))
+    return boxes
+
+
+def parse_fetch(data):
+    """imaplib's answer to a FETCH as one dict a message: uid, flags, internal
+    (INTERNALDATE as Bridge wrote it), size and literals, the bodies Bridge
+    sent in order. imaplib hands a response as the text up to a literal with
+    the literal, then what follows it as the next item, and a server may put
+    UID and FLAGS before the literal or after it, so the text of each response
+    is joined and read as one."""
+    messages, current = [], None
+    for item in data or []:
+        literal = None
+        if isinstance(item, tuple):
+            item, literal = item
+        if not item:
+            continue
+        if FETCH_START.match(item):
+            current = {"attrs": b"", "literals": []}
+            messages.append(current)
+        if current is None:
+            continue
+        current["attrs"] += item + b" "
+        if literal is not None:
+            current["literals"].append(literal)
+    out = []
+    for m in messages:
+        attrs = m["attrs"]
+        uid = re.search(rb"\bUID (\d+)", attrs)
+        flags = re.search(rb"\bFLAGS \(([^)]*)\)", attrs)
+        internal = re.search(rb'\bINTERNALDATE "([^"]+)"', attrs)
+        size = re.search(rb"\bRFC822\.SIZE (\d+)", attrs)
+        if not uid:
+            continue
+        out.append({
+            "uid": int(uid.group(1)),
+            "flags": flags.group(1).decode("utf-8", "replace").split() if flags else [],
+            "internal": internal.group(1).decode("ascii", "replace") if internal else None,
+            "size": int(size.group(1)) if size else None,
+            "literals": m["literals"],
+        })
+    return out
+
+
+class Bridge:
+    """The connection to Bridge: opened and logged in when it is made, and the
+    only code that sends a command. A command that goes wrong ends the call
+    with a line that says what, and the deadline of the call is kept between
+    them."""
+
+    def __init__(self, base, credential):
+        self.deadline = time.monotonic() + BUDGET
+        self.open_box = None
+        self.validity = {}
+        try:
+            url = urllib.parse.urlsplit(base)
+            host, port = url.hostname, url.port or DEFAULT_PORT
+        except ValueError:
+            host = None
+        if not host:
+            raise Refusal("YARDR_SOURCE_BASE is no host and port: %s" % one_line(base, 100))
+        user, colon, password = credential.partition(":")
+        if not colon or not user or not password:
+            raise Refusal("PROTON_BRIDGE is not <username>:<password>: give the username and the password Bridge shows for the account (SETUP.md)")
+        # LOGIN sends the user as an atom, which has no %, * or quote in it, so
+        # a user that is not a plain address could not be said; and no line
+        # break could be in the password.
+        if not re.fullmatch(r"[A-Za-z0-9._+@=-]+", user) or not all(" " <= c <= "~" for c in password):
+            raise Refusal("PROTON_BRIDGE holds a character LOGIN cannot carry: a Bridge username is an address, and its password is printable ASCII")
+        self.where = "%s:%d" % (host, port)
+        try:
+            self.imap = imaplib.IMAP4(host, port, timeout=TIMEOUT)
+        except (socket.timeout, TimeoutError):
+            raise Refusal("no answer from Bridge at %s in %d seconds: is Proton Mail Bridge running and signed in?" % (self.where, TIMEOUT))
+        except OSError as e:
+            raise Refusal("no Bridge at %s (%s): is Proton Mail Bridge running and signed in? If it listens on another port, SETUP.md says how to give the yard that one" % (self.where, one_line(e, 100)))
+        except imaplib.IMAP4.error as e:
+            raise Refusal("what answers at %s is no IMAP server, or it is not Bridge speaking STARTTLS: %s" % (self.where, words(e)))
+        self.imap.sock.settimeout(self._left())
+        try:
+            self.imap.starttls(ssl_context=tls_context(host))
+        except (OSError, imaplib.IMAP4.error) as e:
+            raise Refusal("Bridge at %s would not start TLS (%s): this speaks IMAP with STARTTLS, so Bridge's IMAP connection mode must be STARTTLS, its default (SETUP.md)" % (self.where, words(e)))
+        self.imap.sock.settimeout(self._left())
+        try:
+            self.imap.login(user, password)
+        except imaplib.IMAP4.error as e:
+            # A server's words are quoted, and one that echoed the password would put it in the line.
+            raise Refusal("Bridge refused the login (%s): PROTON_BRIDGE wants the username and the password Bridge shows for the account under Mailbox details, not the Proton password (SETUP.md)" % words(e).replace(password, "[password]"))
+        except (socket.timeout, TimeoutError, OSError) as e:
+            raise Refusal("the login to Bridge failed: %s" % one_line(e, 100))
+
+    def _left(self):
+        """Seconds the next command may take: its own limit, or what the call has left of its."""
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise Refusal("Bridge took too long: the call is over its %d seconds" % BUDGET)
+        return min(TIMEOUT, left)
+
+    def _run(self, what, fn, *args):
+        timeout = self._left()
+        try:
+            self.imap.sock.settimeout(timeout)
+            return fn(*args)
+        except (socket.timeout, TimeoutError):
+            raise Refusal("Bridge did not answer %s in time: a search reads each message of a mailbox, so in: and a date keep it small" % what)
+        except imaplib.IMAP4.abort as e:
+            raise Refusal("Bridge dropped the connection %s: %s" % (what, words(e)))
+        except imaplib.IMAP4.error as e:
+            raise Refusal("Bridge refused %s: %s" % (what, words(e)))
+        except OSError as e:
+            raise Refusal("the connection to Bridge failed %s: %s" % (what, one_line(e, 100)))
+
+    def mailboxes(self):
+        typ, data = self._run("the list of mailboxes", self.imap.list)
+        if typ != "OK":
+            raise Refusal("Bridge would not list its mailboxes")
+        return parse_list(data)
+
+    def examine(self, name):
+        """Opens the mailbox read-only and says its UIDVALIDITY."""
+        mailbox_name(name)
+        if self.open_box == name:
+            return self.validity[name]
+        quoted = quoted_string(name)
+        typ, data = self._run("to open " + one_line(name, 60), self.imap.select, quoted, True)
+        if typ != "OK":
+            raise Refusal("Bridge would not open %s: %s" % (one_line(name, 60), one_line(data[-1] if data else "", 100)))
+        _, found = self.imap.response("UIDVALIDITY")
+        self.open_box = name
+        self.validity[name] = int(found[-1]) if found and found[-1] else 0
+        return self.validity[name]
+
+    def search(self, key, literal=None):
+        args = (["CHARSET", "UTF-8"] if literal is not None else []) + key
+
+        def send():
+            # Set here, so that a command that is never sent leaves none behind
+            # for the next one to send.
+            if literal is not None:
+                self.imap.literal = literal.encode("utf-8")
+            return self.imap.uid("SEARCH", *args)
+
+        typ, data = self._run("the search", send)
+        if typ != "OK":
+            raise Refusal("Bridge refused the search: %s" % one_line(data[-1] if data else "", 100))
+        return [int(u) for u in (data[0] or b"").split()] if data else []
+
+    def fetch(self, uids, items):
+        typ, data = self._run("a message", self.imap.uid, "FETCH", ",".join(str(u) for u in uids), items)
+        if typ != "OK":
+            raise Refusal("Bridge refused to give a message: %s" % one_line(data[-1] if data else "", 100))
+        return parse_fetch(data)
+
+    def close(self):
+        try:
+            self.imap.logout()
+        except Exception:
+            pass
+
+
+# ---- mailboxes ------------------------------------------------------------
+
+ALIASES = {"sent": "\\sent", "drafts": "\\drafts", "trash": "\\trash", "spam": "\\junk", "junk": "\\junk",
+           "archive": "\\archive", "starred": "\\flagged", "all": "\\all", "anywhere": "\\all"}
+
+
+def all_mail(boxes):
+    """The mailbox of all mail, which Bridge lists with \\All unless the
+    operator has hidden it in Bridge, or None."""
+    return next((b for b in boxes if b.selectable and "\\all" in b.attrs), None)
+
+
+def default_box(boxes):
+    return all_mail(boxes) or next((b for b in boxes if b.name.upper() == "INBOX"), None) \
+        or next((b for b in boxes if b.selectable), None)
+
+
+def find_box(boxes, want):
+    """The mailbox in: names: its name as LIST gives it in any case, a word
+    for one Bridge marks (sent, trash, spam, archive, starred, all), or the
+    last part of a nested name (Receipts for Labels/Receipts) when only one
+    ends so."""
+    low = want.lower()
+    usable = [b for b in boxes if b.selectable]
+    for b in usable:
+        if b.name.lower() == low:
+            return b
+    special = ALIASES.get(low)
+    for b in usable:
+        if special and special in b.attrs:
+            return b
+    tails = [b for b in usable if b.name.lower().rsplit(b.delim or "/", 1)[-1] == low]
+    if len(tails) == 1:
+        return tails[0]
+    if tails:
+        raise Refusal("%s ends the names of several mailboxes, %s: give one in full" % (
+            one_line(want, 60), ", ".join(one_line(b.name, 60) for b in tails)))
+    raise Refusal("no mailbox %s: Bridge has %s" % (one_line(want, 60), ", ".join(one_line(b.name, 60) for b in usable)))
+
+
+def open_box(bridge, name, validity):
+    """Opens the mailbox an id names, and refuses the id if Bridge has
+    renumbered it since."""
+    now = bridge.examine(name)
+    if now != validity:
+        raise Refusal("that id is stale: Bridge has renumbered %s (its UIDVALIDITY was %d and is %d), so a number in it may be another message: search again" % (one_line(name, 60), validity, now))
+
+
+# ---- messages -------------------------------------------------------------
+
+ID = re.compile(r"([A-Za-z0-9%._~-]+):([0-9]+):([0-9]+)")
+MSGID = re.compile(r"<[^<>\s]+>")
+
+
+def make_id(mailbox, validity, uid):
+    return "%s:%d:%d" % (urllib.parse.quote(mailbox, safe=""), validity, uid)
+
+
+def parse_id(text):
+    m = ID.fullmatch(text) if isinstance(text, str) else None
+    if not m or int(m.group(3)) < 1:
+        raise Refusal("that is no id of a message: it is the id search answers, mailbox:validity:uid")
+    encoded = m.group(1)
+    if re.search(r"%(?![0-9A-Fa-f]{2})", encoded):
+        raise Refusal("that is no id of a message: its mailbox name is not percent-encoded")
+    try:
+        name = urllib.parse.unquote(encoded, errors="strict")
+    except UnicodeDecodeError:
+        raise Refusal("that is no id of a message: its mailbox name is not UTF-8")
+    try:
+        mailbox_name(name)
+    except Refusal:
+        raise Refusal("that is no id of a message: its mailbox name has a control character")
+    return name, int(m.group(2)), int(m.group(3))
+
+
+def parse_message(raw):
+    return email.message_from_bytes(raw or b"", policy=email.policy.default)
+
+
+def decoded(raw):
+    """A header's raw text with its RFC 2047 words decoded, on one line."""
+    try:
+        text = str(email.header.make_header(email.header.decode_header(str(raw))))
+    except Exception:
+        text = str(raw)
+    return one_line(text, 100000)
+
+
+def hval(msg, name):
+    """A header of msg as one line of text, or None. The default policy
+    decodes it; one it cannot parse is read raw and decoded by hand."""
+    try:
+        value = msg[name]
+        return None if value is None else one_line(value, 100000)
+    except Exception:
+        for key, raw in msg.raw_items():
+            if key.lower() == name.lower():
+                return decoded(raw)
+    return None
+
+
+def clip(text, limit):
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def parse_internal(text):
+    """INTERNALDATE, 06-Nov-2026 09:00:00 +0000, as a datetime, or None."""
+    m = re.fullmatch(r"\s*(\d{1,2})-([A-Za-z]{3})-(\d{4}) (\d\d):(\d\d):(\d\d) ([+-])(\d\d)(\d\d)", text or "")
+    if not m or m.group(2).title() not in MONTHS:
+        return None
+    offset = datetime.timedelta(hours=int(m.group(8)), minutes=int(m.group(9)))
+    zone = datetime.timezone(-offset if m.group(7) == "-" else offset)
+    try:
+        return datetime.datetime(int(m.group(3)), MONTHS.index(m.group(2).title()) + 1, int(m.group(1)),
+                                 int(m.group(4)), int(m.group(5)), int(m.group(6)), tzinfo=zone)
+    except ValueError:
+        return None
+
+
+def header_date(text):
+    """A Date header as a datetime, or None."""
+    try:
+        return email.utils.parsedate_to_datetime(text)
+    except Exception:
+        return None
+
+
+def stamp(when):
+    """Seconds since the epoch; a date with no zone (-0000) is taken as UTC."""
+    if when is None:
+        return 0.0
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    return when.timestamp()
+
+
+def ids_of(text):
+    return MSGID.findall(text or "")
+
+
+class Row:
+    """One message as Bridge gave it: where it is and what it carries, and its
+    headers or all of it as an email.message.Message."""
+
+    def __init__(self, mailbox, validity, entry, raw):
+        self.mailbox, self.validity, self.uid = mailbox, validity, entry["uid"]
+        self.id = make_id(mailbox, validity, entry["uid"])
+        self.flags = [f for f in entry["flags"] if f.lower() != "\\recent"]
+        self.size = entry["size"]
+        self.internal = parse_internal(entry["internal"])
+        self.skipped = False
+        self.read(raw, False)
+
+    def read(self, raw, whole):
+        """Takes raw as the message's headers, or as all of it when whole."""
+        self.msg, self.whole = parse_message(raw), whole
+        self.text = self.files = None
+        ids = ids_of(hval(self.msg, "Message-ID"))
+        self.mid = ids[0] if ids else None
+        self.sent = header_date(hval(self.msg, "Date")) or self.internal
+
+    def body(self):
+        """Its text and its attachments, worked out once: fit() asks again for a
+        smaller cut of the same text."""
+        if self.text is None:
+            self.text, self.files = body_text(self.msg), attachments(self.msg)
+        return self.text, self.files
+
+    def read_whole(self, bridge):
+        """Reads all of the message: the mailbox it is in must be the one open."""
+        body = bridge.fetch([self.uid], "(UID BODY.PEEK[])")
+        entry = next((e for e in body if e["uid"] == self.uid and e["literals"]), None)
+        if entry is None:
+            raise Refusal("Bridge gave no text for that message")
+        self.read(entry["literals"][0], True)
+
+
+def read_rows(bridge, mailbox, validity, uids, header=True):
+    """Rows for the UIDs of the open mailbox that Bridge still has, in the
+    order of uids. The headers are all of them when header, else the three
+    that search shows."""
+    if not uids:
+        return []
+    fields = "BODY.PEEK[HEADER]" if header else "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)]"
+    got = {e["uid"]: e for e in bridge.fetch(uids, "(UID FLAGS INTERNALDATE RFC822.SIZE %s)" % fields)}
+    return [Row(mailbox, validity, got[u], got[u]["literals"][0] if got[u]["literals"] else b"")
+            for u in uids if u in got]
+
+
+class Plain(html.parser.HTMLParser):
+    """HTML as the text a reader sees: no tags, scripts or styles, and a line
+    break where a block ends."""
+
+    BLOCKS = {"p", "div", "br", "li", "tr", "table", "ul", "ol", "blockquote", "pre", "hr", "section",
+              "article", "header", "footer", "h1", "h2", "h3", "h4", "h5", "h6"}
+    SKIPPED = {"script", "style", "head", "title"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts, self.skipping = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIPPED:
+            self.skipping += 1
+        elif tag in self.BLOCKS:
+            self.parts.append("\n")
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIPPED:
+            self.skipping = max(0, self.skipping - 1)
+        elif tag in self.BLOCKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.skipping:
+            self.parts.append(re.sub(r"\s+", " ", data))
+
+
+def html_to_text(markup):
+    parser = Plain()
+    try:
+        parser.feed(markup)
+        parser.close()
+        return "".join(parser.parts)
+    except Exception:
+        return re.sub(r"<[^>]*>", " ", markup)
+
+
+def tidy(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def body_text(msg):
+    """The text of a message: its plain part, else its HTML part as text."""
+    try:
+        part = msg.get_body(preferencelist=("plain", "html"))
+    except Exception:
+        part = None
+    if part is None:
+        return ""
+    try:
+        content = part.get_content()
+    except Exception:
+        content = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
+    if part.get_content_type() == "text/html":
+        content = html_to_text(content)
+    return tidy(content)
+
+
+def attachments(msg):
+    """The name, type and size of each attachment, and never its contents."""
+    try:
+        parts = list(msg.iter_attachments())
+    except Exception:
+        parts = []
+    if not msg.is_multipart() and msg.get_content_maintype() != "text":
+        parts = [msg]
+    out = []
+    for part in parts[:100]:
+        try:
+            name = part.get_filename()
+        except Exception:
+            name = None
+        try:
+            data = part.get_payload(decode=True)
+            size = len(data) if data is not None else len(part.as_bytes())
+        except Exception:
+            size = None
+        entry = {"name": clip(decoded(name), 200) if name else None, "type": part.get_content_type()}
+        if size is not None:
+            entry["size"] = size
+        out.append(entry)
+    return out
+
+
+def describe(row, limit=None, brief=False):
+    """One message as the answers show it. With a limit its text is read, cut to
+    that many bytes. A brief one, a message of a thread, leaves out its
+    mailbox and references, and shortens its recipients."""
+    msg = row.msg
+    cc_to = 300 if brief else 2000
+    out = {"id": row.id}
+    if not brief:
+        out["mailbox"] = row.mailbox
+    out["flags"] = row.flags
+    out["from"] = clip(hval(msg, "From") or "", 500)
+    for key, name in (("to", "To"), ("cc", "Cc")):
+        value = hval(msg, name)
+        if value:
+            out[key] = clip(value, cc_to)
+    out["subject"] = clip(hval(msg, "Subject") or "", 1000)
+    when = row.sent
+    out["date"] = when.isoformat() if when else clip(hval(msg, "Date") or "", 100)
+    if row.mid:
+        out["messageId"] = row.mid
+    reply = ids_of(hval(msg, "In-Reply-To"))
+    if reply:
+        out["inReplyTo"] = reply[0]
+    refs = ids_of(hval(msg, "References"))
+    if refs and not brief:
+        out["references"] = refs if len(refs) <= 40 else refs[:1] + refs[-39:]
+    if row.size is not None:
+        out["size"] = row.size
+    if limit is not None:
+        if row.whole:
+            text, files = row.body()
+            text, cut = clip_bytes(text, limit)
+            out["text"] = text
+            if cut:
+                out["truncated"] = True
+            out["attachments"] = files
+        elif row.skipped:
+            out["truncated"] = True
+    return out
+
+
+def dump(answer):
+    return json.dumps(answer, ensure_ascii=False, separators=(",", ":")).encode("utf-8", "replace")
+
+
+def fit(build, droppable=0):
+    """The answer build(limit, drop) gives for the largest limit that makes it
+    fit in OUTPUT bytes: limit is the bytes of text all the messages of an
+    answer share, and drop the oldest messages left out once no text is left
+    to give up. Cutting a byte of text takes at least a byte from the JSON, so
+    each round gives up the overshoot and a little more; a round is cheap, since
+    each message's text is worked out once (Row.body)."""
+    limit, drop = TEXT, 0
+    while True:
+        answer = build(limit, drop)
+        size = len(dump(answer))
+        if size <= OUTPUT:
+            return answer
+        if limit:
+            limit = max(0, limit - (size - OUTPUT) - 256)
+        elif drop < droppable:
+            drop += 1
+        else:
+            raise Refusal("the answer is over 60 KB even without its text")
+
+
+# ---- the calls ------------------------------------------------------------
+
+def want_format(params):
+    fmt = params.get("format") or "metadata"
+    if fmt not in ("metadata", "full"):
+        raise Refusal("format is metadata or full")
+    return fmt
+
+
+def call_search(params, connect):
+    try:
+        limit = int(params.get("maxResults") or 20)
+    except (TypeError, ValueError):
+        limit = 0
+    if not 1 <= limit <= MAX_RESULTS:
+        raise Refusal("maxResults is a number from 1 to %d" % MAX_RESULTS)
+    crits, want = plan_search(params.get("q"))
+    bridge = connect()
+    boxes = bridge.mailboxes()
+    box = find_box(boxes, want) if want else default_box(boxes)
+    if box is None:
+        raise Refusal("Bridge has no mailbox to search")
+    validity = bridge.examine(box.name)
+    uids = search(bridge, crits)
+    rows = read_rows(bridge, box.name, validity, uids[::-1][:limit], header=False)
+    hits = []
+    for row in rows:
+        when = row.sent
+        hits.append({
+            "id": row.id,
+            "from": clip(hval(row.msg, "From") or "", 200),
+            "subject": clip(hval(row.msg, "Subject") or "", 300),
+            "date": when.isoformat() if when else clip(hval(row.msg, "Date") or "", 100),
+            "flags": row.flags,
+        })
+    # A page is bounded by its fields, and a mailbox with a long name or a
+    # message with many flags can still make 50 of them too much: the oldest go.
+    return fit(lambda limit, drop: {"mailbox": box.name, "messages": hits[:len(hits) - drop],
+                                    "resultSizeEstimate": len(uids)}, max(0, len(hits) - 1))
+
+
+def call_message(params, connect):
+    name, validity, uid = parse_id(params.get("id"))
+    full = want_format(params) == "full"
+    bridge = connect()
+    open_box(bridge, name, validity)
+    got = bridge.fetch([uid], "(UID FLAGS INTERNALDATE RFC822.SIZE%s)" % ("" if full else " BODY.PEEK[HEADER]"))
+    entry = next((e for e in got if e["uid"] == uid), None)
+    if entry is None:
+        raise Refusal("Bridge has no message of that id: it was moved or deleted, or the id is wrong: search again")
+    if full and (entry["size"] or 0) > FULL_ONE:
+        raise Refusal("the message is %d MB, over the %d MB read in full: format metadata reads its headers" % (entry["size"] >> 20, FULL_ONE >> 20))
+    row = Row(name, validity, entry, b"" if full else (entry["literals"] or [b""])[0])
+    if full:
+        row.read_whole(bridge)
+    return fit(lambda limit, drop: describe(row, limit if full else None))
+
+
+def thread_criteria(ids):
+    """The SEARCH words for every message that is, answers or follows one of
+    ids by its Message-ID, In-Reply-To or References: one OR of them, since
+    each search of Bridge's reads each message of the mailbox."""
+    key = []
+    for one in ids:
+        for field in ("Message-ID", "In-Reply-To", "References"):
+            key += ["HEADER", field, quoted_string(one)]
+    return ["OR"] * (len(ids) * 3 - 1) + key
+
+
+def call_thread(params, connect):
+    name, validity, uid = parse_id(params.get("id"))
+    full = want_format(params) == "full"
+    bridge = connect()
+    open_box(bridge, name, validity)
+    mine = read_rows(bridge, name, validity, [uid])
+    if not mine:
+        raise Refusal("Bridge has no message of that id: it was moved or deleted, or the id is wrong: search again")
+    me = mine[0]
+    # The thread's root is the first message of References, or else the one
+    # In-Reply-To names: clients write the chain from the root down. A search
+    # for the root, and for the message itself, finds the root, the replies and
+    # the message's own replies, however far down the chain each cites.
+    refs = ids_of(hval(me.msg, "References"))
+    reply = ids_of(hval(me.msg, "In-Reply-To"))
+    root = refs[0] if refs else (reply[0] if reply else me.mid)
+    # An id with anything but printable ASCII in it would need a literal of its
+    # own, and a Message-ID has none in practice.
+    wanted = [i for i in dict.fromkeys([me.mid, root]) if i and all(" " <= c <= "~" for c in i)]
+    rows, found, matched = [me], [], 1
+    if wanted:
+        boxes = bridge.mailboxes()
+        scope = all_mail(boxes)
+        own = next((b for b in boxes if b.name == name), None)
+        # Mail in the trash or spam is not in all mail: its thread is read where it is.
+        if scope is None or (own is not None and own.attrs & {"\\trash", "\\junk"}):
+            scope = own
+        if scope is not None:
+            sv = bridge.examine(scope.name)
+            uids = bridge.search(thread_criteria(wanted))
+            found = read_rows(bridge, scope.name, sv, uids[-MAX_RESULTS:])
+            # The message's own copy is among the matches, unless the mailbox
+            # has none; when more matched than are read it may be one not read.
+            has_copy = len(uids) > MAX_RESULTS or me.mid in {r.mid for r in found}
+            matched = len(uids) + (0 if has_copy else 1)
+            rows = found + [me]
+
+    def is_me(row):
+        return row is me or (me.mid is not None and row.mid == me.mid)
+
+    # One row to a Message-ID (a message sent to oneself is in the mailbox
+    # twice), the mailbox's own copy over the message asked about, so that the
+    # ids of a thread are those of one mailbox where they can be.
+    unique, seen = [], set()
+    for row in sorted(rows, key=lambda r: (r is me, r.uid)):
+        if row.mid is not None and row.mid in seen:
+            continue
+        seen.add(row.mid)
+        unique.append(row)
+    rows = sorted(unique, key=lambda r: (stamp(r.sent), r.uid))
+    while len(rows) > MAX_RESULTS:
+        rows.remove(next(r for r in rows if not is_me(r)))
+    # What matched and is not shown: not the copies of one message, which are one.
+    twins = len(found) - len({r.mid or r.id for r in found})
+    omitted = max(0, matched - twins - len(rows))
+    if full:
+        total = 0
+        for row in rows:
+            size = row.size or 0
+            if size > FULL_EACH or total + size > FULL_ALL:
+                row.skipped = True
+                continue
+            total += size
+            bridge.examine(row.mailbox)
+            row.read_whole(bridge)
+
+    def build(limit, drop):
+        kept = rows[drop:]
+        each = limit // max(1, len(kept))
+        out = {"id": params["id"]}
+        if root:
+            out["threadId"] = root
+        out["messages"] = [describe(r, each if full else None, brief=True) for r in kept]
+        if omitted + drop:
+            out["omitted"] = omitted + drop
+        return out
+
+    return fit(build, len(rows) - 1)
+
+
+CALLS = {"search": call_search, "message": call_message, "thread": call_thread}
+
+
+def main(argv):
+    if len(argv) != 2 or argv[1] not in CALLS:
+        sys.stderr.write("proton-imap: run as proton-imap %s, with the call's parameters on stdin\n" % "|".join(CALLS))
+        return 2
+    try:
+        params = json.loads(sys.stdin.buffer.read().decode("utf-8"))["params"]
+        if not isinstance(params, dict):
+            raise TypeError
+    except (ValueError, KeyError, TypeError):
+        sys.stderr.write('proton-imap: stdin is no {"params": {...}} object\n')
+        return 2
+    bridges = []
+
+    def connect():
+        base, credential = os.environ.get("YARDR_SOURCE_BASE"), os.environ.get("PROTON_BRIDGE")
+        if not base:
+            raise Refusal("YARDR_SOURCE_BASE is not set: it is Bridge's address, from the source's base")
+        if not credential:
+            raise Refusal("PROTON_BRIDGE is not set: the source's env file holds <username>:<password> for it (SETUP.md)")
+        bridges.append(Bridge(base, credential))
+        return bridges[-1]
+
+    try:
+        answer = CALLS[argv[1]](params, connect)
+        out = sys.stdout.buffer
+        out.write(dump(answer))
+        out.flush()
+        return 0
+    except Refusal as e:
+        sys.stderr.write("proton-imap: %s\n" % one_line(e, 600))
+    except Exception as e:
+        # A bug of this program, not of the call: say where, in one line.
+        frame = traceback.extract_tb(e.__traceback__)[-1]
+        sys.stderr.write("proton-imap: unexpected %s at line %d: %s\n" % (type(e).__name__, frame.lineno, one_line(e, 200)))
+    finally:
+        for bridge in bridges:
+            bridge.close()
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

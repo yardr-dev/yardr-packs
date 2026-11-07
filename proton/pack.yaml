@@ -1,0 +1,32 @@
+# Proton Mail as a pack of kind source: the integration, imported into the
+# yard and into no depot. What Proton is here: the declared source proton,
+# which searches the operator's mail, reads a message and reads the thread a
+# message is in, all through Proton Mail Bridge's local IMAP as the one
+# account Bridge is signed in to. Proton offers no public API for mail, so each
+# call is answered by a program the pack brings beside its declaration,
+# proton/proton-imap, which the yard runs (call.run) and which talks IMAP to
+# Bridge itself. It reads and changes nothing.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/proton
+#
+# The source is named proton: a pack is named after the service it talks to.
+# A pack of kind source asks no grants at import, so what a crew member may
+# call is granted afterwards, by the setup notes. Every agent granted a call
+# reads the whole mailbox of that one account: Bridge has no narrower login.
+name: proton
+kind: source
+setup: SETUP.md
+
+sources:
+  proton:
+    declaration: proton.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. Every call here is a read, so there is no
+# preset for writing.
+presets:
+  read:
+    about: Search mail, read a message and read a thread; change nothing
+    grants:
+      proton: [read]

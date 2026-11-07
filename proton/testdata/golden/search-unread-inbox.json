@@ -1,0 +1,29 @@
+{
+  "mailbox": "INBOX",
+  "messages": [
+    {
+      "id": "INBOX:1111:5",
+      "from": "Dave <dave@example.org>",
+      "subject": "Quarterly report",
+      "date": "2026-11-05T12:00:00+00:00",
+      "flags": []
+    },
+    {
+      "id": "INBOX:1111:4",
+      "from": "News Café <news@example.com>",
+      "subject": "Café news",
+      "date": "2026-11-04T07:15:00+00:00",
+      "flags": [
+        "\\Flagged"
+      ]
+    },
+    {
+      "id": "INBOX:1111:3",
+      "from": "Bob <bob@example.com>",
+      "subject": "Re: Quarterly report",
+      "date": "2026-11-03T11:00:00+00:00",
+      "flags": []
+    }
+  ],
+  "resultSizeEstimate": 3
+}

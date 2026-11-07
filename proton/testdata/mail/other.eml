@@ -1,0 +1,9 @@
+From: Dave <dave@example.org>
+To: bob@example.com
+Subject: Quarterly report
+Date: Thu, 05 Nov 2026 12:00:00 +0000
+Message-ID: <o1@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+A different report, from Dave: it shares a subject with the thread and nothing else.

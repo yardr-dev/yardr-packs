@@ -1,0 +1,15 @@
+{
+  "id": "INBOX:1111:2",
+  "mailbox": "INBOX",
+  "flags": [
+    "\\Seen",
+    "\\Answered"
+  ],
+  "from": "Alice Example <alice@example.com>",
+  "to": "Bob <bob@example.com>",
+  "cc": "carol@example.com",
+  "subject": "Quarterly report",
+  "date": "2026-11-03T09:30:00+01:00",
+  "messageId": "<q1@example.com>",
+  "size": 651
+}

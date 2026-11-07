@@ -1,0 +1,858 @@
+#!/usr/bin/env python3
+# The proton pack's tests: what the gate runs beside yardr pack check. Needs no
+# network and no secret, done in seconds, and never touches a live Bridge: the
+# Bridge here is testdata/bridge_stub.py, a socket loop in this process that
+# answers the commands proton-imap sends, over STARTTLS with a certificate made
+# here and thrown away. Needs openssl and yardr, and fails without them, as
+# snowflake's test does: a part that was skipped would leave the pack unpinned.
+#
+#   functions  proton-imap's own functions called in this process, the
+#              cheapest way to hold what needs no server: the query translator
+#              as tables of what each q becomes and what it is refused for,
+#              the way a search with accents is split into commands, which
+#              hosts get no certificate check, the parsers of what imaplib hands
+#              back, HTML as text, the bound on an answer, and the program's
+#              deadline and timeout.
+#   program    proton-imap as a process, run as the yard runs it (parameters on
+#              stdin, the login and the base in its environment and nothing
+#              else of the yard's) against the stub: each call's answer, in
+#              goldens where its shape is the point, then what it does with
+#              mail that is big, odd or missing; each way a call fails, with the
+#              line it says; and, of every command the stub saw, that all of
+#              them were reads, the password never went in the clear and no
+#              output held it.
+#   yardr      the real yardr in a scratch yard (its own home, an environment
+#              of nothing but HOME and PATH, a short path for its socket): the
+#              pack applied from its directory, the declaration as the yard reads
+#              it, the grants SETUP.md teaches run as written, and the calls made
+#              through yardr call against the stub, each held to what the program
+#              gives when run on its own.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the program
+# prints; read the diff before keeping it.
+import datetime
+import difflib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import shlex
+import shutil
+import socket
+import ssl
+import subprocess
+import sys
+import tempfile
+
+sys.dont_write_bytecode = True
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "testdata"))
+import bridge_stub as bs  # noqa: E402
+
+PROGRAM = os.path.join(HERE, "proton-imap")
+USER, PASSWORD = "bob@example.com", "b3f9-bridge-pass"
+CREDENTIAL = USER + ":" + PASSWORD
+UPDATE = os.environ.get("UPDATE_GOLDEN") == "1"
+failed = []
+leaks = []
+
+
+def ok(name, condition, detail=""):
+    print("test: %s %s" % (name, "ok" if condition else "FAILED" + (": " + str(detail) if detail else "")))
+    if not condition:
+        failed.append(name)
+
+
+def golden(name, value):
+    """Holds value, as JSON, to testdata/golden/<name>.json."""
+    path = os.path.join(HERE, "testdata", "golden", name + ".json")
+    text = json.dumps(value, indent=2, ensure_ascii=False) + "\n"
+    if UPDATE:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if not os.path.exists(path) or open(path, encoding="utf-8").read() != text:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            print("test: %s golden written" % name)
+        return
+    if not os.path.exists(path):
+        ok("golden " + name, False, "no golden %s (UPDATE_GOLDEN=1 ./test writes it)" % path)
+        return
+    want = open(path, encoding="utf-8").read()
+    diff = "\n".join(list(difflib.unified_diff(want.splitlines(), text.splitlines(), "golden", "answer", lineterm=""))[:30])
+    ok("golden " + name, want == text, "differs from %s:\n%s" % (path, diff))
+
+
+for tool in ("openssl",):
+    if not shutil.which(tool):
+        print("test: %s is not on PATH: the pack needs it" % tool)
+        sys.exit(1)
+YARDR = os.environ.get("YARDR") or shutil.which("yardr") or "/Users/mckean/go/bin/yardr"
+if not os.access(YARDR, os.X_OK):
+    print("test: no yardr (%s): the declaration and the calls are read through it" % YARDR)
+    sys.exit(1)
+
+tmp = tempfile.mkdtemp(prefix="protont.", dir="/tmp")
+stubs = []
+core = None
+
+
+def cleanup():
+    for stub in stubs:
+        try:
+            stub.stop()
+        except Exception:
+            pass
+    if core:
+        subprocess.run([YARDR, "--home", core + "/y", "--actor", "tester", "server", "stop"], capture_output=True,
+                       env={"HOME": core + "/h", "PATH": os.environ["PATH"]})
+        shutil.rmtree(core, ignore_errors=True)
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ---- the program, loaded to call its functions ---------------------------------
+loader = importlib.machinery.SourceFileLoader("proton_imap", PROGRAM)
+spec = importlib.util.spec_from_loader("proton_imap", loader)
+P = importlib.util.module_from_spec(spec)
+loader.exec_module(P)
+
+# ---- a certificate made here and thrown away -----------------------------------
+made = subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", tmp + "/key.pem",
+                       "-out", tmp + "/cert.pem", "-days", "2", "-subj", "/CN=localhost"], capture_output=True)
+if made.returncode != 0:
+    print("test: the throwaway certificate could not be made: %s" % made.stderr.decode()[-300:])
+    sys.exit(1)
+
+# ---- the mail the stand-in holds ---------------------------------------------------
+NAMES = "welcome report reply news other muller sentreply trashed work".split()
+SENT = {"welcome": "02-Nov-2026 08:00:00 +0000", "report": "03-Nov-2026 08:30:00 +0000", "reply": "03-Nov-2026 11:00:00 +0000",
+        "news": "04-Nov-2026 07:15:00 +0000", "other": "05-Nov-2026 12:00:00 +0000", "muller": "06-Nov-2026 08:30:00 +0000",
+        "sentreply": "04-Nov-2026 10:00:00 +0000", "trashed": "05-Nov-2026 09:00:00 +0000", "work": "06-Nov-2026 14:00:00 +0000"}
+FLAGS = {"welcome": ["\\Seen"], "report": ["\\Seen", "\\Answered"], "reply": [], "news": ["\\Flagged"], "other": [],
+         "muller": ["\\Seen"], "sentreply": ["\\Seen"], "trashed": ["\\Seen"], "work": []}
+RAW = {}
+for _name in NAMES:
+    with open(os.path.join(HERE, "testdata", "mail", _name + ".eml"), "rb") as _f:
+        RAW[_name] = _f.read()
+
+
+def copies(first_uid, names):
+    return [bs.Msg(first_uid + i, RAW[n], FLAGS[n], SENT[n]) for i, n in enumerate(names.split())]
+
+
+def world(all_mail=True):
+    """The account: an inbox, Bridge's special folders, all mail with a copy of what is not in the trash,
+    and a folder and two labels, each a placeholder (\\Noselect) above them."""
+    boxes = [
+        bs.Mailbox("INBOX", ["\\HasNoChildren"], 1111, copies(1, "welcome report reply news other muller")),
+        bs.Mailbox("Drafts", ["\\HasNoChildren", "\\Drafts"], 1212, []),
+        bs.Mailbox("Sent", ["\\HasNoChildren", "\\Sent"], 3333, copies(1, "sentreply")),
+        bs.Mailbox("Starred", ["\\HasNoChildren", "\\Flagged"], 1313, []),
+        bs.Mailbox("Archive", ["\\HasNoChildren", "\\Archive"], 1414, []),
+        bs.Mailbox("Spam", ["\\HasNoChildren", "\\Junk"], 1515, []),
+        bs.Mailbox("Trash", ["\\HasNoChildren", "\\Trash"], 4444, copies(1, "trashed")),
+        bs.Mailbox("Folders", ["\\Noselect", "\\HasChildren"], 1, []),
+        bs.Mailbox("Folders/Work", ["\\HasNoChildren"], 5555, copies(1, "work")),
+        bs.Mailbox("Labels", ["\\Noselect", "\\HasChildren"], 1, []),
+        bs.Mailbox("Labels/Receipts", ["\\HasNoChildren"], 6666, copies(1, "welcome")),
+        bs.Mailbox("Labels/Work", ["\\HasNoChildren"], 7777, []),
+    ]
+    if all_mail:
+        boxes.append(bs.Mailbox("All Mail", ["\\HasNoChildren", "\\All"], 2222,
+                                copies(101, "welcome report reply news other muller sentreply work")))
+    return boxes
+
+
+def gen(mid, subject, body, refs=(), reply=None, date="Mon, 02 Nov 2026 08:00:00 +0000", extra=(), ctype="text/plain; charset=utf-8",
+        to="Bob <bob@example.com>"):
+    """A message made here, as bytes."""
+    lines = ["From: Gen <gen@example.com>", "To: " + to, "Subject: " + subject, "Date: " + date]
+    if mid:
+        lines.append("Message-ID: " + mid)
+    if reply:
+        lines.append("In-Reply-To: " + reply)
+    if refs:
+        lines.append("References: " + " ".join(refs))
+    lines += list(extra) + ["MIME-Version: 1.0", "Content-Type: " + ctype, "", body]
+    return "\n".join(lines).encode("utf-8")
+
+
+def start(boxes, **kw):
+    stub = bs.Stub(boxes, USER, PASSWORD, tmp + "/cert.pem", tmp + "/key.pem", **kw)
+    stub.start()
+    stubs.append(stub)
+    return stub
+
+
+def env_for(stub, **over):
+    env = {"PATH": os.environ["PATH"], "HOME": tmp, "PROTON_BRIDGE": CREDENTIAL,
+           "YARDR_SOURCE_BASE": "http://127.0.0.1:%d" % stub.port}
+    for key, value in over.items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
+    return env
+
+
+def run(stub, call, params=None, stdin=None, **over):
+    """(exit status, stdout, stderr) of proton-imap as the yard runs it."""
+    given = stdin if stdin is not None else json.dumps({"params": params or {}})
+    env = env_for(stub, **over)
+    p = subprocess.run([PROGRAM, call], input=given, capture_output=True, text=True, env=env, timeout=120)
+    # What no output may hold: the password, and whatever login this run was given
+    # (a wrong one is no less a login), unless that is too short to tell from words.
+    secret = env.get("PROTON_BRIDGE", "")
+    needles = {PASSWORD, CREDENTIAL} | ({secret, secret.partition(":")[2]} if len(secret.partition(":")[2]) >= 8 else set())
+    for text in (p.stdout, p.stderr):
+        if any(n in text for n in needles):
+            leaks.append("%s %s" % (call, params))
+    return p.returncode, p.stdout, p.stderr
+
+
+def answer(stub, call, params=None, **over):
+    rc, out, err = run(stub, call, params, **over)
+    if rc != 0:
+        raise AssertionError("%s %s exited %d: %s" % (call, params, rc, err.strip()))
+    return json.loads(out)
+
+
+def refused(stub, call, params, want, name, status=1, **over):
+    rc, out, err = run(stub, call, params, **over)
+    ok(name, rc == status and out == "" and want in err and err.count("\n") == 1,
+       "exit %d, stdout %r, stderr %r, wanted %r in one line" % (rc, out[:80], err, want))
+
+
+def ids(result):
+    return [m["id"] for m in result["messages"]]
+
+
+# =====================================================================================
+# functions
+# =====================================================================================
+TODAY = datetime.date(2026, 11, 7)
+PLANS = [
+    ("", [], None),
+    ("invoice", [(False, "TEXT", "invoice")], None),
+    ('"two words"', [(False, "TEXT", "two words")], None),
+    ('"a \\"quoted\\" word"', [(False, "TEXT", 'a "quoted" word')], None),
+    ("from:alice", [(False, "FROM", "alice")], None),
+    ("FROM:Alice", [(False, "FROM", "Alice")], None),
+    ('subject:"big news"', [(False, "SUBJECT", "big news")], None),
+    ("to:a cc:b bcc:c", [(False, "TO", "a"), (False, "CC", "b"), (False, "BCC", "c")], None),
+    ("-from:bob", [(True, "FROM", "bob")], None),
+    ("-spam", [(True, "TEXT", "spam")], None),
+    ("after:2026-10-01", [(False, "SINCE", "1-Oct-2026")], None),
+    ("before:2026/10/09", [(False, "BEFORE", "9-Oct-2026")], None),
+    ("newer_than:7d", [(False, "SINCE", "31-Oct-2026")], None),
+    ("older_than:2w", [(False, "BEFORE", "24-Oct-2026")], None),
+    ("newer_than:1m", [(False, "SINCE", "8-Oct-2026")], None),
+    ("older_than:1y", [(False, "BEFORE", "7-Nov-2025")], None),
+    ("is:unread is:read is:starred is:flagged is:answered is:draft",
+     [(False, "UNSEEN", None), (False, "SEEN", None), (False, "FLAGGED", None), (False, "FLAGGED", None),
+      (False, "ANSWERED", None), (False, "DRAFT", None)], None),
+    ("-is:read", [(True, "SEEN", None)], None),
+    ("in:sent", [], "sent"),
+    ("label:Receipts", [], "Receipts"),
+    ('in:"Folders/My Stuff"', [], "Folders/My Stuff"),
+    ("from:alice invoice in:inbox", [(False, "FROM", "alice"), (False, "TEXT", "invoice")], "inbox"),
+    ('"has:attachment"', [(False, "TEXT", "has:attachment")], None),
+    ("12:30", [(False, "TEXT", "12:30")], None),
+    ("-", [(False, "TEXT", "-")], None),
+]
+for q, crits, box in PLANS:
+    got = P.plan_search(q, today=TODAY)
+    ok("q %r is %s" % (q, "%s %s" % (crits, box) if crits or box else "everything"), got == (crits, box), got)
+
+REFUSALS = [
+    ("has:attachment", "is no operator"), ("http://example.com", "put it in quotes"), ('"unclosed', "never closed"),
+    ("from:", "needs something"), ("after:yesterday", "wants a date"), ("after:2026-13-45", "wants a date"),
+    ("before:26-10-01", "wants a date"), ("newer_than:7x", "wants a count"), ("older_than:d", "wants a count"),
+    ("is:weird", "is: knows"), ("in:a in:b", "once"), ("-in:sent", "cannot be left out"), ("in:", "names one mailbox"),
+    ("x " * 31, "more than 30 terms"), ("a\x00b", "NUL"),
+]
+for q, want in REFUSALS:
+    try:
+        P.plan_search(q, today=TODAY)
+        ok("q %r is refused" % q[:20], False, "it was taken")
+    except P.Refusal as e:
+        ok("q %r is refused, saying %r" % (q[:20], want), want in str(e), str(e))
+
+
+class Fake:
+    """The part of Bridge that search() sends its commands to: it keeps them and answers in turn."""
+
+    def __init__(self, *answers):
+        self.calls, self.answers = [], list(answers)
+
+    def search(self, key, literal=None):
+        self.calls.append((key, literal))
+        return self.answers[len(self.calls) - 1]
+
+
+SPLITS = [
+    ("nothing is ALL", [], [([1, 2], ["ALL"], None)], [1, 2]),
+    ("plain criteria are one command", [(False, "FROM", "alice"), (False, "UNSEEN", None)],
+     [([3, 1], ["FROM", '"alice"', "UNSEEN"], None)], [1, 3]),
+    ("one with accents is a literal under CHARSET", [(False, "SUBJECT", "Müller")], [([4], ["SUBJECT"], "Müller")], [4]),
+    ("a plain one rides before the literal", [(False, "FROM", "alice"), (False, "SUBJECT", "Müller")],
+     [([5], ["FROM", '"alice"', "SUBJECT"], "Müller")], [5]),
+    ("two with accents are two commands, intersected", [(False, "SUBJECT", "Müller"), (False, "TEXT", "Café")],
+     [([1, 2, 3], ["TEXT"], "Café"), ([2, 3, 4], ["SUBJECT"], "Müller")], [2, 3]),
+    ("a negated one keeps its NOT", [(True, "FROM", "José")], [([9], ["NOT", "FROM"], "José")], [9]),
+    ("a quote and a backslash are escaped", [(False, "SUBJECT", 'say "hi" \\ there')],
+     [([1], ["SUBJECT", '"say \\"hi\\" \\\\ there"'], None)], [1]),
+    ("a tab is a literal", [(False, "TEXT", "a\tb")], [([1], ["TEXT"], "a\tb")], [1]),
+]
+for name, crits, commands, want in SPLITS:
+    fake = Fake(*[c[0] for c in commands])
+    got = P.search(fake, crits)
+    ok("search: " + name, fake.calls == [(c[1], c[2]) for c in commands] and got == want, "%s -> %s" % (fake.calls, got))
+
+LOOPBACK = {"127.0.0.1": True, "127.1.2.3": True, "::1": True, "localhost": True, "bridge.localhost": True,
+            "192.0.2.1": False, "10.0.0.5": False, "0.0.0.0": False, "example.com": False,
+            "localhost.example.com": False, "127.0.0.1.example.com": False, "::ffff:8.8.8.8": False}
+for host, want in LOOPBACK.items():
+    context = P.tls_context(host)
+    verifies = context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+    skips = context.verify_mode == ssl.CERT_NONE and not context.check_hostname
+    ok("TLS to %s is %s" % (host, "not verified" if want else "verified"), P.loopback(host) == want and (skips if want else verifies))
+
+LISTS = [
+    (b'(\\HasNoChildren \\All) "/" "All Mail"', ("All Mail", {"\\hasnochildren", "\\all"}, "/")),
+    (b'(\\Noselect \\HasChildren) "/" Folders', ("Folders", {"\\noselect", "\\haschildren"}, "/")),
+    (b'(\\HasNoChildren) NIL INBOX', ("INBOX", {"\\hasnochildren"}, None)),
+    (b'(\\HasNoChildren) "/" "Say \\"hi\\""', ('Say "hi"', {"\\hasnochildren"}, "/")),
+    ((b'(\\HasNoChildren) "/" {10}', b'Odd "Name"'), ('Odd "Name"', {"\\hasnochildren"}, "/")),
+]
+for raw, want in LISTS:
+    got = P.parse_list([raw])
+    ok("LIST %r" % (raw,), len(got) == 1 and (got[0].name, got[0].attrs, got[0].delim) == want, [(b.name, b.attrs, b.delim) for b in got])
+
+HEADER = b"From: a@example.com\r\n\r\n"
+FETCHES = [
+    (b"FLAGS", [(b'1 (UID 42 FLAGS (\\Seen) INTERNALDATE "06-Nov-2026 09:00:00 +0000" BODY[HEADER.FIELDS (FROM)] {22}', HEADER), b")"],
+     [{"uid": 42, "flags": ["\\Seen"], "internal": "06-Nov-2026 09:00:00 +0000", "size": None, "literals": [HEADER]}]),
+    (b"attributes after the literal", [(b"2 (BODY[HEADER.FIELDS (FROM)] {22}", HEADER), b" UID 43 FLAGS () RFC822.SIZE 99)"],
+     [{"uid": 43, "flags": [], "internal": None, "size": 99, "literals": [HEADER]}]),
+    (b"no literal at all", [b"3 (UID 44 FLAGS (\\Seen \\Answered))", None],
+     [{"uid": 44, "flags": ["\\Seen", "\\Answered"], "internal": None, "size": None, "literals": []}]),
+    (b"a response with no UID is no answer to a UID FETCH", [b"4 (FLAGS (\\Seen))"], []),
+    (b"nothing", [None], []),
+]
+for name, data, want in FETCHES:
+    ok("FETCH parsed: %s" % name.decode(), P.parse_fetch(data) == want, P.parse_fetch(data))
+many = P.parse_fetch([(b"1 (UID 1 BODY[HEADER] {22}", HEADER), b")", (b"2 (UID 2 BODY[HEADER] {22}", HEADER), b")"])
+ok("FETCH parsed: two messages each with a literal", [e["uid"] for e in many] == [1, 2] and all(e["literals"] == [HEADER] for e in many), many)
+
+INTERNALS = {"06-Nov-2026 09:00:00 +0000": "2026-11-06T09:00:00+00:00", " 6-Nov-2026 09:00:00 -0500": "2026-11-06T09:00:00-05:00",
+             "06-Foo-2026 09:00:00 +0000": None, "yesterday": None, None: None}
+for text, want in INTERNALS.items():
+    got = P.parse_internal(text)
+    ok("INTERNALDATE %r" % (text,), (got.isoformat() if got else None) == want, got)
+
+for mailbox in ("INBOX", "All Mail", "Folders/Work", "A&B-é"):
+    made_id = P.make_id(mailbox, 77, 5)
+    ok("id of %r reads back" % mailbox, re.fullmatch(r"[A-Za-z0-9%._~-]+:77:5", made_id) and P.parse_id(made_id) == (mailbox, 77, 5), made_id)
+for bad in ("x", "INBOX:1", "INBOX:1:0", ":1:1", "INBOX:a:1", "INBOX%0D%0Aevil:1:1",
+            "INBOX%GG:1:1", "INBOX%FF:1:1", None, 5):
+    try:
+        P.parse_id(bad)
+        ok("id %r is refused" % (bad,), False)
+    except P.Refusal as e:
+        ok("id %r is refused" % (bad,), "no id of a message" in str(e), e)
+
+bad_name_bridge = object.__new__(P.Bridge)
+bad_name_bridge.open_box, bad_name_bridge.validity = None, {}
+try:
+    P.Bridge.examine(bad_name_bridge, "INBOX\r\nA999 UID STORE 1 +FLAGS (\\Seen)")
+    ok("EXAMINE refuses a mailbox name that could add an IMAP command", False)
+except P.Refusal as e:
+    ok("EXAMINE refuses a mailbox name that could add an IMAP command", "control character" in str(e), e)
+
+TEXTS = [
+    ("<html><head><title>t</title><style>p{}</style></head><body><p>Hello &amp; welcome</p><div>a<br>b &eacute;</div><script>x()</script></body></html>",
+     "Hello & welcome\n\na\nb é"),
+    ("<p>one<p>two</p>", "one\ntwo"),
+    # a line break in markup is white space, as in a browser
+    ("plain <b>bold</b>   text\n\n\n\n\nmore", "plain bold text more"),
+    ("<div><<<broken & < markup", None),
+]
+for markup, want in TEXTS:
+    got = P.tidy(P.html_to_text(markup))
+    ok("HTML as text: %r" % markup[:30], want is None or got == want, got)
+ok("tidy takes the controls out, keeps the lines and no more than one blank between", P.tidy("a\x00b \r\n\xa0c\x1b\r\n\r\n\r\n\r\nd") == "ab\n c\n\nd",
+   repr(P.tidy("a\x00b \r\n\xa0c\x1b\r\n\r\n\r\n\r\nd")))
+ok("one_line flattens a line break and a terminal control", P.one_line("a\r\nb\x1b[31mc") == "a b [31mc", P.one_line("a\r\nb\x1b[31mc"))
+ok("an error of imaplib is read as the text it holds", P.words(P.imaplib.IMAP4.error(b"[AUTH] bad\r\nline")) == "[AUTH] bad line")
+
+fitted = P.fit(lambda limit, drop: {"t": "é" * (min(limit, 90000) // 2), "drop": drop})
+ok("fit gives up text until the answer is within 60 KB", len(P.dump(fitted)) <= P.OUTPUT and len(fitted["t"]) > 20000, len(P.dump(fitted)))
+dropped = P.fit(lambda limit, drop: {"m": ["x" * 20000] * (5 - drop)}, 4)
+ok("fit leaves out the oldest messages when no text is left", len(P.dump(dropped)) <= P.OUTPUT and len(dropped["m"]) == 2, len(dropped["m"]))
+try:
+    P.fit(lambda limit, drop: {"m": "x" * 70000}, 0)
+    ok("fit refuses an answer it cannot bring within 60 KB", False)
+except P.Refusal as e:
+    ok("fit refuses an answer it cannot bring within 60 KB", "over 60 KB" in str(e))
+ok("a thread's search is one OR of three keys for each id", P.thread_criteria(["<a>", "<b>"]).count("OR") == 5
+   and P.thread_criteria(["<a>"]) == ["OR", "OR", "HEADER", "Message-ID", '"<a>"', "HEADER", "In-Reply-To", '"<a>"', "HEADER", "References", '"<a>"'])
+
+# the mailboxes a query may name, as Bridge lists them
+listing = start(world())
+boxes = P.parse_list([b'(%s) "/" "%s"' % (" ".join(b.attrs).encode(), b.name.encode()) for b in listing.mailboxes])
+FOUND = {"inbox": "INBOX", "INBOX": "INBOX", "sent": "Sent", "Sent": "Sent", "trash": "Trash", "spam": "Spam", "junk": "Spam",
+         "archive": "Archive", "starred": "Starred", "all": "All Mail", "anywhere": "All Mail", "drafts": "Drafts",
+         "all mail": "All Mail", "FOLDERS/work": "Folders/Work", "receipts": "Labels/Receipts"}
+for want, name in FOUND.items():
+    ok("in:%s is %s" % (want, name), P.find_box(boxes, want).name == name)
+for want, said in (("work", "several mailboxes, Folders/Work, Labels/Work"), ("Folders", "no mailbox Folders"), ("nope", "Bridge has INBOX")):
+    try:
+        P.find_box(boxes, want)
+        ok("in:%s is refused" % want, False)
+    except P.Refusal as e:
+        ok("in:%s is refused, saying %r" % (want, said), said in str(e), e)
+try:
+    P.find_box(boxes, "nope")
+except P.Refusal as e:
+    named = str(e).split("Bridge has ")[1].split(", ")
+    ok("a refusal lists the mailboxes that can be opened and not the placeholders above Bridge's folders and labels",
+       "Folders/Work" in named and "All Mail" in named and "Folders" not in named and "Labels" not in named, named)
+ok("the default is all mail, or the inbox where all mail is hidden",
+   P.default_box(boxes).name == "All Mail" and P.default_box([b for b in boxes if b.name != "All Mail"]).name == "INBOX")
+
+# the deadline and the timeout of a command, in this process
+slow = start(world(), delay=1.5)
+base = "http://127.0.0.1:%d" % slow.port
+saved = P.TIMEOUT, P.BUDGET
+try:
+    P.TIMEOUT = 0.4
+    bridge = P.Bridge(base, CREDENTIAL)
+    try:
+        P.call_search({"q": "from:alice"}, lambda: bridge)
+        ok("a search Bridge does not answer in time is refused", False)
+    except P.Refusal as e:
+        ok("a search Bridge does not answer in time is refused, saying so", "did not answer the search in time" in str(e), e)
+    P.TIMEOUT = saved[0]
+    P.BUDGET = -1
+    try:
+        P.call_search({}, lambda: P.Bridge(base, CREDENTIAL))
+        ok("a call over its deadline is refused", False)
+    except P.Refusal as e:
+        ok("a call over its deadline is refused, saying so", "took too long" in str(e), e)
+finally:
+    P.TIMEOUT, P.BUDGET = saved
+
+# the sizes past which a message is not read in full, with the limits made small enough for the mail here
+real = P.FULL_ONE, P.FULL_EACH, P.FULL_ALL
+connect = lambda: P.Bridge("http://127.0.0.1:%d" % listing.port, CREDENTIAL)  # noqa: E731
+try:
+    P.FULL_ONE = 100
+    try:
+        P.call_message({"id": "INBOX:1111:2", "format": "full"}, connect)
+        ok("a message over the size read in full is refused as full", False)
+    except P.Refusal as e:
+        ok("a message over the size read in full is refused as full, and metadata is named", "format metadata reads its headers" in str(e), e)
+    ok("and metadata still reads it", P.call_message({"id": "INBOX:1111:2"}, connect)["size"] == 651)
+    P.FULL_ONE, P.FULL_EACH = real[0], 500
+    each = {m["messageId"]: m for m in P.call_thread({"id": "INBOX:1111:3", "format": "full"}, connect)["messages"]}
+    ok("a message of a thread over the size read in full is shown without its text, marked cut",
+       each["<q1@example.com>"].get("truncated") is True and "text" not in each["<q1@example.com>"]
+       and each["<r1@example.com>"]["text"].startswith("Thanks Alice") and "truncated" not in each["<r1@example.com>"], each)
+    P.FULL_EACH, P.FULL_ALL = real[1], 800
+    total = {m["messageId"]: m for m in P.call_thread({"id": "INBOX:1111:3", "format": "full"}, connect)["messages"]}
+    ok("a thread stops reading messages in full when the total is reached: the first is read, the rest are cut",
+       total["<q1@example.com>"]["text"].startswith("Hi Bob") and all(total[i].get("truncated") is True and "text" not in total[i]
+                                                                       for i in ("<r1@example.com>", "<s1@example.com>")), total)
+finally:
+    P.FULL_ONE, P.FULL_EACH, P.FULL_ALL = real
+
+# =====================================================================================
+# program
+# =====================================================================================
+main = start(world())
+main_all = {"mailbox": "All Mail"}
+
+default = answer(main, "search")
+golden("search-default", default)
+ok("search with nothing asks for all mail, newest first", default["mailbox"] == "All Mail" and default["resultSizeEstimate"] == 8
+   and ids(default) == ["All%20Mail:2222:" + str(u) for u in (108, 107, 106, 105, 104, 103, 102, 101)], ids(default))
+ok("a search shows each message's id, sender, subject, date and flags and nothing more",
+   all(set(m) == {"id", "from", "subject", "date", "flags"} for m in default["messages"]))
+ok("a sender and a subject are decoded", {"News Café <news@example.com>", "José Müller <jose@example.net>"} <= {m["from"] for m in default["messages"]}
+   and "Café news" in [m["subject"] for m in default["messages"]])
+paged = answer(main, "search", {"maxResults": "3"})
+ok("maxResults gives the newest few and the number that matched", len(paged["messages"]) == 3 and paged["resultSizeEstimate"] == 8
+   and ids(paged) == ids(default)[:3])
+
+SEARCHES = [
+    ("from:alice", ["All%20Mail:2222:107", "All%20Mail:2222:102"]),
+    ("cc:carol", ["All%20Mail:2222:102"]),
+    ("to:bob -from:alice -from:dave after:2026-11-04", ["All%20Mail:2222:108", "All%20Mail:2222:106", "All%20Mail:2222:104"]),
+    ('subject:"quarterly report"', ["All%20Mail:2222:" + str(u) for u in (107, 105, 103, 102)]),
+    ("after:2026-11-05", ["All%20Mail:2222:" + str(u) for u in (108, 106, 105)]),
+    ("before:2026-11-03", ["All%20Mail:2222:101"]),
+    ("after:2026/11/03 before:2026/11/05", ["All%20Mail:2222:" + str(u) for u in (107, 104, 103, 102)]),
+    ("is:starred", ["All%20Mail:2222:104"]),
+    ("is:answered", ["All%20Mail:2222:102"]),
+    ("-is:read", ["All%20Mail:2222:" + str(u) for u in (108, 105, 104, 103)]),
+    ("welcome", ["All%20Mail:2222:104", "All%20Mail:2222:101"]),
+    ('"numbers are attached"', ["All%20Mail:2222:103", "All%20Mail:2222:102"]),
+    ('"has:attachment"', []),
+    ("subject:Müller", ["All%20Mail:2222:106"]),
+    ("Café", ["All%20Mail:2222:106"]),
+    ("subject:Müller Café", ["All%20Mail:2222:106"]),
+    ("from:alice subject:Müller", []),
+    ("-subject:Müller from:jose", []),
+]
+for q, want in SEARCHES:
+    got = ids(answer(main, "search", {"q": q}))
+    ok("search q=%r finds %d" % (q, len(want)), got == want, got)
+
+INBOX = lambda *uids: ["INBOX:1111:%d" % u for u in uids]  # noqa: E731
+IN = [
+    ("is:unread in:inbox", "INBOX", INBOX(5, 4, 3)),
+    ("in:INBOX", "INBOX", INBOX(6, 5, 4, 3, 2, 1)),
+    ("in:sent", "Sent", ["Sent:3333:1"]),
+    ("in:trash", "Trash", ["Trash:4444:1"]),
+    ("in:spam", "Spam", []),
+    ("in:archive", "Archive", []),
+    ("in:starred", "Starred", []),
+    ("in:drafts", "Drafts", []),
+    ("in:all is:starred", "All Mail", ["All%20Mail:2222:104"]),
+    ("in:Folders/Work", "Folders/Work", ["Folders%2FWork:5555:1"]),
+    ("label:receipts", "Labels/Receipts", ["Labels%2FReceipts:6666:1"]),
+]
+for q, box, want in IN:
+    got = answer(main, "search", {"q": q})
+    ok("search q=%r reads %s" % (q, box), got["mailbox"] == box and ids(got) == want, (got["mailbox"], ids(got)))
+golden("search-unread-inbox", answer(main, "search", {"q": "is:unread in:inbox"}))
+
+# what the stub saw of those searches: plain ones with no literal and no charset, accents with both
+sent = main.searches
+ok("a search with no accents sends no literal and no charset", all(s["charset"] is None and s["literals"] == 0 for s in sent
+   if "Müller" not in s["text"] and "Café" not in s["text"]))
+ok("a search with accents sends CHARSET UTF-8 and the string as a literal", all(s["charset"] == "UTF-8" and s["literals"] >= 1 for s in sent
+   if "Müller" in s["text"] or "Café" in s["text"]))
+ok("two strings with accents were two commands, and a plain one rode before a literal",
+   [s["text"] for s in sent if "Müller" in s["text"] or "Café" in s["text"]]
+   == ["SUBJECT Müller", "TEXT Café", "TEXT Café", "SUBJECT Müller", "FROM alice SUBJECT Müller", "FROM jose NOT SUBJECT Müller"],
+   [s["text"] for s in sent if "Müller" in s["text"] or "Café" in s["text"]])
+
+for q, want, name in (("has:attachment", "is no operator", "an operator the search does not know"),
+                      ('"unclosed', "never closed", "a quote that is never closed"),
+                      ("after:soon", "wants a date", "a date that is none"),
+                      ("in:nowhere", "no mailbox nowhere: Bridge has INBOX", "a mailbox Bridge does not have"),
+                      ("in:work", "several mailboxes", "a mailbox name two end with")):
+    before = main.connections
+    rc, out, err = run(main, "search", {"q": q})
+    ok("search: %s is refused in one line" % name, rc == 1 and out == "" and want in err and err.count("\n") == 1, (rc, err))
+    # a q the translator refuses is refused before Bridge is asked anything; a mailbox is known only by asking
+    if name != "a mailbox Bridge does not have" and name != "a mailbox name two end with":
+        ok("search: %s is refused before it connects" % name, main.connections == before, main.connections - before)
+for bad in ("0", "51", "abc", "-1", "5.5"):
+    refused(main, "search", {"maxResults": bad}, "maxResults is a number from 1 to 50", "search: maxResults %s is refused" % bad)
+
+# message
+report = "INBOX:1111:2"
+golden("message-metadata", answer(main, "message", {"id": report}))
+golden("message-full-report", answer(main, "message", {"id": report, "format": "full"}))
+golden("message-full-news", answer(main, "message", {"id": "INBOX:1111:4", "format": "full"}))
+meta = answer(main, "message", {"id": report})
+ok("message metadata is the default and has no text", "text" not in meta and answer(main, "message", {"id": report, "format": "metadata"}) == meta)
+full = answer(main, "message", {"id": report, "format": "full"})
+ok("message full is the plain part decoded and the attachment's name, type and size", full["text"] == "Hi Bob,\n\nThe numbers are attached. Revenue is up 12%.\n\nAlice"
+   and full["attachments"] == [{"name": "report.pdf", "type": "application/pdf", "size": 55}], full)
+ok("a message's date is ISO 8601 with its own offset", meta["date"] == "2026-11-03T09:30:00+01:00")
+news = answer(main, "message", {"id": "INBOX:1111:4", "format": "full"})
+ok("an HTML message is its text, with no tag, style or script", news["text"] == "Hello & welcome\n\nSecond\nline é" and news["attachments"] == [], news["text"])
+thread_member = answer(main, "message", {"id": "All%20Mail:2222:107", "format": "full"})
+ok("message reads from all mail as from the inbox, with the headers of a reply",
+   thread_member["inReplyTo"] == "<r1@example.com>" and thread_member["references"] == ["<q1@example.com>", "<r1@example.com>"]
+   and thread_member["mailbox"] == "All Mail", thread_member)
+
+refused(main, "message", {"id": "INBOX:9:2"}, "that id is stale", "message: an id from before Bridge renumbered the mailbox is refused as stale")
+refused(main, "message", {"id": "INBOX:1111:99"}, "Bridge has no message of that id", "message: an id of a message that is gone is refused")
+refused(main, "message", {"id": "Nowhere:1:1"}, "Bridge would not open Nowhere", "message: an id of a mailbox that is not there is refused")
+refused(main, "message", {"id": "INBOX"}, "no id of a message", "message: a word that is no id is refused")
+refused(main, "message", {"id": report, "format": "html"}, "format is metadata or full", "message: a format it does not have is refused")
+
+# thread
+thread = answer(main, "thread", {"id": "INBOX:1111:3"})
+golden("thread-report-metadata", thread)
+golden("thread-report-full", answer(main, "thread", {"id": "INBOX:1111:3", "format": "full"}))
+members = lambda t: [m["messageId"] for m in t["messages"]]  # noqa: E731
+ok("a thread is the root, its replies and the reply in Sent, oldest first, and no unrelated message with the same subject",
+   members(thread) == ["<q1@example.com>", "<r1@example.com>", "<s1@example.com>"] and thread["threadId"] == "<q1@example.com>", members(thread))
+ok("a thread has no unrelated message, and none that is in the trash", "<o1@example.org>" not in members(thread) and "<t1@example.net>" not in members(thread))
+ok("a thread's messages are all of one mailbox, all mail", all(m["id"].startswith("All%20Mail:2222:") for m in thread["messages"]), ids(thread))
+ok("a thread leaves out the mailbox and the references, which message gives", all("mailbox" not in m and "references" not in m for m in thread["messages"]))
+for start_id in ("INBOX:1111:2", "Sent:3333:1", "All%20Mail:2222:107"):
+    again = answer(main, "thread", {"id": start_id})
+    ok("the thread of %s is the same thread" % start_id, members(again) == members(thread) and again["threadId"] == thread["threadId"] and again["id"] == start_id, members(again))
+alone = answer(main, "thread", {"id": "INBOX:1111:5"})
+ok("a message that is in no thread is its own", members(alone) == ["<o1@example.org>"] and alone["threadId"] == "<o1@example.org>", alone)
+trashed = answer(main, "thread", {"id": "Trash:4444:1"})
+ok("a thread of mail in the trash is read from the trash, where all mail has no copy", members(trashed) == ["<t1@example.net>"], members(trashed))
+refused(main, "thread", {"id": "INBOX:9:3"}, "that id is stale", "thread: an id from before Bridge renumbered the mailbox is refused as stale")
+refused(main, "thread", {"id": "INBOX:1111:99"}, "Bridge has no message of that id", "thread: an id of a message that is gone is refused")
+
+# the same answers when the stand-in sends attributes after the literal, and read from a mailbox with no all mail
+after = start(world(), order="after")
+same = [("search", {"q": "from:alice"}), ("search", {"q": "is:unread in:inbox"}), ("message", {"id": report}),
+        ("message", {"id": report, "format": "full"}), ("thread", {"id": "INBOX:1111:3"}), ("thread", {"id": "INBOX:1111:3", "format": "full"})]
+ok("a server that sends UID and FLAGS after the body gives the same answers", all(answer(after, c, p) == answer(main, c, p) for c, p in same))
+bare = start(world(all_mail=False))
+no_all = answer(bare, "search")
+ok("with all mail hidden a search reads the inbox, and says so", no_all["mailbox"] == "INBOX" and no_all["resultSizeEstimate"] == 6, no_all["mailbox"])
+no_all_thread = answer(bare, "thread", {"id": "INBOX:1111:3"})
+ok("with all mail hidden a thread is read from the message's own mailbox: what is in the inbox",
+   members(no_all_thread) == ["<q1@example.com>", "<r1@example.com>"] and no_all_thread["id"] == "INBOX:1111:3", members(no_all_thread))
+
+# mail that is big, many, odd or without a Message-ID
+long_refs = ["<ref%03d@gen>" % i for i in range(100)]
+edge_inbox = [
+    bs.Msg(1, gen("<big@gen>", "Big one", 'say "hi"\n' * 20000)),
+    bs.Msg(2, gen("<many@gen>", "Many attachments", "--B\nContent-Type: text/plain; charset=utf-8\n\nsee attached\n" + "".join(
+        '--B\nContent-Type: text/plain; name="f%03d.txt"\nContent-Disposition: attachment; filename="f%03d.txt"\n\ndata\n' % (i, i)
+        for i in range(150)) + "--B--\n", ctype='multipart/mixed; boundary="B"')),
+    bs.Msg(3, gen(None, "No Message-ID", "nothing names this one")),
+    bs.Msg(4, gen("<long@gen>", "x" * 2000, "short", refs=long_refs, to=", ".join("user%d@example.com" % i for i in range(300)))),
+    bs.Msg(5, gen("<pdf@gen>", "A bare PDF", "JVBERi0xLjQK", ctype='application/pdf; name="x.pdf"',
+                  extra=["Content-Disposition: attachment; filename=\"x.pdf\"", "Content-Transfer-Encoding: base64"])),
+    bs.Msg(6, b"From: =?UTF-8?B?!!!not-base64?= <bad@example.com>\nSubject: caf\xe9 in a byte of Latin-1\nDate: not a date at all\n"
+              b"Message-ID: <bad@gen>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n\nbody\n", internal="06-Nov-2026 08:00:00 +0000"),
+    bs.Msg(7, gen("<charset@gen>", "A charset nobody knows", "its text, in a charset Python has no codec for", ctype="text/plain; charset=x-no-such-charset")),
+]
+chain = [bs.Msg(1, gen("<root@gen>", "A long thread", "root " + "x" * 3000))]
+for i in range(2, 62):
+    chain.append(bs.Msg(i, gen("<r%d@gen>" % i, "Re: A long thread", "reply %d " % i + "y" * 3000, refs=["<root@gen>"], reply="<root@gen>",
+                               date="Mon, 02 Nov 2026 %02d:%02d:00 +0000" % (8 + i // 60, i % 60))))
+twin = bs.Msg(63, gen("<r5@gen>", "Re: A long thread", "a second copy of reply 5, as mail sent to oneself is", refs=["<root@gen>"], reply="<root@gen>"))
+edge = start([bs.Mailbox("INBOX", [], 7, edge_inbox), bs.Mailbox("All Mail", ["\\All"], 8, chain[:61])])
+
+big = answer(edge, "message", {"id": "INBOX:7:1", "format": "full"})
+rc, out, err = run(edge, "message", {"id": "INBOX:7:1", "format": "full"})
+ok("an answer is within the 64 KB a command may print", len(out.encode()) <= 65536 and len(out.encode()) <= P.OUTPUT, len(out.encode()))
+ok("a message too long is cut and says so, at the text's budget", big.get("truncated") is True and 40000 < len(big["text"].encode()) <= P.TEXT
+   and big["text"].startswith('say "hi"\nsay "hi"'), (big.get("truncated"), len(big["text"].encode())))
+many_attachments = answer(edge, "message", {"id": "INBOX:7:2", "format": "full"})
+ok("attachments are listed up to 100, by name and size", len(many_attachments["attachments"]) == 100
+   and many_attachments["attachments"][0] == {"name": "f000.txt", "type": "text/plain", "size": 4}, many_attachments["attachments"][:1])
+nomid = answer(edge, "message", {"id": "INBOX:7:3"})
+ok("a message with no Message-ID has none in its answer", "messageId" not in nomid and nomid["subject"] == "No Message-ID")
+before = len(edge.searches)
+alone = answer(edge, "thread", {"id": "INBOX:7:3"})
+ok("the thread of a message with no Message-ID is itself, with no search", [m["subject"] for m in alone["messages"]] == ["No Message-ID"]
+   and "threadId" not in alone and len(edge.searches) == before, alone)
+long = answer(edge, "message", {"id": "INBOX:7:4"})
+ok("long headers are cut: recipients, subject and references",
+   len(long["to"]) <= 2000 and long["to"].endswith("…") and len(long["subject"]) == 1000 and len(long["references"]) == 40
+   and long["references"][0] == long_refs[0] and long["references"][-1] == long_refs[-1], (len(long["to"]), len(long["subject"]), len(long["references"])))
+pdf = answer(edge, "message", {"id": "INBOX:7:5", "format": "full"})
+ok("a message that is one PDF is its own attachment and has no text", pdf["text"] == "" and pdf["attachments"] == [{"name": "x.pdf", "type": "application/pdf", "size": 9}], pdf)
+bad = answer(edge, "message", {"id": "INBOX:7:6", "format": "full"})
+ok("a message with a bad date, a bad encoded word and a byte of Latin-1 is read as well as it can be",
+   bad["date"] == "2026-11-06T08:00:00+00:00" and "bad@example.com" in bad["from"] and bad["subject"].startswith("caf") and bad["text"] == "body", bad)
+charset = answer(edge, "message", {"id": "INBOX:7:7", "format": "full"})
+ok("a message in a charset Python has no codec for is read as UTF-8, as well as it can be", charset["text"] == "its text, in a charset Python has no codec for", charset)
+hits = answer(edge, "search", {"q": "in:inbox"})
+ok("a search of a mailbox with odd mail still answers", len(hits["messages"]) == 7 and hits["messages"][1]["subject"].startswith("caf"), hits["messages"][:2])
+
+# a thread of 61 messages, each with 3 KB of text: the newest 50 and the message asked about, whose
+# copy is one of the older, the rest counted
+first = answer(edge, "thread", {"id": "All%20Mail:8:3"})
+ok("a thread over 50 messages is the newest and the message asked about, and says how many are left out",
+   len(first["messages"]) == 50 and first["omitted"] == 11 and "<r3@gen>" in members(first) and "<r13@gen>" in members(first)
+   and "<r12@gen>" not in members(first) and "<root@gen>" not in members(first), (len(first["messages"]), first.get("omitted")))
+rc, out, err = run(edge, "thread", {"id": "All%20Mail:8:30", "format": "full"})
+full_thread = json.loads(out)
+ok("a thread read in full shares the text budget, within 64 KB", rc == 0 and len(out.encode()) <= P.OUTPUT and len(full_thread["messages"]) == 50
+   and all(m.get("truncated") is True for m in full_thread["messages"]) and sum(len(m["text"].encode()) for m in full_thread["messages"]) <= P.TEXT,
+   (rc, len(out.encode()), err))
+
+flooded = start([bs.Mailbox("INBOX", [], 1, [])], flood=200000)
+many_found = answer(flooded, "search")
+ok("an answer to a search of 200,000 UIDs, over a megabyte on one line, is read", many_found["resultSizeEstimate"] == 200000 and many_found["messages"] == [],
+   many_found["resultSizeEstimate"])
+
+twins = start([bs.Mailbox("INBOX", [], 1, [chain[0], chain[4]]),
+               bs.Mailbox("All Mail", ["\\All"], 2, [chain[0], chain[4], twin])])
+tw = answer(twins, "thread", {"id": "INBOX:1:5"})
+ok("two copies of one message are one in a thread, and are not counted as left out",
+   members(tw) == ["<root@gen>", "<r5@gen>"] and "omitted" not in tw and ids(tw) == ["All%20Mail:2:1", "All%20Mail:2:5"], (members(tw), tw.get("omitted"), ids(tw)))
+
+# how a call fails
+refused(main, "search", {}, "Bridge refused the login", "a wrong password is refused, and never shown",
+        PROTON_BRIDGE=USER + ":not-the-password")
+careless = start(world(), echo=True)
+rc, out, err = run(careless, "search", {}, PROTON_BRIDGE=USER + ":not-the-password")
+ok("a server that says the password in refusing the login does not get it into the line", rc == 1 and "Bridge refused the login" in err
+   and "not-the-password" not in err and "for %s:[password]" % USER in err, (rc, err))
+refused(main, "search", {}, "PROTON_BRIDGE is not set", "a missing login is refused", PROTON_BRIDGE=None)
+refused(main, "search", {}, "PROTON_BRIDGE is not <username>:<password>", "a login with no colon is refused", PROTON_BRIDGE="nocolon")
+refused(main, "search", {}, "PROTON_BRIDGE holds a character LOGIN cannot carry", "a username LOGIN cannot carry is refused", PROTON_BRIDGE='a b"c:pw')
+refused(main, "search", {}, "PROTON_BRIDGE holds a character LOGIN cannot carry", "a username with a % is refused: it is no atom", PROTON_BRIDGE="a%b@example.com:password1234")
+refused(main, "search", {}, "PROTON_BRIDGE holds a character LOGIN cannot carry", "a password with a line break is refused", PROTON_BRIDGE="u@example.com:pw\nrest")
+refused(main, "search", {}, "YARDR_SOURCE_BASE is not set", "a missing base is refused", YARDR_SOURCE_BASE=None)
+refused(main, "search", {}, "YARDR_SOURCE_BASE is no host and port", "a base with no host is refused", YARDR_SOURCE_BASE="http://:1143x")
+gone = socket.socket()
+gone.bind(("127.0.0.1", 0))
+closed = gone.getsockname()[1]
+gone.close()
+refused(main, "search", {}, "no Bridge at 127.0.0.1:%d" % closed, "no Bridge listening is refused, saying where and what to do",
+        YARDR_SOURCE_BASE="http://127.0.0.1:%d" % closed)
+no_tls = start(world(), starttls=False)
+refused(no_tls, "search", {}, "connection mode must be STARTTLS", "a Bridge that does not offer STARTTLS is refused, naming its connection mode")
+ok("the password was never sent to a server that did not offer TLS", no_tls.logins == [] and no_tls.clear_logins == 0, no_tls.logins)
+hung = start(world(), hang_up=True)
+refused(hung, "search", {}, "is no IMAP server", "a server that hangs up is refused")
+rc, out, err = run(main, "nothing")
+ok("an unknown call is a usage error", rc == 2 and "run as proton-imap search|message|thread" in err)
+rc, out, err = run(main, "search", stdin="not json")
+ok("input that is no JSON is a usage error", rc == 2 and "stdin is no" in err)
+rc, out, err = run(main, "search", stdin='{"params": []}')
+ok("input whose params are no object is a usage error", rc == 2 and "stdin is no" in err)
+
+# what the stand-in saw
+everything = [s for s in stubs if s.connections]
+verbs = set(v for s in everything for v in s.commands)
+ok("every command sent was a read: %s" % ", ".join(sorted(verbs)), verbs <= {"CAPABILITY", "STARTTLS", "LOGIN", "LIST", "EXAMINE", "UID SEARCH", "UID FETCH", "LOGOUT"}, verbs)
+ok("no mailbox was opened with SELECT, and nothing was changed, moved or copied: no violations", all(s.violations == [] for s in stubs), [s.violations for s in stubs if s.violations])
+ok("no password was sent before TLS", all(s.clear_logins == 0 for s in stubs))
+ok("every login was the one in PROTON_BRIDGE, split at its colon", all(login in {(USER, PASSWORD), (USER, "not-the-password")} for s in stubs for login in s.logins), [s.logins for s in stubs if s.logins][:1])
+ok("no output of any run held the password or the login", leaks == [], leaks)
+
+# =====================================================================================
+# yardr
+# =====================================================================================
+core = tempfile.mkdtemp(prefix="protonc.", dir="/tmp")
+os.mkdir(core + "/h")
+
+
+def yrun(*args, stdin=None):
+    p = subprocess.run([YARDR, "--home", core + "/y", "--actor", "tester"] + list(args), input=stdin, capture_output=True, text=True,
+                       env={"HOME": core + "/h", "PATH": os.environ["PATH"]}, timeout=180)
+    if PASSWORD in p.stdout + p.stderr or CREDENTIAL in p.stdout + p.stderr:
+        leaks.append("yardr " + " ".join(args))
+    return p
+
+
+def holding(root, needle):
+    """The regular files under root that hold needle: a socket is no file to read."""
+    found = []
+    for here_, _, names in os.walk(root):
+        for name in names:
+            path = os.path.join(here_, name)
+            if os.path.isfile(path) and not os.path.islink(path):
+                with open(path, "rb") as f:
+                    if needle in f.read():
+                        found.append(path)
+    return found
+
+
+init = yrun("init", "--harness", "claude", "--operator", "tester")
+if init.returncode != 0:
+    ok("the scratch yard is made", False, init.stderr[-300:])
+else:
+    applied = yrun("pack", "apply", HERE, "--yes")
+    ok("the pack applies from its directory", applied.returncode == 0, applied.stderr[-300:])
+    copy = os.path.join(core, "y", "sources", "proton", "proton-imap")
+    ok("the program is carried into the yard, byte for byte, at mode 0700",
+       os.path.exists(copy) and open(copy, "rb").read() == open(PROGRAM, "rb").read() and (os.stat(copy).st_mode & 0o777) == 0o700)
+    shown = yrun("source", "show", "proton", "--json")
+    declaration = json.loads(shown.stdout)["declaration"] if shown.returncode == 0 else {}
+    calls = {c["name"]: c for c in declaration.get("calls", [])}
+    ok("the declaration as the yard reads it: Bridge's default address, one credential, three read calls each run by proton-imap, and no check",
+       declaration.get("base") == "http://127.0.0.1:1143" and declaration.get("credential") == {"env": "PROTON_BRIDGE"}
+       and "check" not in declaration and list(calls) == ["search", "message", "thread"]
+       and all(c["kind"] == "read" and c["run"] == ["proton-imap", n] for n, c in calls.items()), json.dumps(declaration)[:300])
+    params = {n: {p["name"]: p for p in c.get("params", [])} for n, c in calls.items()}
+    ok("search takes q, free text kept out of the record, and maxResults of at most 50, 20 unless given",
+       params["search"]["q"] == {"name": "q", "type": "string", "max": 1000, "optional": True}
+       and params["search"]["maxResults"]["pattern"] == "^([1-9]|[1-4][0-9]|50)$" and params["search"]["maxResults"]["default"] == "20", params["search"])
+    ok("message and thread take an id, kept in the record, and a format of metadata or full, metadata unless given",
+       all(params[n]["id"]["log"] is True and params[n]["id"]["pattern"] == r"^[A-Za-z0-9%._~-]+:[0-9]+:[0-9]+$"
+           and params[n]["format"]["values"] == ["metadata", "full"] and params[n]["format"]["default"] == "metadata" for n in ("message", "thread")),
+       params["message"])
+    ok("the pack suggests one preset, read, granting every call and nothing else",
+       "1. read:" in yrun("pack", "show", "proton").stdout and re.search(r"proton: read\n", yrun("pack", "show", "proton").stdout) is not None)
+
+    # the grants SETUP.md teaches, run as written (read out of it, not copied here)
+    with open(os.path.join(HERE, "SETUP.md"), encoding="utf-8") as f:
+        setup = f.read()
+    grants = re.findall(r"^\s*yardr (source grant [^\n`\"]+)$", setup, re.M)
+    ok("SETUP.md teaches a grant", len(grants) >= 1)
+    for grant in grants:
+        done = yrun(*shlex.split(grant))
+        ok("SETUP.md's `yardr %s` is accepted" % grant, done.returncode == 0, done.stderr[-300:])
+    held = yrun("source", "grants", "--json")
+    ok("what it granted is read, as read, to the yardmaster and nobody else",
+       held.returncode == 0 and [(g["holder"] if "holder" in g else None) for g in json.loads(held.stdout)] != [] and "proton" in held.stdout, held.stdout[-300:])
+
+    # the operator's copy points at the stand-in, as SETUP.md has the operator point it at Bridge
+    yard_stub = start(world())
+    mine = os.path.join(core, "mine")
+    os.mkdir(mine)
+    shutil.copy(PROGRAM, mine)
+    with open(os.path.join(HERE, "proton.yaml"), encoding="utf-8") as f:
+        text = f.read()
+    with open(os.path.join(mine, "proton.yaml"), "w", encoding="utf-8") as f:
+        f.write(re.sub(r"(?m)^base: .*$", "base: http://127.0.0.1:%d" % yard_stub.port, text))
+    added = yrun("source", "add", os.path.join(mine, "proton.yaml"))
+    keyed = yrun("source", "key", "proton", stdin="PROTON_BRIDGE=%s\n" % CREDENTIAL)
+    ok("the operator's copy is added and the login given by source key", added.returncode == 0 and keyed.returncode == 0, (added.stderr + keyed.stderr)[-300:])
+    checked = yrun("source", "check", "proton")
+    ok("source check, as SETUP.md says, sees the login set and the program run-able, and asks Bridge nothing",
+       checked.returncode == 0 and "can be run" in checked.stdout + checked.stderr and yard_stub.connections == 0,
+       (checked.returncode, checked.stdout[-200:], checked.stderr[-200:], yard_stub.connections))
+    envfile = os.path.join(core, "y", "sources", "proton.env")
+    ok("the login is in the source's env file, mode 0600", os.path.exists(envfile) and (os.stat(envfile).st_mode & 0o777) == 0o600
+       and CREDENTIAL in open(envfile).read(), envfile)
+
+    def through(*args):
+        """(exit status, the answer, what a refusal said): yardr call --json prints the answer alone, and a refusal as {"error": ...}."""
+        p = yrun("call", "proton", *args, "--json")
+        if p.returncode == 0:
+            return 0, json.loads(p.stdout), ""
+        try:
+            said = json.loads(p.stdout).get("error", "")
+        except ValueError:
+            said = ""
+        return p.returncode, None, said + p.stderr
+
+    for call, given, direct in (("search", ["q=from:alice"], {"q": "from:alice"}),
+                                ("search", ["maxResults=2"], {"maxResults": "2"}),
+                                ("search", ["q=is:unread in:inbox", "maxResults=5"], {"q": "is:unread in:inbox", "maxResults": "5"}),
+                                ("message", ["id=" + report], {"id": report}),
+                                ("message", ["id=" + report, "format=full"], {"id": report, "format": "full"}),
+                                ("thread", ["id=INBOX:1111:3"], {"id": "INBOX:1111:3"}),
+                                ("thread", ["id=INBOX:1111:3", "format=full"], {"id": "INBOX:1111:3", "format": "full"})):
+        rc, got, err = through(call, *given)
+        ok("yardr call proton %s %s answers what the program gives on its own" % (call, " ".join(given)), rc == 0 and got == answer(yard_stub, call, direct), (rc, err.strip()[-200:]))
+    seen = yard_stub.connections
+    for given, why in ((["maxResults=51"], "maxResults over 50"), (["id=nonsense"], "an id that is none"),
+                       (["id=INBOX%0D%0Aevil:1111:3"], "an id with an encoded control character"),
+                       (["id=" + report, "format=html"], "a format it does not have")):
+        call = "search" if given[0].startswith("max") else "message"
+        rc, got, err = through(call, *given)
+        ok("a call with %s does not reach Bridge" % why, rc != 0 and yard_stub.connections == seen, (rc, err.strip()[-200:]))
+    rc, got, err = through("message", "id=INBOX:9:2")
+    ok("a refusal of the program reaches the caller as the program's line", rc != 0 and "that id is stale" in err, (rc, got, err.strip()[-300:]))
+    events = yrun("events")
+    ok("the event log of those calls holds no password, and the free text of a search is not in it", PASSWORD not in events.stdout and "from:alice" not in events.stdout
+       and "is:unread" not in events.stdout, events.stdout[-300:])
+
+    where = holding(core + "/y", PASSWORD.encode()) + holding(core + "/h", PASSWORD.encode())
+    ok("the password is in no file of the yard or its home but the source's env file", where == [envfile], where)
+
+    # the wrong password, through yardr
+    yrun("source", "key", "proton", stdin="PROTON_BRIDGE=%s:wrong-password\n" % USER)
+    rc, got, err = through("search")
+    ok("a wrong password reaches the caller as Bridge's refusal, with no password in it", rc != 0 and "Bridge refused the login" in err and "wrong-password" not in err, (rc, got, err.strip()[-300:]))
+    ok("the login the stand-in saw was never in the clear", yard_stub.clear_logins == 0 and yard_stub.violations == [])
+
+ok("no output of any yardr command held the password or the login", leaks == [], leaks)
+cleanup()
+print("test: proton: %s" % ("all ok" if not failed else "FAILED (%d)" % len(failed)))
+sys.exit(1 if failed else 0)

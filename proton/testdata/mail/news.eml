@@ -1,0 +1,12 @@
+From: =?UTF-8?B?TmV3cyBDYWbDqQ==?= <news@example.com>
+To: bob@example.com
+Subject: =?UTF-8?B?Q2Fmw6kgbmV3cw==?=
+Date: Wed, 04 Nov 2026 07:15:00 +0000
+Message-ID: <news1@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<html><head><title>a title nobody reads</title><style>p { color: red }</style></head>
+<body><p>Hello &amp; welcome</p><div>Second<br>line &eacute;</div>
+<script>alert("never shown")</script></body></html>

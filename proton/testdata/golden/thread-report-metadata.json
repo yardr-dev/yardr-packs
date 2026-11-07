@@ -1,0 +1,44 @@
+{
+  "id": "INBOX:1111:3",
+  "threadId": "<q1@example.com>",
+  "messages": [
+    {
+      "id": "All%20Mail:2222:102",
+      "flags": [
+        "\\Seen",
+        "\\Answered"
+      ],
+      "from": "Alice Example <alice@example.com>",
+      "to": "Bob <bob@example.com>",
+      "cc": "carol@example.com",
+      "subject": "Quarterly report",
+      "date": "2026-11-03T09:30:00+01:00",
+      "messageId": "<q1@example.com>",
+      "size": 651
+    },
+    {
+      "id": "All%20Mail:2222:103",
+      "flags": [],
+      "from": "Bob <bob@example.com>",
+      "to": "Alice Example <alice@example.com>",
+      "subject": "Re: Quarterly report",
+      "date": "2026-11-03T11:00:00+00:00",
+      "messageId": "<r1@example.com>",
+      "inReplyTo": "<q1@example.com>",
+      "size": 434
+    },
+    {
+      "id": "All%20Mail:2222:107",
+      "flags": [
+        "\\Seen"
+      ],
+      "from": "Alice Example <alice@example.com>",
+      "to": "Bob <bob@example.com>",
+      "subject": "Re: Re: Quarterly report",
+      "date": "2026-11-04T10:00:00+00:00",
+      "messageId": "<s1@example.com>",
+      "inReplyTo": "<r1@example.com>",
+      "size": 348
+    }
+  ]
+}

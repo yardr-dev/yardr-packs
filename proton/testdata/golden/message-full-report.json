@@ -1,0 +1,23 @@
+{
+  "id": "INBOX:1111:2",
+  "mailbox": "INBOX",
+  "flags": [
+    "\\Seen",
+    "\\Answered"
+  ],
+  "from": "Alice Example <alice@example.com>",
+  "to": "Bob <bob@example.com>",
+  "cc": "carol@example.com",
+  "subject": "Quarterly report",
+  "date": "2026-11-03T09:30:00+01:00",
+  "messageId": "<q1@example.com>",
+  "size": 651,
+  "text": "Hi Bob,\n\nThe numbers are attached. Revenue is up 12%.\n\nAlice",
+  "attachments": [
+    {
+      "name": "report.pdf",
+      "type": "application/pdf",
+      "size": 55
+    }
+  ]
+}

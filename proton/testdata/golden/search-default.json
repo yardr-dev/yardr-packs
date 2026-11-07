@@ -1,0 +1,73 @@
+{
+  "mailbox": "All Mail",
+  "messages": [
+    {
+      "id": "All%20Mail:2222:108",
+      "from": "Boss <boss@example.com>",
+      "subject": "Planning",
+      "date": "2026-11-06T14:00:00+00:00",
+      "flags": []
+    },
+    {
+      "id": "All%20Mail:2222:107",
+      "from": "Alice Example <alice@example.com>",
+      "subject": "Re: Re: Quarterly report",
+      "date": "2026-11-04T10:00:00+00:00",
+      "flags": [
+        "\\Seen"
+      ]
+    },
+    {
+      "id": "All%20Mail:2222:106",
+      "from": "José Müller <jose@example.net>",
+      "subject": "Gespräch mit Müller",
+      "date": "2026-11-06T08:30:00+00:00",
+      "flags": [
+        "\\Seen"
+      ]
+    },
+    {
+      "id": "All%20Mail:2222:105",
+      "from": "Dave <dave@example.org>",
+      "subject": "Quarterly report",
+      "date": "2026-11-05T12:00:00+00:00",
+      "flags": []
+    },
+    {
+      "id": "All%20Mail:2222:104",
+      "from": "News Café <news@example.com>",
+      "subject": "Café news",
+      "date": "2026-11-04T07:15:00+00:00",
+      "flags": [
+        "\\Flagged"
+      ]
+    },
+    {
+      "id": "All%20Mail:2222:103",
+      "from": "Bob <bob@example.com>",
+      "subject": "Re: Quarterly report",
+      "date": "2026-11-03T11:00:00+00:00",
+      "flags": []
+    },
+    {
+      "id": "All%20Mail:2222:102",
+      "from": "Alice Example <alice@example.com>",
+      "subject": "Quarterly report",
+      "date": "2026-11-03T09:30:00+01:00",
+      "flags": [
+        "\\Seen",
+        "\\Answered"
+      ]
+    },
+    {
+      "id": "All%20Mail:2222:101",
+      "from": "Proton Team <team@proton.example>",
+      "subject": "Welcome to Proton",
+      "date": "2026-11-02T08:00:00+00:00",
+      "flags": [
+        "\\Seen"
+      ]
+    }
+  ],
+  "resultSizeEstimate": 8
+}

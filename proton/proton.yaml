@@ -1,0 +1,133 @@
+# Proton Mail as a declared source: what an agent may ask of one mailbox
+# through Proton Mail Bridge, which runs on the yard's machine and speaks IMAP
+# on a loopback port. Three calls, the same three google-mail has: search,
+# message and thread. All are reads, and each is answered by the program
+# proton/proton-imap, not by a request: yardr's `run` (call.run) runs it with
+# the parameters on stdin and the credential in its environment, and its one
+# JSON object is the answer. The yard sends nothing, so the base below is no
+# address a request goes to; it reaches the program as YARDR_SOURCE_BASE and
+# says where Bridge listens.
+#
+# Checked against Gluon, Bridge's IMAP engine (ProtonMail/gluon d871584, read
+# on 7 November 2026), against the real yardr in a scratch yard with a stand-in
+# for Bridge, and not against a live Bridge (README.md, "What was checked",
+# says what was and was not). What Gluon does that this file relies on:
+#
+#   It advertises IMAP4rev1 UNSELECT UIDPLUS MOVE ID IDLE AUTH=PLAIN and, once
+#     it has a certificate, STARTTLS. Nothing else: no X-GM-EXT-1 (so no
+#     X-GM-THRID), no THREAD, no SORT, no ESEARCH, no LITERAL+. So a thread is
+#     built from References and In-Reply-To, and a search string that needs
+#     it goes as a synchronizing literal with CHARSET UTF-8, which Gluon reads
+#     as any IANA charset.
+#   Its SEARCH matches FROM, TO, CC, BCC, SUBJECT and HEADER as a case-
+#     insensitive substring of the raw header (an RFC 2047 word is not
+#     decoded), TEXT as a substring of the raw message, and SINCE and BEFORE by
+#     the date Bridge holds. Every key but the dates, the flags and the sizes
+#     makes it read each message of the mailbox, so a text search grows with
+#     the mailbox.
+#   It lists the mailbox of all mail with the \All attribute (the operator can
+#     hide it in Bridge), and Bridge's own folders and labels as Folders/<name>
+#     and Labels/<name>, with placeholders for Folders and Labels that
+#     cannot be opened.
+#
+# No call opens a mailbox with SELECT, changes a flag or moves, copies or
+# deletes a message: the program sends LIST, EXAMINE, UID SEARCH, UID FETCH of
+# BODY.PEEK and LOGOUT, and nothing else.
+#
+# The name is proton: a pack is named after the service it talks to.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: proton
+about: Proton Mail through Proton Mail Bridge's local IMAP. Searches mail, reads a message, reads a thread; reads only, sends and changes nothing.
+
+# The name of the variable, never the value. Bridge shows the account a
+# username (the address) and a password of its own for a mail client, and the
+# variable holds them as <username>:<password>, split at the first colon. The
+# program logs in to Bridge with them. It is a password for Bridge on this
+# machine and not the Proton password, which Bridge never gives out. It lives
+# in the source's env file.
+credential:
+  env: PROTON_BRIDGE
+
+# ---- what an agent may ask of it, through `yardr call` --------------------
+# Calls answered by a command, granted one by one. A command is never
+# something an agent calls itself.
+#
+# base is where Bridge listens for IMAP, in the one form yardr takes: http://
+# to this machine (an imap:// base is refused as no address yardr sends to).
+# The program takes the host and the port out of it and ignores the scheme: it
+# always speaks IMAP with STARTTLS, Bridge's default connection mode. Bridge
+# takes the first free port from 1143, so the port may be another: SETUP.md
+# says how to give the yard's copy of this file the port Bridge shows. A pack
+# applied again replaces the yard's copy and puts this one back.
+#
+# No call is the check call: yardr refuses a command-answered call as one.
+# `yardr source check proton` only says the program can be run; the try-it
+# step of SETUP.md is a call.
+#
+# Every call goes to Bridge's one account. What an agent may read is that
+# account's whole mailbox, whatever it passes: the grant is the permission.
+base: http://127.0.0.1:1143
+calls:
+  search:
+    kind: read
+    about: >-
+      Search mail, newest first, at most 50 a page. Each message comes with its
+      id, from, subject, date and flags, and resultSizeEstimate says how many
+      matched. q is Gmail-like and every term must match: from: to: cc: bcc:
+      subject: (text in that header), after: and before: (YYYY-MM-DD or
+      YYYY/MM/DD), newer_than: and older_than: (a count and d, w, m or y, such
+      as 7d), is:unread, is:read, is:starred, is:answered, is:draft, in: or
+      label: (inbox, sent, drafts, trash, spam, archive, starred, all, or a
+      mailbox name as the answer's mailbox gives it), "a phrase" in quotes, a
+      leading - to leave a term out, and any other word, which is looked for
+      anywhere in the message. Without in: it searches All Mail, or the inbox
+      where Bridge hides All Mail, and the answer says which. It refuses an
+      operator it does not know. Quote the word to search for it as text.
+      Bridge matches the raw text of headers and messages, so an accented word
+      can miss mail that encoded it, and every text search reads each message
+      of the mailbox. in: and the dates keep a search quick.
+    params:
+      # Free text in the syntax above, held to a length. Never kept in the
+      # record of a call. Left out: every message of the mailbox.
+      q: { type: string, max: 1000, optional: true }
+      # At most 50, as google-mail's: a string, since an int has no bound.
+      maxResults: { type: string, pattern: '^([1-9]|[1-4][0-9]|50)$', default: "20" }
+    run: [proton-imap, search]
+    answer: { select: [mailbox, messages, resultSizeEstimate] }
+  message:
+    kind: read
+    about: >-
+      Read one message by an id from search or thread. format metadata, the
+      default, answers its headers: from, to, cc, subject, date, messageId,
+      inReplyTo, references, flags, size. format full adds text (the plain
+      part, or the HTML part as text, cut at about 48 KB with truncated: true)
+      and attachments (the name, type and size of each, never the contents).
+      full refuses a message over 25 MB, and metadata still reads it. An id
+      from before Bridge renumbered its mailbox is refused as stale, so search
+      again.
+    params:
+      # <mailbox, percent-encoded>:<UIDVALIDITY>:<UID>, as search answers it.
+      id: { type: string, pattern: '^[A-Za-z0-9%._~-]+:[0-9]+:[0-9]+$', max: 200, log: true }
+      format: { type: enum, values: [metadata, full], default: metadata }
+    run: [proton-imap, message]
+    answer: { select: [id, mailbox, flags, from, to, cc, subject, date, messageId, inReplyTo, references, size, text, truncated, attachments] }
+  thread:
+    kind: read
+    about: >-
+      Read the conversation a message is in, oldest first, by the message's id.
+      Each message has the shape message gives. Bridge has no thread of its own
+      (no X-GM-THRID, no THREAD), so a thread is every message whose
+      Message-ID, References or In-Reply-To names the message or the thread's
+      root. It is read from All Mail, or from the message's own mailbox where
+      Bridge hides All Mail or the message is in the trash or spam. At most 50
+      messages come, the newest and the one asked about, and omitted says how
+      many were left out. format full shares one text budget of about 48 KB
+      between them.
+    params:
+      id: { type: string, pattern: '^[A-Za-z0-9%._~-]+:[0-9]+:[0-9]+$', max: 200, log: true }
+      format: { type: enum, values: [metadata, full], default: metadata }
+    run: [proton-imap, thread]
+    answer: { select: [id, threadId, messages, omitted] }

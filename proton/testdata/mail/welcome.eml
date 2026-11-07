@@ -1,0 +1,11 @@
+From: Proton Team <team@proton.example>
+To: Bob <bob@example.com>
+Subject: Welcome to Proton
+Date: Mon, 02 Nov 2026 08:00:00 +0000
+Message-ID: <welcome@proton.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Welcome to Proton Mail.
+Your mailbox is ready.
