@@ -1,0 +1,42 @@
+# Tdd pack for yardr: a way of building a bead, and no lane for one. A builder
+# writes a test that fails for the bead's reason, commits it alone and then
+# makes it pass; a reviewer checks in the branch's history that the test came
+# first and failed before the change. Red, then green, then clean-up, all inside
+# the stages the depot's flow already has.
+# Like the starter pack it names no agent product, model, depot, person or
+# secret: the import asks, and they stay in the yard. The format is the
+# starter's (packs/starter/pack.yaml, docs/packs.md in the yardr repository).
+
+name: tdd
+
+# The kind of depot the pack is for: the proof is in a branch's commits.
+kind: git
+
+# The setup notes, for the operator: the import, and the two commands that point
+# a depot's groups at these roles. pack check and pack apply print them.
+setup: SETUP.md
+
+# There is no flow. Red, green and clean-up all happen in `new`, and a branch
+# whose test came after its code goes back by `changes` from `review`, which the
+# starter's flow already has. A flow here would add stages the depot has.
+
+# The groups are the starter's, by the starter's names, with roles of this
+# pack's own. A depot the starter set up has them already, and an import never
+# takes over a group another pack made: `pack check` says `kept: prompt` for
+# each, and the roles are installed beside. SETUP.md has the two commands that
+# point the groups at them. No limit is given, so a group the depot has keeps its
+# own.
+groups:
+  builders:  { agent: roles/tdd-builder.md }
+  reviewers: { agent: roles/tdd-reviewer.md }
+
+# The roles tell a builder and a reviewer to mail {{yardmaster}}, so the pack
+# names the crew member, as the starter does and hearing what it hears there,
+# without a stage: this pack has none to name, and an import only adds
+# subscriptions, so the starter's stay. It carries no role for it: the
+# yardmaster keeps the prompt it has.
+crew:
+  yardmaster:
+    hears:
+      events: [attention]
+      done: true

@@ -1,0 +1,220 @@
+#!/bin/sh
+# The tdd pack's tests: what the gate runs beside yardr pack check. Needs no
+# network, no secret and no yardr, and is done in well under a second. The
+# pack is text, so there is nothing to run. What the test pins is what a later
+# edit could lose without a sound:
+#
+#   shape   two role files and nothing else under roles/, no flows/ and no
+#           scripts/ (the pack changes how a bead is built, not which stages it
+#           passes), the two groups mapped to those roles with no limit, and the
+#           yardmaster named and given no role
+#   kept    each role still carries the yard's own rules, the ones the starter's
+#           builder and reviewer carry, by a line of each: taking the pack on
+#           drops none of them (the test line, the Friction line, fix forward,
+#           the hand-over, the rules for notes, /tmp and rm)
+#   added   each role carries what this pack adds: the builder's order (red,
+#           green, clean-up), what counts as red and the red line of its note;
+#           the reviewer's reading of the history and what sends a branch back
+#   readme  the README says what the pack is, names the sources the role text
+#           rests on, and credits nothing it was not written from
+#   setup   SETUP.md carries the operator's commands, one to a fenced block: the
+#           check, the apply, the two that point a depot's groups at these roles
+#           (an import keeps the prompts of groups the starter made) and the two
+#           that point them back; pack.yaml names the file
+#   closed  no role points at a file of the pack that the import leaves behind
+#
+# When the starter changes a rule, the line here and the role's copy change
+# together; the test fails until both agree.
+set -u
+cd "$(dirname "$0")" || exit 1
+fail=0
+
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+# has <file> <fixed text>: the text is in the file.
+has() { grep -qF -- "$2" "$1"; }
+
+builder=roles/tdd-builder.md
+reviewer=roles/tdd-reviewer.md
+
+# ---- shape ------------------------------------------------------------------
+set -- roles/*
+[ "$#" = 2 ] && [ "$1" = "$builder" ] && [ "$2" = "$reviewer" ]
+ok "shape: roles/ holds the two role files and nothing else" $? "found: $*"
+[ ! -e flows ]
+ok "shape: no flows/" $?
+[ ! -e scripts ]
+ok "shape: no scripts/" $?
+
+yaml=$(grep -v '^ *#' pack.yaml)
+y() { printf '%s\n' "$yaml" | grep -q "$@"; }
+y '^kind: git$'
+ok "pack.yaml: for a git depot" $?
+y '^  builders: *{ agent: roles/tdd-builder.md }$'
+ok "pack.yaml: builders run the tdd builder role, with no limit of the pack's" $?
+y '^  reviewers: *{ agent: roles/tdd-reviewer.md }$'
+ok "pack.yaml: reviewers run the tdd reviewer role, with no limit of the pack's" $?
+! y 'limit:'
+ok "pack.yaml: no limit on any group, so a depot's own stay" $?
+! y '^flows:'
+ok "pack.yaml: no flow" $?
+! y 'run:'
+ok "pack.yaml: no script group" $?
+y '^  yardmaster:$'
+ok "pack.yaml: the yardmaster is named, since the roles mail it" $?
+! y '^    role:'
+ok "pack.yaml: the yardmaster carries no role" $?
+
+# ---- kept -------------------------------------------------------------------
+# Each line is one the starter's role has and a copy must keep. They hold the
+# yard's rules for a builder: the plan note, the base run, the test command and
+# the test line, commits, the isolated run, notes, the hand-over, the Friction
+# line, evidence, rm, holds and the shared build cache.
+for t in 'You implement one bead, in its own worktree on branch `yard/<bead>`.' \
+         'Nothing ends your session but `yardr bead done <id>` (or `--outcome question`,' \
+         'write a plan note' \
+         'test command on the base before you change anything' \
+         'Every bug you find or fix gets a regression test.' \
+         'find the test that already' \
+         'Test anything that starts agents or servers in an isolated environment,' \
+         'Run it under `env -i` with only what it needs' \
+         'Commit on your branch. Do not merge. Do not push unless your brief says' \
+         'Add no trailers of your own: the yard adds them.' \
+         '`BREAKING CHANGE: <what breaks>` in the body of its commit.' \
+         'retitle the bead to say what the change does,' \
+         '`test: <command> @ <commit>: pass, <n> ok, 0 failed`' \
+         'After the test line, one last line: `Friction: <what>`, the one thing' \
+         'Never leave evidence or anything a later stage must read in /tmp, where the' \
+         'Keep rm out of inline shell scripts, long or short' \
+         'If you are stuck and the stage offers no outcome for it, write a note on the' \
+         '## Writing a note' \
+         '## A screenshot, where the bead asks for one' \
+         '## Something outside your bead' \
+         'Never run `go clean -cache`' \
+         '`yardr session snooze 10m "<what>"` before you end your turn, so the yard' \
+         '{{operator}}' '{{yardmaster}}'; do
+  has "$builder" "$t"
+  ok "builder: keeps '$t'" $?
+done
+# And for a reviewer: reading the change, fix forward, the test line, the
+# Friction line and the sections for what comes from outside or in another shape.
+for t in 'You review one bead that a builder finished' \
+         'you review forward: you fix what you find instead of' \
+         'Read the whole change: `git log <base>..HEAD` and `git diff <base>...HEAD`.' \
+         '3. Fix forward. For problems you can fix with confidence, fix them on the' \
+         'small commits subject "review: <what>"' \
+         'Do not run the whole suite as a matter of course' \
+         '`test: <command> @ <commit>: pass, <n> ok, 0 failed`' \
+         'Last in the note, after any test line: `Friction: <what>`, the one' \
+         'Where the brief offers an outcome that approves the bead straight past a' \
+         '## Writing a note' \
+         '## Something outside your bead' \
+         '## A bead labelled `eyes`' \
+         '## A branch from another yard' \
+         '## Merge re-review' \
+         '## A carrier with one bad part' \
+         '## Train review' \
+         'Never merge, never touch the base or any other branch or worktree. Commit' \
+         'Never run `go clean -cache`' \
+         '{{operator}}' '{{yardmaster}}'; do
+  has "$reviewer" "$t"
+  ok "reviewer: keeps '$t'" $?
+done
+
+# ---- added ------------------------------------------------------------------
+# What the pack is for. The builder: the section, the order, what counts as red,
+# the stub that lets a test run, the test that passes at once, the commit that
+# holds the test alone, the red line of the note, the history left as it was
+# made, the kinds of change with nothing to pin, and the way back from a branch
+# sent for its order.
+for t in '## Test first' 'Commit the test alone' \
+         'smallest stub' 'passes on its first run' \
+         'red: <command> @ <short sha>: fail, <n> failed' \
+         'in the order you made them' 'Where there is nothing to pin' \
+         'their rows share a test commit' 'move its row ahead of that fix' \
+         'A bead sent back for its order is rebuilt in the right one' \
+         'git switch --detach <base>' 'git diff --cached <old tip>' \
+         'git switch -C yard/<bead>'; do
+  has "$builder" "$t"
+  ok "builder: carries '$t'" $?
+done
+# The rebuild deletes nothing. A builder's permission mode can refuse a hard
+# reset as irreversible, as one did in a run of this role, and a detached switch
+# to the base and a switch back with -C reach the same end.
+! has "$builder" 'git reset --hard'
+ok "builder: the rebuild does not reset the branch hard" $?
+# The reviewer: the section, the history read first, the red line looked for,
+# the probe for a test whose fix came first (no commit shows its red), the test
+# read since red, the outcome that sends a branch back and what it names, a
+# history out of order as the large part missing that the stage's `changes`
+# speaks of, and the line that says what was checked.
+for t in '## Test first, checked' \
+         'git log --reverse --stat <base>..HEAD' 'may share a test commit' \
+         'smallest stub or fixture' 'code beyond its needed stub or fixture' \
+         'red: <command> @ <short sha>: fail, <n> failed' \
+         'git worktree add --detach <dir> <base>' 'this is your probe' \
+         'git diff <test sha> HEAD' \
+         'report `changes`, naming the commits' \
+         'A history out of order' 'generated files' 'a dependency bump' \
+         'no red is needed for those' \
+         'tdd: <what you checked>'; do
+  has "$reviewer" "$t"
+  ok "reviewer: carries '$t'" $?
+done
+
+# ---- readme -----------------------------------------------------------------
+# The README says what the pack is and names what the role text rests on: the
+# book that gives the cycle, the later article that restates it, the writing on
+# what makes a test worth having, and where each can be read. The role text is
+# yardr's own words, and the pack credits no source it was not taken from.
+for t in 'test-driven development' 'There is no flow' \
+         'red: <command> @ <short sha>: fail, <n> failed' 'SETUP.md' \
+         'Test-Driven Development: By Example' \
+         'Canon TDD' 'newsletter.kentbeck.com/p/canon-tdd' \
+         'martinfowler.com/bliki/TestDrivenDevelopment.html' \
+         'Growing Object-Oriented Software, Guided by Tests' \
+         'xUnit Test Patterns' 'xunitpatterns.com' \
+         'TDD Anti-Patterns'; do
+  has README.md "$t"
+  ok "readme: carries '$t'" $?
+done
+! grep -rli 'superpowers' --exclude=test .
+ok "pack: no file credits or names a source the text was not written from" $?
+
+# ---- setup ------------------------------------------------------------------
+y '^setup: SETUP.md$'
+ok "pack.yaml: names SETUP.md as the setup notes" $?
+# Each command is a line of its own. The blocks sit indented inside the numbered
+# steps, so a line is read without its indent.
+n=0
+for t in 'yardr pack check /path/to/yardr-packs/tdd --depot <depot>' \
+         'yardr pack apply /path/to/yardr-packs/tdd --depot <depot>' \
+         'yardr group set <depot>-builders prompt=$HOME/.yardr/packs/tdd/roles/tdd-builder.md' \
+         'yardr group set <depot>-reviewers prompt=$HOME/.yardr/packs/tdd/roles/tdd-reviewer.md' \
+         'yardr depot sources <depot>' \
+         'yardr group set <depot>-builders prompt=$HOME/.yardr/packs/starter/roles/builder.md' \
+         'yardr group set <depot>-reviewers prompt=$HOME/.yardr/packs/starter/roles/reviewer.md'; do
+  sed 's/^[[:space:]]*//' SETUP.md | grep -qxF -- "$t"
+  ok "setup: a command of its own: $t" $?
+  n=$((n + 1))
+done
+has SETUP.md 'replace `$HOME/.yardr` in'
+ok "setup: documents the path when a yard uses another home" $?
+# One command to a fenced block, as yardr's own packs write their setup: as many
+# blocks as commands, none holding a second line. The count keeps the check from
+# passing on a file with no fences.
+blocks=$(awk '/^[ \t]*```/ { f = !f; if (f) n++ } END { print n + 0 }' SETUP.md)
+extra=$(awk '/^[ \t]*```/ { f = !f; c = 0; next } f && NF { c++; if (c > 1) n++ } END { print n + 0 }' SETUP.md)
+[ "$blocks" = "$n" ] && [ "$extra" = 0 ]
+ok "setup: one fenced block to a command, none holding a second line" $? "$blocks blocks for $n commands, $extra extra lines"
+
+# ---- closed -----------------------------------------------------------------
+# An import installs the roles alone: a role that sends its reader to a file of
+# the pack sends it nowhere.
+! grep -n 'SETUP\.md\|the pack'"'"'s README' roles/*.md
+ok "roles: point at no file of the pack that the import leaves behind" $?
+
+if [ "$fail" = 0 ]; then echo "test: tdd: all ok"; else echo "test: tdd: FAILED"; fi
+exit $fail
