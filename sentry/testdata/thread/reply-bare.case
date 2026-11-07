@@ -1,0 +1,7 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org#1234567890","body":"No key, as a hand-made reply may have none."}
+=== answer_1
+201
+{"id":"7051","commentId":"7051","user":{"id":"9","name":"yardr","username":"sentry-app-yardr"},"sentry_app":null,"type":"note","data":{"text":"No key, as a hand-made reply may have none.","comment_id":7051},"dateCreated":"2026-11-07T10:03:00Z","source":null}

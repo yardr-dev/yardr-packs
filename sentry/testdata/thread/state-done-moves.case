@@ -1,0 +1,11 @@
+=== cmd
+state
+=== in
+{"thread":"example-org#1234567890","state":"done"}
+=== answer_1
+200
+{"id":"1234567890","shortId":"PYTHON-Y","title":"ZeroDivisionError","status":"unresolved","substatus":"ongoing","statusDetails":{},"project":{"slug":"python"}}
+=== answer_2
+200
+{"id":"1234567890","shortId":"PYTHON-Y","title":"ZeroDivisionError","status":"resolved","substatus":"","statusDetails":{},"project":{"slug":"python"}}
+=== real

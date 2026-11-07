@@ -1,0 +1,10 @@
+--- requests
+POST https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"The slug is kept lowercase, as Sentry keeps it.\n\n<!-- yardr-reply 0a1b2c3d-1111-4222-8333-444455556666 -->"}
+--- status
+0
+--- stdout
+{"id":"7052","url":"https://sentry.io/organizations/example-org/issues/1234567890/"}
+--- stderr

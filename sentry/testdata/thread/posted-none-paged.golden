@@ -1,0 +1,10 @@
+--- requests
+GET https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/?per_page=100
+  auth: ok
+GET https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/?per_page=100&cursor=0:100:0
+  auth: ok
+--- status
+0
+--- stdout
+{}
+--- stderr

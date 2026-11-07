@@ -1,0 +1,8 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org#1234567890","body":"The deprecated path answers 410 in a brownout.","key":"0a1b2c3d-5555-4222-8333-444455556666"}
+=== answer_1
+410
+{"message":"This API no longer exists."}
+=== real

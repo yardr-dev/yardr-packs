@@ -1,0 +1,7 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org#1234567890","body":"An answer that names no comment is no post.","key":"0a1b2c3d-6666-4222-8333-444455556666"}
+=== answer_1
+201
+{"type":"note"}

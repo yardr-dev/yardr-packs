@@ -1,0 +1,357 @@
+#!/bin/sh
+# The sentry pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds; needs jq and bash, which
+# the pack's programs need, and python3 and yardr for the last two parts,
+# which fail without them since a skipped part would leave what they pin
+# unpinned.
+#
+#   hook     each webhook body in testdata/hook is turned into the yard's
+#            envelope by sentry/normalize; its output must match the golden
+#            beside it byte for byte. issue-created, event-alert (trimmed)
+#            and comment-created are Sentry's own samples (docs.sentry.io,
+#            7 November 2026) with the signature and the ids made up;
+#            issue-resolved is the issue sample resolved by the integration,
+#            and issue-created-path an issue whose address has the path shape
+#            the docs' alert sample has. The variants below each change one
+#            thing in one of them. The fields those envelopes carry and
+#            hook.keys must agree both ways.
+#   thread   each testdata/thread/*.case is one run of sentry/thread against
+#            a stand-in curl (testdata/bin/curl) that records each request
+#            and answers from the case. The case's golden holds the requests
+#            (a changed request is a changed golden), the exit status,
+#            stdout and stderr. The token is a canary, looked for in every
+#            argument, output and record. Then the cases that name it run
+#            again with the real curl against a stand-in server on a loopback
+#            port (testdata/standin.py), which must give the same golden:
+#            what the stand-in curl takes is what curl does.
+#   core     the declaration as the yard reads it, a delivery signed as
+#            Sentry signs it (taken, a tampered body and a wrong secret
+#            refused), a bead linked by the address of what a delivery
+#            names, and the check call, through the real yardr in a scratch
+#            yard (testdata/core.sh).
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again: read the diff before
+# committing it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn comes,
+# and the yard's server, which its first command starts, would outlive the
+# directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "test: jq is not on PATH: the pack's programs need it"
+  exit 1
+fi
+if ! command -v bash >/dev/null 2>&1; then
+  echo "test: bash is not on PATH: sentry/thread needs it"
+  exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "test: python3 is not on PATH: the stand-in for Sentry is one"
+  exit 1
+fi
+if [ ! -x "$YARDR" ]; then
+  echo "test: needs yardr ($YARDR)"
+  exit 1
+fi
+
+# A canary, not a secret: a token of the shape Sentry's has, which no output
+# of the pack may hold. The signing secret is another canary, which no file
+# of the scratch yard may hold but the one the hook names.
+token=canary_5e47a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6
+
+# ---- hook ------------------------------------------------------------------
+for f in testdata/hook/*.json; do
+  n=$(basename "$f" .json)
+  case $n in not-an-object | no-resource) continue ;; esac
+  env -i PATH="$PATH" ./sentry/normalize <"$f" >"$tmp/$n.out" 2>"$tmp/$n.err"
+  check "normalize $n" "$tmp/$n.out" "testdata/hook/$n.golden"
+  [ ! -s "$tmp/$n.err" ]
+  ok "normalize $n prints nothing to stderr" $? "$(head -c 200 "$tmp/$n.err")"
+done
+
+# refuse <name> <fixture> <stderr wanted>: a body normalize will not take is
+# refused with a fixed line that quotes none of it.
+refuse() {
+  env -i PATH="$PATH" ./sentry/normalize <"testdata/hook/$2.json" >"$tmp/r.out" 2>"$tmp/r.err"
+  rc=$?
+  line=$(sed 's/^jq: error (at [^)]*): //' "$tmp/r.err")
+  [ "$rc" != 0 ] && [ ! -s "$tmp/r.out" ] && [ "$line" = "$3" ] && ! grep -q QUOTED-BODY-TEXT "$tmp/r.err"
+  ok "normalize refuses $1" $? "exit $rc, stdout $(wc -c <"$tmp/r.out") bytes, stderr: $line"
+}
+refuse "a body that is no object" not-an-object "sentry payload is not JSON"
+refuse "a delivery with no resource header" no-resource "sentry delivery has no Sentry-Hook-Resource"
+
+# Each row is one change to one fixture and what must then hold of the
+# envelope: label ;; fixture ;; jq edit ;; jq condition. The address
+# an organization and an issue are read from comes in two shapes, and goes
+# out as one; what cannot be read is heard with no thread, and never refused.
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  label=${line%% ;; *}
+  rest=${line#* ;; }
+  file=${rest%% ;; *}
+  rest=${rest#* ;; }
+  edit=${rest%% ;; *}
+  want=${rest#* ;; }
+  jq -c "$edit" "testdata/hook/$file.json" | env -i PATH="$PATH" ./sentry/normalize >"$tmp/v.out" 2>"$tmp/v.err"
+  rc=$?
+  if [ "$rc" = 0 ] && [ ! -s "$tmp/v.err" ] && [ "$(jq -c "$want" "$tmp/v.out" 2>/dev/null)" = true ]; then
+    echo "test: normalize $label ok"
+  else
+    echo "test: normalize $label FAILED ($rc): $(head -c 300 "$tmp/v.err") $(head -c 600 "$tmp/v.out")"
+    fail=1
+  fi
+done <<'EOF'
+an issue on an organization's own address, on a regional host ;; issue-created ;; .body.data.issue.web_url = "https://example-org.de.sentry.io/issues/1234567890/" ;; .thread.id == "example-org#1234567890" and .thread.url == "https://de.sentry.io/organizations/example-org/issues/1234567890/" and .url == .thread.url
+an issue on a self-hosted address with a port and a capital in the slug ;; issue-created ;; .body.data.issue.id = "42" | .body.data.issue.web_url = "https://sentry.example.com:9000/organizations/Acme/issues/42/" ;; .thread.id == "acme#42" and .thread.url == "https://sentry.example.com:9000/organizations/acme/issues/42/"
+an issue whose address carries a query ;; issue-created ;; .body.data.issue.web_url = "https://example-org.sentry.io/issues/1234567890/?query=is%3Aunresolved" ;; .thread.url == "https://sentry.io/organizations/example-org/issues/1234567890/"
+an issue with no id of its own, read from the address ;; issue-created ;; del(.body.data.issue.id) ;; .thread.id == "example-org#1234567890"
+an issue with no web_url is heard with no thread ;; issue-created ;; del(.body.data.issue.web_url) ;; .thread == {} and (has("url") | not) and (has("entity") | not) and (.text | startswith("new fatal issue PYTHON-Y")) and .fields.outsider == ["yes"]
+an issue at an http address has no thread ;; issue-created ;; .body.data.issue.web_url = "http://example-org.sentry.io/issues/1234567890/" ;; .thread == {}
+an issue at an address with a user has no thread ;; issue-created ;; .body.data.issue.web_url = "https://x@sentry.io/organizations/example-org/issues/1234567890/" ;; .thread == {}
+an issue at a host with two dots in a row has no thread ;; issue-created ;; .body.data.issue.web_url = "https://a..b/organizations/o/issues/1234567890/" ;; .thread == {}
+an issue whose id is not the address's has no thread ;; issue-created ;; .body.data.issue.id = "999" ;; .thread == {}
+an issue id that is no number falls back on the address's ;; issue-created ;; .body.data.issue.id = "../x" ;; .thread.id == "example-org#1234567890"
+an issue that is a string is heard, quoting nothing ;; issue-created ;; .body.data.issue = "QUOTED-BODY-TEXT" ;; .thread == {} and .text == "new issue" and (tojson | contains("QUOTED") | not)
+data that is an array is heard ;; issue-created ;; .body.data = ["QUOTED-BODY-TEXT"] ;; .thread == {} and (tojson | contains("QUOTED") | not)
+a created issue with no data is heard ;; issue-created ;; del(.body.data) ;; .thread == {} and .type == "issue" and .action == "created"
+a level that is not a word is left out of the fields ;; issue-created ;; .body.data.issue.level = "a b" ;; (.fields | has("level") | not) and (.text | startswith("new issue PYTHON-Y"))
+a project slug that is not a word is left out of the fields ;; issue-created ;; .body.data.issue.project.slug = "a/b" ;; (.fields | has("project") | not)
+no actor ;; issue-created ;; del(.body.actor) ;; .actor == {} and .thread.id == "example-org#1234567890"
+an actor that is a string ;; issue-created ;; .body.actor = "QUOTED-BODY-TEXT" ;; .actor == {} and (tojson | contains("QUOTED") | not)
+a header in other case ;; issue-created ;; .headers = {"sentry-hook-resource": ["issue"]} ;; .type == "issue" and .thread.id == "example-org#1234567890"
+a title of many lines is one line ;; issue-created-path ;; . ;; .thread.title == "ZeroDivisionError: division by zero second line of the message"
+an alert on an organization's own address ;; event-alert ;; .body.data.event.web_url = "https://test-org.sentry.io/issues/1117540176/events/e4874d664c3540c1a32eab185f12c5ab/" ;; .thread.id == "test-org#1117540176" and .url == "https://sentry.io/organizations/test-org/issues/1117540176/events/e4874d664c3540c1a32eab185f12c5ab/"
+an alert with another action is recorded without a thread ;; event-alert ;; .body.action = "updated" ;; .type == "event_alert" and .action == "updated" and .thread == {} and .mentions == [] and (has("text") | not) and (has("fields") | not) and (has("url") | not)
+an alert with no issue_id, read from the address ;; event-alert ;; del(.body.data.event.issue_id) ;; .thread.id == "test-org#1117540176"
+an alert whose issue_id is a number ;; event-alert ;; .body.data.event.issue_id = 1117540176 ;; .thread.id == "test-org#1117540176"
+an alert whose issue_id is not the address's has no thread ;; event-alert ;; .body.data.event.issue_id = "5" ;; .thread == {}
+an alert with an event id that is not 32 hex points at the issue ;; event-alert ;; .body.data.event.event_id = "../x" ;; .url == .thread.url
+an alert with no rule ;; event-alert ;; del(.body.data.triggered_rule) ;; .text == "alert: error event in ?(<anonymous>)"
+an alert with no API address has no project ;; event-alert ;; del(.body.data.event.url) ;; (.fields | has("project") | not) and .fields.level == ["error"]
+an alert with no web_url is heard with no thread ;; event-alert ;; del(.body.data.event.web_url) ;; .thread == {} and (has("url") | not) and .fields.outsider == ["yes"]
+an alert with no data is heard ;; event-alert ;; del(.body.data) ;; .thread == {} and .text == "alert: event"
+EOF
+
+# Any other issue action, and any other resource, is recorded with its type,
+# action and actor and nothing else: no thread, no text, no fields. An issue
+# resolved by the yard's own integration is one, which is why the yard never
+# hears its own resolve as a new issue.
+for action in resolved assigned archived unresolved; do
+  jq -c --arg a "$action" '.body.action = $a' testdata/hook/issue-created.json | env -i PATH="$PATH" ./sentry/normalize >"$tmp/a.out" 2>"$tmp/a.err"
+  jq -e --arg a "$action" '.type == "issue" and .action == $a and .thread == {} and .mentions == [] and (has("text") | not) and (has("fields") | not) and (has("url") | not) and (has("entity") | not)' "$tmp/a.out" >/dev/null 2>&1 && [ ! -s "$tmp/a.err" ]
+  ok "normalize an issue $action has no thread and no text" $? "$(head -c 300 "$tmp/a.out")"
+done
+for resource in error metric_alert installation comment seer preprod_artifact something_new; do
+  jq -c --arg r "$resource" '.headers["Sentry-Hook-Resource"] = [$r] | .body.action = "created"' testdata/hook/issue-created.json | env -i PATH="$PATH" ./sentry/normalize >"$tmp/a.out" 2>"$tmp/a.err"
+  jq -e --arg r "$resource" '.type == $r and .action == "created" and .thread == {} and (has("text") | not) and (has("fields") | not)' "$tmp/a.out" >/dev/null 2>&1 && [ ! -s "$tmp/a.err" ]
+  ok "normalize a $resource delivery is recorded with no thread" $? "$(head -c 300 "$tmp/a.out")"
+done
+
+# A field normalize sets is one a subscription may name only when hook.keys
+# lists it (or it is a common key), and a key the file lists that no
+# envelope here sets is stale.
+keys=$(sed -n 's/^  keys: \[\(.*\)\]$/\1/p' sentry.yaml | tr -d ' ' | tr ',' ' ')
+seen=$(for g in testdata/hook/*.golden; do jq -r '.fields // {} | keys[]' "$g"; done | sort -u | tr '\n' ' ')
+bad=
+for k in $seen; do
+  case " $keys team project repo label " in *" $k "*) ;; *) bad="$bad $k is set and in no hook.keys;" ;; esac
+done
+for k in $keys; do
+  case " $seen " in *" $k "*) ;; *) bad="$bad hook.keys lists $k and no envelope sets it;" ;; esac
+done
+[ -z "$bad" ]
+ok "fields and hook.keys agree" $? "$bad"
+
+# ---- thread ----------------------------------------------------------------
+stand=$here/testdata/bin
+# Prove the stand-in is what the program would run, before anything runs.
+if [ "$(PATH="$stand:$PATH" command -v curl)" != "$stand/curl" ]; then
+  echo "test: the stand-in curl is not the first curl on PATH"
+  exit 1
+fi
+
+# The stand-in server of the second pass, one process for every case.
+sd=$tmp/standin
+mkdir "$sd"
+python3 -I testdata/standin.py "$sd" 2>"$tmp/standin.err" <<EOF &
+$token
+EOF
+standin_pid=$!
+i=0
+while [ ! -s "$sd/port" ] && [ "$i" -lt 200 ]; do sleep 0.05; i=$((i + 1)); done
+if [ ! -s "$sd/port" ]; then
+  echo "test: the stand-in server did not listen: $(cat "$tmp/standin.err")"
+  exit 1
+fi
+port=$(cat "$sd/port")
+
+# golden <requests> <status> <stdout> <stderr>: what a run is held to.
+golden() {
+  echo "--- requests"
+  cat "$1"
+  echo "--- status"
+  echo "$2"
+  echo "--- stdout"
+  cat "$3"
+  [ ! -s "$3" ] || [ "$(tail -c 1 "$3" | wc -l)" -ne 0 ] || echo
+  echo "--- stderr"
+  cat "$4"
+}
+
+# A case file is sections, each opened by a line "=== name": cmd (the
+# command), base (YARDR_SOURCE_BASE, the shipped one otherwise), in (the
+# object on stdin), answer_n (the nth request's answer: its status, then its
+# body), headers_n (the nth answer's response headers, as curl -D writes
+# them), curl_exit_n (the nth request fails as a refused connection does) and
+# real (the case is run again with the real curl, below).
+# @TOKEN@ is the canary, where an answer repeats the credential it was sent.
+for c in testdata/thread/*.case; do
+  n=$(basename "$c" .case)
+  d="$tmp/case_$n"
+  mkdir "$d"
+  sed -e "s|@TOKEN@|$token|g" "$c" | awk -v dir="$d" '/^=== /{ name = substr($0, 5); f = dir "/" name; printf "" > f; next } { print >> f }'
+  # curl -D writes its header lines with a carriage return.
+  for h in "$d"/headers_*; do
+    [ -e "$h" ] || continue
+    sed 's/$/\r/' "$h" >"$h.crlf"
+    mv "$h.crlf" "$h"
+  done
+  base=https://sentry.io/api/0
+  [ ! -e "$d/base" ] || base=$(cat "$d/base")
+  cmd=$(cat "$d/cmd")
+  : >"$tmp/requests"
+  rm -f "$tmp/requests.n"
+  env -i PATH="$stand:$PATH" HOME="$tmp" TMPDIR="$tmp" SENTRY_TOKEN="$token" YARDR_SOURCE_BASE="$base" \
+    FAKE_CASE="$d" FAKE_LOG="$tmp/requests" FAKE_AUTH="$token" FAKE_SECRETS="$token" \
+    ./sentry/thread "$cmd" <"$d/in" >"$tmp/stdout" 2>"$tmp/stderr"
+  status=$?
+  golden "$tmp/requests" "$status" "$tmp/stdout" "$tmp/stderr" >"$tmp/golden"
+  check "thread $n" "$tmp/golden" "testdata/thread/$n.golden"
+  # No secret anywhere a program can put one, and nothing left behind.
+  ! grep -qF "$token" "$tmp/golden"
+  ok "thread $n leaks no token" $?
+  ! grep -q "LEAK" "$tmp/requests"
+  ok "thread $n passes no token in an argument" $?
+  [ -z "$(find "$tmp" -mindepth 1 -maxdepth 1 -name 'tmp.*')" ]
+  ok "thread $n leaves no temporary directory" $?
+  ! grep -E '^  auth: (WRONG|missing)$' "$tmp/requests" >/dev/null
+  ok "thread $n sent the token to every request, on stdin" $?
+  cat "$tmp/requests" >>"$tmp/allrequests"
+
+  # The second pass, for the cases that name it with a real section: the same
+  # case, the real curl, the stand-in server. The base is the case's with the
+  # host the server's, and what the run says of it is put back before the two
+  # are compared. The cases that name it are one of each way the program uses
+  # curl (a GET, a POST and a PUT with a body, a list read by cursor from the
+  # headers, an answer that is no 2xx), which is what the stand-in curl can get
+  # wrong; the rest differ only in what they hold.
+  [ -e "$d/real" ] || continue
+  origin=$(printf '%s' "$base" | sed 's|^\([a-z]*://[^/]*\).*|\1|')
+  printf '%s\n' "$d" >"$sd/case"
+  rm -f "$sd/n"
+  : >"$sd/requests"
+  env -i PATH="$PATH" HOME="$tmp" TMPDIR="$tmp" SENTRY_TOKEN="$token" YARDR_SOURCE_BASE="http://127.0.0.1:$port${base#"$origin"}" \
+    ./sentry/thread "$cmd" <"$d/in" >"$tmp/rstdout" 2>"$tmp/rstderr"
+  rstatus=$?
+  for f in requests; do sed "s|http://127.0.0.1:$port|$origin|g" "$sd/$f" >"$tmp/r$f"; done
+  sed -i.bak "s|http://127.0.0.1:$port|$origin|g" "$tmp/rstdout" "$tmp/rstderr"
+  golden "$tmp/rrequests" "$rstatus" "$tmp/rstdout" "$tmp/rstderr" >"$tmp/rgolden"
+  if cmp -s "$tmp/golden" "$tmp/rgolden"; then
+    echo "test: thread $n with the real curl ok"
+  else
+    echo "test: thread $n with the real curl differs from the stand-in curl's run:"
+    diff "$tmp/golden" "$tmp/rgolden" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+done
+
+# A token Sentry's has no characters like is refused before anything is
+# sent, and is not repeated.
+for target in "reply reply" "read read" "state state-done-moves" "posted posted-none"; do
+  # shellcheck disable=SC2086 # two words, on purpose
+  set -- $target
+  d="$tmp/case_$2"
+  [ -e "$d/in" ] || d="$tmp/case_reply"
+  for t in '' 'bad"token' 'with space' 'back\slash' 'two
+lines'; do
+    : >"$tmp/requests"
+    rm -f "$tmp/requests.n"
+    env -i PATH="$stand:$PATH" HOME="$tmp" TMPDIR="$tmp" SENTRY_TOKEN="$t" YARDR_SOURCE_BASE=https://sentry.io/api/0 \
+      FAKE_CASE="$d" FAKE_LOG="$tmp/requests" FAKE_AUTH="$token" FAKE_SECRETS="" \
+      ./sentry/thread "$1" <"$d/in" >"$tmp/stdout" 2>"$tmp/stderr"
+    rc=$?
+    [ "$rc" != 0 ] && [ ! -s "$tmp/stdout" ] && [ ! -s "$tmp/requests" ] && [ "$(cat "$tmp/stderr")" = "SENTRY_TOKEN is not set, or holds a character a Sentry token has none of" ]
+    ok "thread $1 with the token '$(printf '%s' "$t" | tr '\n' '~')' is refused, sending nothing and saying nothing of it" $? "exit $rc: $(head -c 200 "$tmp/stderr")"
+  done
+done
+
+# The standard organization-token shape is taken: + / and = are in it.
+: >"$tmp/requests"
+rm -f "$tmp/requests.n"
+env -i PATH="$stand:$PATH" HOME="$tmp" TMPDIR="$tmp" SENTRY_TOKEN="sntrys_eyJpYXQiOjE3NjI4MDczODAuMTIz+/=_AbC123+/AbC123+/AbC123+/AbC123+/AbC123+/AbC1" YARDR_SOURCE_BASE=https://sentry.io/api/0 \
+  FAKE_CASE="$tmp/case_read-empty" FAKE_LOG="$tmp/requests" FAKE_AUTH="sntrys_eyJpYXQiOjE3NjI4MDczODAuMTIz+/=_AbC123+/AbC123+/AbC123+/AbC123+/AbC123+/AbC1" FAKE_SECRETS="" \
+  ./sentry/thread read <"$tmp/case_read-empty/in" >"$tmp/stdout" 2>"$tmp/stderr"
+[ "$?" = 0 ] && [ "$(cat "$tmp/stdout")" = '{"messages":[]}' ] && grep -q '^  auth: ok$' "$tmp/requests"
+ok "thread takes an organization token, with its + / and =" $? "$(head -c 200 "$tmp/stderr")"
+
+kill "$standin_pid" 2>/dev/null
+standin_pid=
+
+# The pack writes two things in Sentry and no more: of every request the
+# cases made, the writes are a POST of a comment and a PUT of an issue's
+# status, each on the organization's path, and no request is a DELETE.
+methods=$(awk '/^[A-Z]+ /{ print $1 }' "$tmp/allrequests" | sort -u | tr '\n' ' ')
+[ "$methods" = "GET POST PUT " ]
+ok "no request of any case is anything but a GET, a POST or a PUT" $? "methods seen: $methods"
+bad=$(awk '$1 == "POST" && $2 !~ /^https:\/\/sentry\.io\/api\/0\/organizations\/[a-z0-9_-]+\/issues\/[0-9]+\/comments\/$/ || $1 == "PUT" && $2 !~ /^https:\/\/sentry\.io\/api\/0\/organizations\/[a-z0-9_-]+\/issues\/[0-9]+\/$/ { print $1, $2 }' "$tmp/allrequests" | grep -v '127\.0\.0\.1' | head -3)
+[ -z "$bad" ]
+ok "every POST is a comment on an issue and every PUT an issue, under its organization" $? "$bad"
+! grep -q '/api/0/issues/' "$tmp/allrequests"
+ok "no request goes to the deprecated path without the organization" $?
+
+# ---- core ------------------------------------------------------------------
+# Through the real yardr, in a scratch yard (testdata/core.sh).
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: sentry ok"; else echo "test: sentry FAILED"; fi
+exit $fail

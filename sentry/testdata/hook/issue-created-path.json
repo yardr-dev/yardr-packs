@@ -1,0 +1,61 @@
+{
+  "headers": {
+    "Content-Type": ["application/json"],
+    "Request-Id": ["8b2f6a4e1c9d4073b5a1e8f2c3d4b5a6"],
+    "Sentry-Hook-Resource": ["issue"],
+    "Sentry-Hook-Signature": ["0000000000000000000000000000000000000000000000000000000000000000"],
+    "Sentry-Hook-Timestamp": ["1762807441"],
+    "User-Agent": ["Sentry Integration Platform/1.0"]
+  },
+  "body": {
+    "action": "created",
+    "installation": {
+      "uuid": "a8e5d37a-696c-4c54-adb5-b3f28d64c7de"
+    },
+    "data": {
+      "issue": {
+        "url": "https://sentry.io/api/0/issues/1170/",
+        "web_url": "https://sentry.io/organizations/test-org/issues/1170/",
+        "project_url": "https://sentry.io/organizations/test-org/issues/?project=1",
+        "id": "1170",
+        "shareId": null,
+        "shortId": "BAR-1A",
+        "title": "ZeroDivisionError: division by zero\nsecond line of the message",
+        "culprit": "raven.scripts.runner in main",
+        "permalink": null,
+        "logger": null,
+        "level": "error",
+        "status": "unresolved",
+        "statusDetails": {},
+        "isPublic": false,
+        "platform": "python",
+        "project": {
+          "id": "1",
+          "name": "Bar",
+          "slug": "bar",
+          "platform": "python"
+        },
+        "type": "default",
+        "metadata": {
+          "type": "ZeroDivisionError",
+          "value": "division by zero"
+        },
+        "numComments": 0,
+        "assignedTo": null,
+        "isBookmarked": false,
+        "isSubscribed": false,
+        "hasSeen": false,
+        "isUnhandled": false,
+        "count": "1",
+        "userCount": 0,
+        "firstSeen": "2018-11-06T21:19:55.121Z",
+        "lastSeen": "2018-11-06T21:19:55.121Z"
+      }
+    },
+    "actor": {
+      "type": "application",
+      "id": "sentry",
+      "name": "Sentry"
+    }
+  }
+}

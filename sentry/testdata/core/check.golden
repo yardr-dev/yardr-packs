@@ -1,0 +1,14 @@
+--- output
+sentry: credential: SENTRY_TOKEN is set in <yard>/y/sources/sentry.env
+sentry: check call scopes (GET /): 200 in <n>ms, 125 bytes
+sentry: auth: {"scopes":["event:read","event:write"]}
+sentry: command thread.reply (sentry/thread reply): can be run
+sentry: command thread.posted (sentry/thread posted): can be run
+sentry: command thread.read (sentry/thread read): can be run
+sentry: command thread.state (sentry/thread state): can be run
+sentry: command hook.normalize (sentry/normalize): can be run
+--- status
+0
+--- requests
+GET http://<stand-in>/api/0/
+  auth: ok

@@ -1,0 +1,10 @@
+--- requests
+POST http://127.0.0.1:1/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"A stand-in base has no web address, so the answer has no URL.\n\n<!-- yardr-reply 0a1b2c3d-2222-4222-8333-444455556666 -->"}
+--- status
+0
+--- stdout
+{"id":"7053"}
+--- stderr

@@ -1,0 +1,12 @@
+--- requests
+GET https://sentry.io/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+PUT https://sentry.io/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"status":"resolved"}
+--- status
+1
+--- stdout
+--- stderr
+https://sentry.io/api/0/organizations/example-org/issues/1234567890/: HTTP 403: You do not have permission to perform this action. (the token needs event:read to read an issue and event:write to comment on it and resolve it)

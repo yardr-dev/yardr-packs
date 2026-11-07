@@ -1,0 +1,17 @@
+# Sentry as a pack of kind source: the integration, imported into the yard
+# and into no depot. What Sentry is: how an internal integration's webhook
+# is verified and read (a new issue, an alert rule's event), how the yard
+# speaks in an issue (a comment, resolve and unresolve), and a bead's link
+# to an issue.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/sentry
+#
+# The source is named sentry: a pack is named after the service it
+# talks to.
+name: sentry
+kind: source
+setup: SETUP.md
+
+sources:
+  sentry:
+    declaration: sentry.yaml

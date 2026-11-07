@@ -1,0 +1,7 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org#1234567890","body":"A token with event:read alone cannot comment.","key":"0a1b2c3d-4444-4222-8333-444455556666"}
+=== answer_1
+403
+{"detail":"You do not have permission to perform this action."}

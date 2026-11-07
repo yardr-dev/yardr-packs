@@ -1,0 +1,135 @@
+# Sentry as a declared source: how the core verifies a delivery of an
+# internal integration's webhook, and the command that turns a verified body
+# into the envelope; what the yard does in an issue's thread, by one command
+# per thing (a comment, resolve, unresolve); and Sentry's issue URLs as a
+# bead's link.
+#
+# The first slice: hearing a new issue and an alert rule's event, answering
+# in the issue, and resolving it when a bead lands. What is not here:
+# self-hosted Sentry and regional hosts (SETUP.md says what to change),
+# metric alerts, releases, source maps, assignment, any issue action beyond
+# created, and calls an agent makes with `yardr call` beyond the one that
+# checks the token.
+#
+# Checked against Sentry's docs and source on 7 November 2026
+# (docs.sentry.io; github.com/getsentry/sentry, master): the integration
+# platform's webhooks pages (headers, signature, the issue and the issue
+# alert payloads), the Update an Issue API page and its scopes, the API's
+# permissions page, the token formats page; and in source, the URL registry
+# (src/sentry/api/urls.py), GroupNotesEndpoint and NoteSerializer, the
+# issue group endpoints and their scope map (src/sentry/issues/endpoints/),
+# the deprecation helper (src/sentry/api/helpers/deprecation.py) and the
+# API index (src/sentry/api/endpoints/index.py). The comment routes and the
+# index are in source and not in the public API nav: the pack's tests pin
+# what they send and what they read back.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: sentry
+about: "Sentry issues. Hears an internal integration's webhook for a new issue and for an alert rule, and speaks in the issue: a comment, resolve, unresolve."
+
+# The name of the variable, never the value. An internal integration's
+# token, sent as a Bearer token: 64 hex characters, with the scopes
+# event:read and event:write (the permission Issue & Event, Read & Write,
+# and nothing wider). hook.normalize is handed no credential at all.
+credential:
+  env: SENTRY_TOKEN
+  header: "Authorization: Bearer {credential}"
+
+# ---- what it sends us ----------------------------------------------------
+
+hook:
+  # Adapter.Verify stays data, checked by the core: the integration's
+  # client secret is handed to no command, and an unverified body reaches
+  # none. Sentry signs the exact body, hex HMAC-SHA256 under the client
+  # secret, in Sentry-Hook-Signature. Sentry-Hook-Timestamp rides along
+  # and is not signed, and the core refuses a timestamp its signature does
+  # not cover, so none is named. The delivery is told by Request-ID, which
+  # Sentry makes (a uuid) once for each request it builds: a retry that
+  # builds the request again has another, so a retry is told by its body
+  # as well, which it repeats.
+  verify:
+    scheme: hmac-sha256
+    signed: body
+    signature: { header: Sentry-Hook-Signature, encoding: hex }
+    delivery:  { header: Request-ID }
+  # Per hook, not per source: a delivery's body is the same for every hook
+  # aimed at the one integration, and each hook records its own.
+  bodies: unique-per-hook
+  # Sentry's deliveries follow errors, not a rhythm: an idle hour after
+  # the last issue is no break, so the quiet check does not time them.
+  untimed: true
+
+  # Adapter.Normalize. stdin {"headers":{…},"body":{…}}, stdout the
+  # envelope. The core sets source and delivery itself.
+  normalize: [sentry/normalize]
+
+  # The keys its events' fields may carry: a subscription's --where may
+  # name them beside type, action, team, project, repo and label. project
+  # is the Sentry project's slug. level is the issue's level (fatal, error,
+  # warning, info, debug) and category its issueCategory (error, outage or
+  # feedback: the issue webhook is sent for all three). outsider is yes on
+  # every delivery that carries text: an issue's title and culprit come
+  # from the monitored application's runtime, and whoever uses that
+  # application can shape them, so the yard marks them as information, not
+  # instructions.
+  keys: [level, category, outsider]
+
+# ---- what the yard does in its threads ------------------------------------
+# One command per thing, each handed its object on stdin and the
+# credential under SENTRY_TOKEN, with YARDR_SOURCE_BASE from base below.
+# sentry/thread is the script: reply posts a comment on the issue with the
+# key in a marker, posted finds what a key left ({} for none), read lists
+# the issue's comments oldest first, and state moves the issue to what the
+# word means: exactly, or never backwards with forward (a stage map's
+# move). A thread is <organization slug>#<issue id>, the issue's number in
+# Sentry's own API. There is no open: Sentry makes its issues from errors.
+# The shapes are in docs/integrations.md in the yardr repository.
+#
+# The words are the three the core has, of which Sentry has two statuses to
+# set: started is unresolved and done is resolved. An issue that is ignored
+# (archived) stands between them.
+
+thread:
+  reply:  [sentry/thread, reply]      # in  {thread, parent, body, key}      out {id, url}
+  posted: [sentry/thread, posted]     # in  {thread, key}                    out {id, url} or {}
+  read:   [sentry/thread, read]       # in  {thread}                         out {messages: [...]}
+  state:  [sentry/thread, state]      # in  {thread, state, forward?}        out {status, moved, was?}
+  states: [started, done]             # the words it has a status for
+
+# ---- its issues as a bead's link ------------------------------------------
+# The host its URLs are on, what reads an issue from a URL's path, and over
+# the groups: the organization's slug and the issue's number. The one fixed
+# form is the path form on sentry.io, which Sentry has middleware to send on
+# to an organization's own address, <slug>.sentry.io (not yet tried: see
+# README.md). The file can name one host only, so an address on
+# <slug>.sentry.io is not read as a link: SETUP.md says to link the fixed
+# form, which is also the URL a heard delivery's thread has. An
+# organization's slug is lowercase, so the groups fold.
+
+link:
+  host: sentry.io
+  issue: '^/organizations/([A-Za-z0-9_][A-Za-z0-9_-]*)/issues/([1-9][0-9]*)(?:/.*)?$'
+  fixed: "https://sentry.io/organizations/{1}/issues/{2}"
+  thread: "{1}#{2}"
+  fold: lower
+
+# ---- what an agent may ask of it, through `yardr call` -------------------
+# The scopes the token holds, and nothing else: the file's calls are what
+# keep its base and credential (a file with none has neither), and one read
+# call is what that takes. It is the API's index, which needs no scope and
+# answers a token's own, so `yardr source check` shows at once whether
+# event:write is there, and fails on a token Sentry does not take.
+#
+# base is the REST API every thread command and every call sends to, as
+# YARDR_SOURCE_BASE.
+
+base: https://sentry.io/api/0
+check: scopes
+calls:
+  scopes:
+    kind: read
+    about: What the credential may do, as the scopes its token holds.
+    request: { method: GET, path: / }
+    answer: { select: [auth] }

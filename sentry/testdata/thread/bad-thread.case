@@ -1,0 +1,4 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org/1234567890","body":"A thread is <organization>#<issue id>.","key":"0a1b2c3d-7777-4222-8333-444455556666"}

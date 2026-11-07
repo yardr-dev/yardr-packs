@@ -1,0 +1,11 @@
+--- output
+sentry thread example-org#1234567890 is now resolved (was unresolved)
+--- status
+0
+--- requests
+GET http://<stand-in>/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+PUT http://<stand-in>/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"status":"resolved"}

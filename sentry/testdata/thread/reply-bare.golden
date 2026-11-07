@@ -1,0 +1,10 @@
+--- requests
+POST https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"No key, as a hand-made reply may have none."}
+--- status
+0
+--- stdout
+{"id":"7051","url":"https://sentry.io/organizations/example-org/issues/1234567890/"}
+--- stderr

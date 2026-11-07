@@ -1,0 +1,12 @@
+--- requests
+GET https://sentry.io/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+PUT https://sentry.io/api/0/organizations/example-org/issues/1234567890/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"status":"resolved"}
+--- status
+0
+--- stdout
+{"status":"resolved","moved":true,"was":"ignored"}
+--- stderr

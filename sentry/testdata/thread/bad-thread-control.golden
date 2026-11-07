@@ -1,0 +1,6 @@
+--- requests
+--- status
+1
+--- stdout
+--- stderr
+thread example-org#1 [31m forged log line: want <organization>#<issue id>

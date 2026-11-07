@@ -1,0 +1,10 @@
+--- requests
+POST https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"An answer that names no comment is no post.\n\n<!-- yardr-reply 0a1b2c3d-6666-4222-8333-444455556666 -->"}
+--- status
+5
+--- stdout
+--- stderr
+jq: error (at <stdin>:1): the answer names no comment

@@ -1,0 +1,8 @@
+--- output
+already posted as http://<stand-in>/organizations/example-org/issues/1234567890/; not posted again
+http://<stand-in>/organizations/example-org/issues/1234567890/
+--- status
+0
+--- requests
+GET http://<stand-in>/api/0/organizations/example-org/issues/1234567890/comments/?per_page=100
+  auth: ok

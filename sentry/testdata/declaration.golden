@@ -1,0 +1,79 @@
+{
+  "about": "Sentry issues. Hears an internal integration's webhook for a new issue and for an alert rule, and speaks in the issue: a comment, resolve, unresolve.",
+  "base": "https://sentry.io/api/0",
+  "calls": [
+    {
+      "about": "What the credential may do, as the scopes its token holds.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "auth"
+        ]
+      },
+      "kind": "read",
+      "name": "scopes",
+      "request": {
+        "method": "GET",
+        "path": "/"
+      }
+    }
+  ],
+  "check": "scopes",
+  "credential": {
+    "env": "SENTRY_TOKEN",
+    "header": "Authorization: Bearer {credential}"
+  },
+  "hook": {
+    "bodies": "unique-per-hook",
+    "keys": [
+      "level",
+      "category",
+      "outsider"
+    ],
+    "normalize": [
+      "sentry/normalize"
+    ],
+    "untimed": true,
+    "verify": {
+      "delivery": {
+        "header": "Request-ID"
+      },
+      "scheme": "hmac-sha256",
+      "signature": {
+        "encoding": "hex",
+        "header": "Sentry-Hook-Signature"
+      },
+      "signed": "body"
+    }
+  },
+  "link": {
+    "fixed": "https://sentry.io/organizations/{1}/issues/{2}",
+    "fold": "lower",
+    "host": "sentry.io",
+    "issue": "^/organizations/([A-Za-z0-9_][A-Za-z0-9_-]*)/issues/([1-9][0-9]*)(?:/.*)?$",
+    "thread": "{1}#{2}"
+  },
+  "name": "sentry",
+  "thread": {
+    "posted": [
+      "sentry/thread",
+      "posted"
+    ],
+    "read": [
+      "sentry/thread",
+      "read"
+    ],
+    "reply": [
+      "sentry/thread",
+      "reply"
+    ],
+    "state": [
+      "sentry/thread",
+      "state"
+    ],
+    "states": [
+      "started",
+      "done"
+    ]
+  }
+}

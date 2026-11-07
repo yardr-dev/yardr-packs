@@ -1,0 +1,7 @@
+=== cmd
+state
+=== in
+{"thread":"example-org#99","state":"done"}
+=== answer_1
+404
+{"detail":"The requested resource does not exist"}

@@ -1,0 +1,7 @@
+=== cmd
+reply
+=== in
+{"thread":"Example-Org#1234567890","body":"The slug is kept lowercase, as Sentry keeps it.","key":"0a1b2c3d-1111-4222-8333-444455556666"}
+=== answer_1
+201
+{"id":"7052","commentId":"7052","user":null,"sentry_app":null,"type":"note","data":{"text":"x","comment_id":7052},"dateCreated":"2026-11-07T10:04:00Z","source":null}

@@ -1,0 +1,15 @@
+# One address a person may type, a tab, and what yardr link add keeps of it as
+# the issue one form, or - where it refuses it. The groups fold to lowercase.
+https://sentry.io/organizations/acme/issues/1170/	https://sentry.io/organizations/acme/issues/1170
+https://sentry.io/organizations/acme/issues/1171	https://sentry.io/organizations/acme/issues/1171
+https://sentry.io/organizations/Acme-Corp/issues/1172/events/e4874d664c3540c1a32eab185f12c5ab/?project=1	https://sentry.io/organizations/acme-corp/issues/1172
+https://sentry.io/organizations/acme/issues/1173/?query=is%3Aunresolved#activity	https://sentry.io/organizations/acme/issues/1173
+https://acme.sentry.io/issues/1174/	-
+https://sentry.io/organizations/acme/issues/	-
+https://sentry.io/organizations/acme/issues/abc/	-
+https://sentry.io/organizations/acme/issues/0/	-
+https://sentry.io/organizations/acme/projects/python/	-
+https://sentry.io/organizations/acme/alerts/rules/	-
+https://sentry.io/settings/acme/	-
+https://sentry.io/issues/1175/	-
+https://sentry.io/api/0/organizations/acme/issues/1176/	-

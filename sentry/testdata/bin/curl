@@ -1,0 +1,79 @@
+#!/bin/bash
+# A stand-in curl for the thread tests, put first on the program's PATH. It
+# makes no request. sentry/thread uses curl in one way only,
+#
+#   curl -sS -o FILE -D FILE -w '%{http_code}' -K - -X METHOD
+#        [-H HEADER] [--data-binary @FILE] URL
+#
+# and any other word is refused, so a changed invocation fails the test
+# instead of passing unseen. It records each request in $FAKE_LOG and answers
+# from the case's fixtures: the nth request gets $FAKE_CASE/answer_n, whose
+# first line is the status and the rest the body, and the response headers
+# $FAKE_CASE/headers_n where there is one (a case with no answer for it
+# answers 599, and a file named curl_exit_n makes the nth request fail as a
+# refused connection does).
+#
+# The credential comes on the stdin config line, as the real program sends
+# it. The log says only whether it was the one expected ($FAKE_AUTH) and
+# whether any argument held a secret ($FAKE_SECRETS): the test fails if a
+# secret reaches an argument, and the log never holds one.
+set -u
+args="$*"
+config=$(cat)
+out='' dump='' fmt='' method='' url='' data='' hdrs=''
+while [ $# -gt 0 ]; do
+  case $1 in
+  -sS) ;;
+  -o) out=$2; shift ;;
+  -D) dump=$2; shift ;;
+  -w) fmt=$2; shift ;;
+  -K) [ "$2" = - ] || { echo "stand-in curl: the token is to come on stdin (-K -)" >&2; exit 2; }; shift ;;
+  -X) method=$2; shift ;;
+  -H) hdrs="$hdrs  header: $2
+"; shift ;;
+  --data-binary)
+    case $2 in
+    @*) data=$(cat "${2#@}") ;;
+    *) echo "stand-in curl: the data is to be a file (--data-binary @FILE)" >&2; exit 2 ;;
+    esac
+    shift ;;
+  -*) echo "stand-in curl: no option $1" >&2; exit 2 ;;
+  *)
+    [ -z "$url" ] || { echo "stand-in curl: two urls" >&2; exit 2; }
+    url=$1 ;;
+  esac
+  shift
+done
+[ "$fmt" = '%{http_code}' ] || { echo "stand-in curl: -w is to be the status code" >&2; exit 2; }
+[ -n "$out" ] && [ -n "$dump" ] && [ -n "$method" ] && [ -n "$url" ] || { echo "stand-in curl: wants -o, -D, -X and a url" >&2; exit 2; }
+n=$(cat "$FAKE_LOG.n" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$FAKE_LOG.n"
+got=$(printf '%s\n' "$config" | sed -n 's/^header = "Authorization: Bearer \(.*\)"$/\1/p')
+if [ "$got" = "$FAKE_AUTH" ]; then auth=ok; elif [ -z "$got" ]; then auth=missing; else auth=WRONG; fi
+leak=
+for s in $FAKE_SECRETS; do
+  case $args in *"$s"*) leak="  LEAK: an argument holds a secret
+" ;; esac
+done
+{
+  printf '%s %s\n' "$method" "$url"
+  printf '  auth: %s\n' "$auth"
+  printf '%s' "$hdrs"
+  [ -z "$data" ] || printf '  body: %s\n' "$(printf '%s' "$data" | jq -S -c . 2>/dev/null || echo "NOT JSON")"
+  printf '%s' "$leak"
+} >>"$FAKE_LOG"
+if [ -e "$FAKE_CASE/curl_exit_$n" ]; then
+  echo "curl: (7) Failed to connect to stand-in" >&2
+  exit 7
+fi
+: >"$dump"
+if [ -r "$FAKE_CASE/answer_$n" ]; then
+  status=$(sed -n 1p "$FAKE_CASE/answer_$n")
+  sed 1d "$FAKE_CASE/answer_$n" >"$out"
+  [ ! -r "$FAKE_CASE/headers_$n" ] || cp "$FAKE_CASE/headers_$n" "$dump"
+else
+  status=599
+  printf '%s' '{"detail":"the stand-in has no answer for this request"}' >"$out"
+fi
+printf '%s' "$status"

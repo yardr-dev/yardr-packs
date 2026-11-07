@@ -1,0 +1,9 @@
+=== cmd
+read
+=== base
+http://127.0.0.1:1
+=== in
+{"thread":"example-org#1234567890"}
+=== answer_1
+200
+[{"id":"7","data":{}}]

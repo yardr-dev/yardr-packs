@@ -1,0 +1,7 @@
+=== cmd
+posted
+=== in
+{"thread":"example-org#1234567890","key":"6f1f3b1e-1d3c-4a52-9a6b-0b1b2c3d4e5f"}
+=== answer_1
+200
+[{"id":"7061","commentId":"7061","user":{"id":"3","name":"","username":"grace"},"sentry_app":null,"type":"note","data":{"text":"Seen again on the nightly.","comment_id":7061},"dateCreated":"2026-11-07T11:30:00.5Z","source":null},{"id":"7050","commentId":"7050","user":{"id":"9","name":"yardr","username":"sentry-app-yardr"},"sentry_app":{"id":"5f0e9a2b-7c3d-4e1f-8a6b-0d9c8b7a6e5f","name":"yardr","slug":"yardr","avatars":[]},"type":"note","data":{"text":"Fix landed in 4d2c1ab.\n\n<!-- yardr-reply 6f1f3b1e-1d3c-4a52-9a6b-0b1b2c3d4e5f -->","comment_id":7050},"dateCreated":"2026-11-07T10:02:11Z","source":null},{"id":"7042","commentId":"7042","user":{"id":"1","name":"Ada Lovelace","username":"ada","email":"ada@example.com"},"sentry_app":null,"type":"note","data":{"text":"Looking into it.","comment_id":7042},"dateCreated":"2026-11-07T09:15:30.123456Z","source":null}]

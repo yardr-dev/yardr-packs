@@ -1,0 +1,9 @@
+=== cmd
+reply
+=== base
+http://127.0.0.1:1
+=== in
+{"thread":"example-org#1234567890","body":"A stand-in base has no web address, so the answer has no URL.","key":"0a1b2c3d-2222-4222-8333-444455556666"}
+=== answer_1
+201
+{"id":"7053","type":"note","data":{"text":"x"},"dateCreated":"2026-11-07T10:05:00Z"}

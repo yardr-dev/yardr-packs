@@ -1,0 +1,38 @@
+{
+  "headers": {
+    "Content-Type": ["application/json"],
+    "Request-Id": ["f3e1b5a7c9d24680a1b2c3d4e5f60718"],
+    "Sentry-Hook-Resource": ["issue"],
+    "Sentry-Hook-Signature": ["0000000000000000000000000000000000000000000000000000000000000000"],
+    "Sentry-Hook-Timestamp": ["1762807588"],
+    "User-Agent": ["Sentry Integration Platform/1.0"]
+  },
+  "body": {
+    "action": "resolved",
+    "installation": {
+      "uuid": "24b397fc-a86e-43ef-9297-949e21b82480"
+    },
+    "data": {
+      "issue": {
+        "url": "https://sentry.io/api/0/organizations/example-org/issues/1234567890/",
+        "web_url": "https://example-org.sentry.io/issues/1234567890/",
+        "project_url": "https://example-org.sentry.io/issues/?project=4509877862268928",
+        "id": "1234567890",
+        "shortId": "PYTHON-Y",
+        "title": "Error generated with event_id: 495d375a-1df6-45c0-9890-34dae8e1b6a4(Priority: HIGH)",
+        "culprit": "test-transaction-0-41e49cd3-7252-441f-8d27-63a9ad697b0a",
+        "level": "fatal",
+        "status": "resolved",
+        "statusDetails": {},
+        "project": {"id": "112313123123134", "name": "python", "slug": "python", "platform": "python"},
+        "issueType": "error",
+        "issueCategory": "error"
+      }
+    },
+    "actor": {
+      "type": "application",
+      "id": "5f0e9a2b-7c3d-4e1f-8a6b-0d9c8b7a6e5f",
+      "name": "yardr"
+    }
+  }
+}

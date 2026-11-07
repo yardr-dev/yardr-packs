@@ -1,0 +1,115 @@
+#!/bin/sh
+# A verified Sentry webhook to the yard's envelope: stdin
+# {"headers":{…},"body":{…}}, stdout the envelope. Needs jq.
+#
+# Two deliveries are read. An issue that was created (Sentry-Hook-Resource
+# issue, action created) and an alert rule's event (event_alert, action
+# triggered) each become the thread of their issue, with the issue's title
+# as the thread's title and a short line of what it is as the text. Any
+# other delivery (an issue resolved, assigned, archived or unresolved, an
+# alert with another action, a comment, an error, a metric alert) is recorded
+# with its type, action and actor and no thread. Nobody is mentioned by it,
+# and the yard does not hear its own resolve come back as a new issue. A
+# event kind this does not read is never refused: a 400 tells Sentry its
+# webhook failed, and Sentry retries it and can disable an integration (its
+# source skips an app that is disabled). A body that is no JSON object, or a
+# delivery with no resource header, is refused: a non-zero exit is answered
+# 400, and the delivery reaches no subscription. Nothing of the body is ever
+# printed to stderr.
+#
+# The type is the resource header and the action the payload action, as
+# Sentry words them. The thread is <organization slug>#<issue id>, and its
+# URL is built here, the same for both deliveries: Sentry sends the
+# organization in no field of its own, only in addresses, so it is read from
+# the web address of the issue (or of the event, for an alert), which comes
+# in two shapes: <slug>.sentry.io/issues/<id>/, which the docs' issue sample
+# has, and /organizations/<slug>/issues/<id>/ on a host, which the docs' alert
+# sample has and a Sentry without customer domains is expected to send. Both
+# become the second shape on the host the delivery came from, which is the
+# one fixed form the declaration links.
+# Where the organization, the host or the id cannot be read, or the two
+# ids disagree, the delivery is recorded with no thread: it is still heard.
+#
+# What Sentry says about an issue is written by the monitored application
+# (its error message, its culprit), so every delivery that carries text is
+# marked outsider: the yard shows its line as information, not instructions.
+exec jq -c '
+def obj: if type == "object" then . else {} end;
+def str($v): if ($v | type) == "string" then $v elif ($v | type) == "number" then "\($v)" else "" end;
+# trunc is hooks.truncate: whitespace collapsed, at most 500 runes. The jq
+# POSIX space class includes the Unicode spaces split by Go strings.Fields.
+def trunc: (gsub("^[[:space:]]+|[[:space:]]+$"; "") | gsub("[[:space:]]+"; " ")) | if length > 500 then .[0:499] + "…" else . end;
+def header($in; $name): [$in.headers // {} | to_entries[] | select(.key | ascii_downcase == $name) | .value[]] | .[0] // "";
+# A word that goes into a field: what Sentry spells a level, a category or a
+# project slug with, or none.
+def word: if test("^[A-Za-z0-9_-]{1,64}$") then . else "" end;
+def field($o; $k; $v): if $v == "" then $o else $o + {($k): [$v]} end;
+# Where an address says an issue is: its host, the slug of its organization
+# and its number, or null. The host is the one the address is on, with no
+# user, and the slug is lowercase as Sentry keeps it. The address may go on
+# past the issue (an event, a query), which is not read.
+def issue_at($u):
+  (if ($u | type) == "string" then $u else "" end) as $u
+  | (([$u | capture("^https://(?<host>[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?)/organizations/(?<org>[A-Za-z0-9_][A-Za-z0-9_-]*)/issues/(?<id>[1-9][0-9]*)(?:[/?#].*)?$")] | .[0])
+     // ([$u | capture("^https://(?<org>[A-Za-z0-9][A-Za-z0-9-]*)\\.(?<host>[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+(?::[0-9]{1,5})?)/issues/(?<id>[1-9][0-9]*)(?:[/?#].*)?$")] | .[0])
+     // null)
+  | if . == null or (.host | test("\\.\\.")) then null else . + {org: (.org | ascii_downcase)} end;
+
+. as $in
+| (.body | if type == "object" then . else error("sentry payload is not JSON") end) as $p
+| (header($in; "sentry-hook-resource") | ascii_downcase | gsub("[^a-z0-9_]+"; "_") | sub("^_+"; "") | sub("_+$"; "")) as $resource
+| if $resource == "" then error("sentry delivery has no Sentry-Hook-Resource") else . end
+| str($p.action) as $action
+| ($p.actor | obj) as $actor
+| {source: "sentry", type: $resource, action: $action,
+   actor: (if str($actor.id) == "" and str($actor.name) == "" then {} else {id: str($actor.id), name: str($actor.name)} end),
+   thread: {}, mentions: []}
+| if $resource == "issue" and $action == "created" then
+    ($p.data | obj | .issue | obj) as $i
+    | issue_at($i.web_url) as $at
+    # The issue id the payload names, else the address; where both are given
+    # they must be the one issue.
+    | (str($i.id) | if test("^[1-9][0-9]*$") then . else ($at.id // "") end) as $id
+    | (if $at == null or $id == "" or $at.id != $id then null else $at end) as $found
+    | (if $found == null then "" else "https://\($found.host)/organizations/\($found.org)/issues/\($found.id)/" end) as $url
+    | (if $found == null then "" else "\($found.org)#\($found.id)" end) as $thread
+    | (str($i.project | obj | .slug) | word) as $slug
+    | (str($i.level) | word) as $level
+    | (str($i.issueCategory) | word) as $category
+    | str($i.shortId) as $short
+    | str($i.culprit) as $culprit
+    | ("new " + (if $level != "" then $level + " " else "" end) + "issue"
+       + (if ($short | word) != "" then " " + $short else "" end)
+       + (if $slug != "" then " in " + $slug else "" end)
+       + (if $culprit != "" then ": " + $culprit else "" end) | trunc) as $text
+    | ({} | field(.; "project"; $slug) | field(.; "level"; $level) | field(.; "category"; $category) | field(.; "outsider"; "yes")) as $fields
+    | . + {text: $text, fields: $fields}
+    | if $found == null then .
+      else . + {thread: {id: $thread, title: (str($i.title) | trunc), url: $url}, url: $url, entity: $thread} end
+  elif $resource == "event_alert" and $action == "triggered" then
+    ($p.data | obj) as $d
+    | ($d.event | obj) as $e
+    | issue_at($e.web_url) as $at
+    | (str($e.issue_id) | if test("^[1-9][0-9]*$") then . else ($at.id // "") end) as $id
+    | (if $at == null or $id == "" or $at.id != $id then null else $at end) as $found
+    | (if $found == null then "" else "https://\($found.host)/organizations/\($found.org)/issues/\($found.id)/" end) as $url
+    | (if $found == null then "" else "\($found.org)#\($found.id)" end) as $thread
+    # The event is a page of its own under the issue, made only from a
+    # 32-hex id.
+    | (str($e.event_id) | if test("^[0-9a-fA-F]{32}$") then . else "" end) as $event
+    | (if $url != "" and $event != "" then $url + "events/" + $event + "/" else $url end) as $to
+    # The event names its project by number and, in its API address, by slug.
+    | (([str($e.url) | capture("^https://[^/]+/api/0/projects/[^/]+/(?<slug>[A-Za-z0-9_-]+)/events/")] | .[0].slug // "") | word) as $slug
+    | (str($e.level) | word) as $level
+    | str($d.triggered_rule) as $rule
+    | str($e.culprit) as $culprit
+    | ("alert" + (if $rule != "" then " \"" + $rule + "\"" else "" end) + ": "
+       + (if $level != "" then $level + " " else "" end) + "event"
+       + (if $culprit != "" then " in " + $culprit else "" end) | trunc) as $text
+    | ({} | field(.; "project"; $slug) | field(.; "level"; $level) | field(.; "outsider"; "yes")) as $fields
+    | . + {text: $text, fields: $fields}
+    | if $found == null then .
+      else . + {thread: {id: $thread, title: (str($e.title) | trunc), url: $url}, url: $to} end
+  else .
+  end
+'

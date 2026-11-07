@@ -1,0 +1,7 @@
+=== cmd
+reply
+=== in
+{"thread":"example-org#1234567890","body":"Sentry refuses the same text twice in an hour.","key":"0a1b2c3d-3333-4222-8333-444455556666"}
+=== answer_1
+400
+{"detail":"You have already posted that comment."}

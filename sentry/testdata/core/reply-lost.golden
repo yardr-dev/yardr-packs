@@ -1,0 +1,9 @@
+--- output
+yardr: reply to event 12 in sentry: thread.reply of source sentry: exit status 1; its stderr ended: http://<stand-in>/api/0/organizations/example-org/issues/1234567890/comments/: HTTP 500: the stand-in broke
+--- status
+1
+--- requests
+POST http://<stand-in>/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"A reply that landed and was lost.\n\n<!-- yardr-reply <key> -->"}

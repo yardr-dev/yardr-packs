@@ -1,0 +1,7 @@
+--- output
+yardr: source sentry: the check call scopes (GET /) was answered 401: the service does not take what SENTRY_TOKEN is set to
+--- status
+1
+--- requests
+GET http://<stand-in>/api/0/
+  auth: ok

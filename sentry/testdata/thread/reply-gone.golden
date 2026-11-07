@@ -1,0 +1,10 @@
+--- requests
+POST https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"The deprecated path answers 410 in a brownout.\n\n<!-- yardr-reply 0a1b2c3d-5555-4222-8333-444455556666 -->"}
+--- status
+1
+--- stdout
+--- stderr
+https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/: HTTP 410: This API no longer exists.

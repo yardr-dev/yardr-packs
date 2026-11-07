@@ -1,0 +1,4 @@
+=== cmd
+state
+=== in
+{"thread":"example-org#1\u001b[31m\nforged log line","state":"done"}

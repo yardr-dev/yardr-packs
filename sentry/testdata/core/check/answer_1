@@ -1,0 +1,2 @@
+200
+{"version":"0","auth":{"scopes":["event:read","event:write"]},"user":{"id":"9","name":"yardr","email":"hidden@example.com"}}

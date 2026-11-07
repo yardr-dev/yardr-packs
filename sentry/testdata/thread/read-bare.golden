@@ -1,0 +1,8 @@
+--- requests
+GET http://127.0.0.1:1/organizations/example-org/issues/1234567890/comments/?per_page=100
+  auth: ok
+--- status
+0
+--- stdout
+{"messages":[{"id":"7","parent":"","author":{"id":"","name":""},"at":"0001-01-01T00:00:00Z","body":"","url":""}]}
+--- stderr

@@ -1,0 +1,6 @@
+--- requests
+--- status
+1
+--- stdout
+--- stderr
+"done [31m forged log line" is no state here: want started, done

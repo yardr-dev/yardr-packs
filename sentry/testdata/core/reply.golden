@@ -1,0 +1,9 @@
+--- output
+http://<stand-in>/organizations/example-org/issues/1234567890/
+--- status
+0
+--- requests
+POST http://<stand-in>/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"Fix landed in 4d2c1ab.\n\n<!-- yardr-reply <key> -->"}

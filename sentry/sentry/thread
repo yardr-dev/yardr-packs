@@ -1,0 +1,233 @@
+#!/bin/bash
+# thread: what the yard does in a Sentry issue: reply, posted, read, state.
+# One JSON object on stdin, one on stdout, as the thread key of the
+# declaration says. SENTRY_TOKEN (an internal integration's token, sent as a
+# Bearer token) and YARDR_SOURCE_BASE, the declaration's base, are in the
+# environment. Needs curl and jq.
+#
+# A thread is <organization slug>#<issue id>: the issue's number as Sentry's
+# API takes it, in the organization it is in. Every request goes to the
+# organization's path, comments included. The comment routes also answer
+# without the organization, at /api/0/issues/<id>/comments/, but Sentry has
+# deprecated that path (its source marks it, with a date that has passed)
+# and answers it 410 Gone in brownouts, by default one minute at noon UTC;
+# the organization's path is the one it names as the replacement.
+set -euo pipefail
+in=$(cat)
+arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+base=${YARDR_SOURCE_BASE%/}
+# The address people read Sentry at, for a URL in an answer: the API's base
+# without its /api/0. A base that is no /api/0 of a site (a stand-in's) has
+# none, and an answer then carries no URL.
+web=${base%/api/0}
+if [ "$web" = "$base" ]; then web=; fi
+
+# The token goes to curl as a config line on its stdin, written by the
+# shell itself: an argument can be read by every process on the machine
+# while curl runs. A token that holds a character a Sentry token never has
+# (a quote, a backslash, a line break) would end the config line early, so
+# it is refused, without saying what it held. A Sentry token is hex, or
+# letters, digits, _, + / and = for an organization token.
+case ${SENTRY_TOKEN-} in
+'' | *[!A-Za-z0-9_.~+/=-]*)
+  echo "SENTRY_TOKEN is not set, or holds a character a Sentry token has none of" >&2
+  exit 1
+  ;;
+esac
+
+# scrub <text>: the text with the token cut out of it, in case an answer
+# repeats what it was sent. Bash does it in process: the token is never an
+# argument.
+scrub() { printf '%s' "${1//"$SENTRY_TOKEN"/<token>}"; }
+
+# plain <text>: the text with its control characters made spaces, for a
+# message that repeats what it was given (a thread, a word), so that it
+# cannot forge a line of the log or move a terminal.
+plain() { printf '%s' "$1" | tr '\000-\037\177' ' '; }
+
+# api <method> <url> [data]: the answer's body, or the failure on stderr.
+# The response headers are kept in $tmp/hdr, for the cursor of a list. The
+# data goes to curl as a file, not an argument: a long reply would not fit
+# one.
+api() {
+  local m u code
+  m=$1
+  u=$2
+  : >"$tmp/hdr"
+  if [ $# -ge 3 ]; then
+    printf '%s' "$3" >"$tmp/req"
+    code=$(printf 'header = "Authorization: Bearer %s"\n' "$SENTRY_TOKEN" \
+      | curl -sS -o "$tmp/out" -D "$tmp/hdr" -w '%{http_code}' -K - -X "$m" "$u" \
+        -H 'Content-Type: application/json' --data-binary @"$tmp/req") || {
+      echo "could not reach $u (curl exit $?)" >&2
+      return 1
+    }
+  else
+    code=$(printf 'header = "Authorization: Bearer %s"\n' "$SENTRY_TOKEN" \
+      | curl -sS -o "$tmp/out" -D "$tmp/hdr" -w '%{http_code}' -K - -X "$m" "$u") || {
+      echo "could not reach $u (curl exit $?)" >&2
+      return 1
+    }
+  fi
+  if [ "${code:0:1}" != 2 ]; then
+    # Sentry says why in detail (a string), or in message for a path it no
+    # longer serves; a refused body is an object of lists. What it says is
+    # one line of at most 300 characters without control characters, and
+    # without the token if it was repeated.
+    local why hint=
+    why=$(jq -r '(.detail // .message // .error // "no answer") | if type == "string" then . else tojson end | .[0:300]' "$tmp/out" 2>/dev/null || head -c 200 "$tmp/out")
+    why=$(plain "$why" | tr -s ' ')
+    if [ "$code" = 403 ]; then
+      hint=" (the token needs event:read to read an issue and event:write to comment on it and resolve it)"
+    fi
+    echo "$u: HTTP $code: $(scrub "$why")$hint" >&2
+    return 1
+  fi
+  cat "$tmp/out"
+}
+
+# pages <url>: every page of a list endpoint as one array, newest first as
+# Sentry sends it. Sentry pages by cursor: a page asks for 100, and the Link
+# header of an answer names the next page's cursor where results="true". A
+# cursor that holds more than what Sentry makes one of is never followed, and
+# neither is a hundred pages.
+pages() {
+  local u cursor i
+  u=$1
+  cursor=
+  i=0
+  : >"$tmp/pages"
+  while :; do
+    i=$((i + 1))
+    if [ "$i" -gt 100 ]; then
+      echo "$u: more than 100 pages of comments" >&2
+      return 1
+    fi
+    api GET "$u?per_page=100${cursor:+&cursor=$cursor}" >"$tmp/page" || return 1
+    jq -e 'type == "array"' "$tmp/page" >/dev/null 2>&1 || {
+      echo "$u: the answer is no list" >&2
+      return 1
+    }
+    cat "$tmp/page" >>"$tmp/pages"
+    cursor=$(tr -d '\r' <"$tmp/hdr" | sed -n 's/.*rel="next"; results="true"; cursor="\([^"]*\)".*/\1/p' | head -n 1)
+    [ -n "$cursor" ] || break
+    [[ $cursor =~ ^[A-Za-z0-9:._-]{1,100}$ ]] || {
+      echo "$u: the next page's cursor is not one Sentry makes" >&2
+      return 1
+    }
+  done
+  jq -c -s 'add // []' "$tmp/pages"
+}
+
+# split <thread>: the organization and the issue a thread names, or why it
+# is no thread. The slug is kept lowercase, as Sentry keeps it.
+split() {
+  if [[ $1 =~ ^([A-Za-z0-9_][A-Za-z0-9_-]*)#([1-9][0-9]*)$ ]]; then
+    org=$(printf '%s' "${BASH_REMATCH[1]}" | tr 'A-Z' 'a-z')
+    id=${BASH_REMATCH[2]}
+    issue=$base/organizations/$org/issues/$id
+    # Where the issue is read, for an answer: none without a site.
+    url=
+    if [ -n "$web" ]; then url=$web/organizations/$org/issues/$id/; fi
+    return 0
+  fi
+  echo "thread $(plain "$1"): want <organization>#<issue id>" >&2
+  return 1
+}
+
+case "$1" in
+reply) # Sentry's comment takes no client-chosen id, so the key goes into
+  # the text as a marker that renders as nothing. A comment is not
+  # threaded, so the parent is left out: every reply is top-level. Sentry
+  # refuses the same text from the same account within an hour, which the
+  # key keeps apart for two replies.
+  thread=$(arg thread)
+  body=$(arg body)
+  key=$(arg key)
+  split "$thread" || exit 1
+  [ -n "$key" ] && body="$body
+
+<!-- yardr-reply $key -->"
+  note=$(printf '%s' "$body" | jq -Rsc '{text: .}')
+  api POST "$issue/comments/" "$note" |
+    jq -c --arg url "$url" '((.id // "") | tostring) as $id
+      | if $id == "" then error("the answer names no comment") else {id: $id} + (if $url == "" then {} else {url: $url} end) end' ;;
+
+posted) # {} for none: a retry asks before it posts, so nothing is posted twice
+  thread=$(arg thread)
+  key=$(arg key)
+  split "$thread" || exit 1
+  pages "$issue/comments/" |
+    jq -c --arg m "<!-- yardr-reply $key -->" --arg url "$url" '[.[] | select((.data.text // "") | contains($m))][0]
+      | if . == null then {}
+        else ((.id // "") | tostring) as $id | {id: $id} + (if $url == "" then {} else {url: $url} end) end' ;;
+
+read) # every page, oldest first: Sentry sends the newest first, and a
+  # comment is numbered as it was made.
+  thread=$(arg thread)
+  split "$thread" || exit 1
+  pages "$issue/comments/" |
+    jq -c --arg url "$url" '{messages: (map(select((.type // "note") == "note"))
+      | sort_by(try (.id | tostring | tonumber) catch 0)
+      | map({id: ((.id // "") | tostring), parent: "",
+             author: {id: ((.sentry_app.id // .user.id // "") | tostring),
+                      name: ([.sentry_app.name, .user.name, .user.username] | map(select(. != null and . != "")) | .[0] // "")},
+             at: (.dateCreated // "0001-01-01T00:00:00Z"), body: (.data.text // ""), url: $url}))}' ;;
+
+state) # started is unresolved, done is resolved. An issue that is ignored
+  # (archived) was put aside by a person: setting it moves it exactly, and a
+  # stage map's move resolves it, since it is not yet done, but leaves it
+  # where it is for started, which it stands past.
+  thread=$(arg thread)
+  state=$(arg state)
+  forward=$(arg forward)
+  split "$thread" || exit 1
+  # The word first: nothing is asked of Sentry for one it has no status for.
+  case "$state" in
+  started) want=unresolved ;;
+  done) want=resolved ;;
+  review)
+    echo "a Sentry issue has no review status: the states it has are started and done" >&2
+    exit 1
+    ;;
+  *)
+    echo "\"$(plain "$state")\" is no state here: want started, done" >&2
+    exit 1
+    ;;
+  esac
+  item=$(api GET "$issue/") || exit 1
+  # now is Sentry's word for where it stands.
+  now=$(jq -r '.status // ""' <<<"$item")
+  case "$now" in
+  unresolved | resolved | ignored) ;;
+  *)
+    echo "the answer names no state for $thread" >&2
+    exit 1
+    ;;
+  esac
+  if [ "$forward" = true ]; then
+    # A stage map's move, which never moves backwards: an issue that is
+    # not unresolved stands at or past started, and a resolved one is
+    # never reopened.
+    if [ "$want" = unresolved ] || [ "$now" = resolved ]; then
+      jq -n -c --arg s "$now" '{status: $s, moved: false}'
+      exit 0
+    fi
+  elif [ "$now" = "$want" ]; then
+    # thread state moves exactly: only an issue already in the status stays.
+    jq -n -c --arg s "$now" '{status: $s, moved: false}'
+    exit 0
+  fi
+  moved=$(api PUT "$issue/" "$(jq -n -c --arg s "$want" '{status: $s}')") || exit 1
+  # An answer that says it is not where it was sent is no move.
+  [ "$(jq -r '.status // ""' <<<"$moved")" = "$want" ] || {
+    echo "Sentry answered, but $thread is not $want" >&2
+    exit 1
+  }
+  jq -n -c --arg s "$want" --arg was "$now" '{status: $s, moved: true, was: $was}' ;;
+
+*) echo "unknown: $1" >&2; exit 2 ;;
+esac

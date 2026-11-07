@@ -1,0 +1,10 @@
+--- requests
+POST https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/
+  auth: ok
+  header: Content-Type: application/json
+  body: {"text":"Fix landed in 4d2c1ab.\n\nA \"quoted\" word, a backslash \\ and ünïcode.\n\n<!-- yardr-reply 6f1f3b1e-1d3c-4a52-9a6b-0b1b2c3d4e5f -->"}
+--- status
+0
+--- stdout
+{"id":"7050","url":"https://sentry.io/organizations/example-org/issues/1234567890/"}
+--- stderr

@@ -1,0 +1,10 @@
+=== cmd
+posted
+=== in
+{"thread":"example-org#1234567890","key":"00000000-0000-4000-8000-000000000000"}
+=== answer_1
+200
+[{"id":"7061","commentId":"7061","user":{"id":"3","name":"","username":"grace"},"sentry_app":null,"type":"note","data":{"text":"Seen again on the nightly.","comment_id":7061},"dateCreated":"2026-11-07T11:30:00.5Z","source":null}]
+=== headers_1
+HTTP/2 200 
+link: <https://sentry.io/x>; rel="next"; results="true"; cursor="0:100:0&x=1 ; rm"

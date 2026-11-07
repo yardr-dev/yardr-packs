@@ -1,0 +1,9 @@
+--- requests
+GET https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/?per_page=100
+  auth: ok
+--- status
+1
+--- stdout
+--- stderr
+curl: (7) Failed to connect to stand-in
+could not reach https://sentry.io/api/0/organizations/example-org/issues/1234567890/comments/?per_page=100 (curl exit 7)
