@@ -49,7 +49,7 @@ Commands below call the pack's directory (the `proton` directory of the yardr-pa
    ```sh
    yardr source key proton
    ```
-   Then check the source. This confirms the login is set and the program can be run. It asks Bridge nothing, because a call answered by a command cannot be the check call. Step 6 is the real check:
+   Then check the source. This confirms the login is set and the program can be run, then makes the source's check call, `search` with no query. That logs in to Bridge, so a Bridge that is not running or a login it refuses shows here (step 7 lists what each says), and the check prints the mailbox it read and the newest messages: sender, subject and date. Step 6 tries each call:
    ```sh
    yardr source check proton
    ```

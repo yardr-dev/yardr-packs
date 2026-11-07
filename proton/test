@@ -763,9 +763,9 @@ else:
     shown = yrun("source", "show", "proton", "--json")
     declaration = json.loads(shown.stdout)["declaration"] if shown.returncode == 0 else {}
     calls = {c["name"]: c for c in declaration.get("calls", [])}
-    ok("the declaration as the yard reads it: Bridge's default address, one credential, three read calls each run by proton-imap, and no check",
+    ok("the declaration as the yard reads it: Bridge's default address, one credential, three read calls each run by proton-imap, and search as the check",
        declaration.get("base") == "http://127.0.0.1:1143" and declaration.get("credential") == {"env": "PROTON_BRIDGE"}
-       and "check" not in declaration and list(calls) == ["search", "message", "thread"]
+       and declaration.get("check") == "search" and list(calls) == ["search", "message", "thread"]
        and all(c["kind"] == "read" and c["run"] == ["proton-imap", n] for n, c in calls.items()), json.dumps(declaration)[:300])
     params = {n: {p["name"]: p for p in c.get("params", [])} for n, c in calls.items()}
     ok("search takes q, free text kept out of the record, and maxResults of at most 50, 20 unless given",
@@ -802,10 +802,15 @@ else:
     added = yrun("source", "add", os.path.join(mine, "proton.yaml"))
     keyed = yrun("source", "key", "proton", stdin="PROTON_BRIDGE=%s\n" % CREDENTIAL)
     ok("the operator's copy is added and the login given by source key", added.returncode == 0 and keyed.returncode == 0, (added.stderr + keyed.stderr)[-300:])
-    checked = yrun("source", "check", "proton")
-    ok("source check, as SETUP.md says, sees the login set and the program run-able, and asks Bridge nothing",
-       checked.returncode == 0 and "can be run" in checked.stdout + checked.stderr and yard_stub.connections == 0,
-       (checked.returncode, checked.stdout[-200:], checked.stderr[-200:], yard_stub.connections))
+    # search is the check call, so the check makes it with no parameters: one search, and the first call Bridge sees
+    seen = yard_stub.connections
+    checked = yrun("source", "check", "proton", "--json")
+    made = yard_stub.connections - seen
+    verdict = json.loads(checked.stdout) if checked.returncode == 0 else {}
+    ok("source check, as SETUP.md says, makes the check call: one search against Bridge, answered as the program answers it on its own",
+       checked.returncode == 0 and made == 1 and verdict.get("call") == "search" and verdict.get("status") == 200
+       and verdict.get("answer") == answer(yard_stub, "search"),
+       (checked.returncode, made, checked.stdout[-300:], checked.stderr[-300:]))
     envfile = os.path.join(core, "y", "sources", "proton.env")
     ok("the login is in the source's env file, mode 0600", os.path.exists(envfile) and (os.stat(envfile).st_mode & 0o777) == 0o600
        and CREDENTIAL in open(envfile).read(), envfile)
@@ -850,6 +855,10 @@ else:
     yrun("source", "key", "proton", stdin="PROTON_BRIDGE=%s:wrong-password\n" % USER)
     rc, got, err = through("search")
     ok("a wrong password reaches the caller as Bridge's refusal, with no password in it", rc != 0 and "Bridge refused the login" in err and "wrong-password" not in err, (rc, got, err.strip()[-300:]))
+    checked = yrun("source", "check", "proton")
+    said = checked.stdout + checked.stderr
+    ok("source check with the wrong password fails in Bridge's refusal, before any real call, with no password in it",
+       checked.returncode != 0 and "Bridge refused the login" in said and "wrong-password" not in said, (checked.returncode, said[-300:]))
     ok("the login the stand-in saw was never in the clear", yard_stub.clear_logins == 0 and yard_stub.violations == [])
 
 ok("no output of any yardr command held the password or the login", leaks == [], leaks)

@@ -78,7 +78,7 @@ The connection uses STARTTLS before the login, and the program never sends the l
 
 `PROTON_BRIDGE` holds `<username>:<password>` as Bridge shows them for the account, split at the first colon. The password is Bridge's own, not the Proton password. The yard gives it to the program in its environment, and the program sends it only to Bridge's login. A failure prints one line, with Bridge's words flattened to one line, and the test searches every output for the password.
 
-The base is `http://127.0.0.1:1143`, Bridge's default address. It says `http://` because yardr accepts only `https://`, or `http://` to this machine, as a source's address, and refuses `imap://`. The program reads the host and port from it and ignores the scheme. [SETUP.md](SETUP.md) shows how to give the yard's copy another port. No call can be the source's check call, because yardr refuses a command-answered call as one. `yardr source check proton` only says the program can be run, and the first call in SETUP.md is the real check.
+The base is `http://127.0.0.1:1143`, Bridge's default address. It says `http://` because yardr accepts only `https://`, or `http://` to this machine, as a source's address, and refuses `imap://`. The program reads the host and port from it and ignores the scheme. [SETUP.md](SETUP.md) shows how to give the yard's copy another port. The source's check call is `search`, the one call with no required parameter. `yardr source check proton` and `yardr doctor --try` make it with no query, so a Bridge that is not running or a login it refuses shows there and not at the first call an agent makes.
 
 ## What was checked
 

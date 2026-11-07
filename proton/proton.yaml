@@ -63,13 +63,17 @@ credential:
 # says how to give the yard's copy of this file the port Bridge shows. A pack
 # applied again replaces the yard's copy and puts this one back.
 #
-# No call is the check call: yardr refuses a command-answered call as one.
-# `yardr source check proton` only says the program can be run; the try-it
-# step of SETUP.md is a call.
+# search is the check call: it is the one call with no required parameter.
+# `yardr source check proton` and `yardr doctor --try` run it as it stands,
+# with no q and the default 20 results, so a Bridge that is not running, a
+# login it refuses or a connection mode that is not STARTTLS shows there and
+# not at an agent's first call. `source check` prints what search answers: the
+# mailbox and its newest messages.
 #
 # Every call goes to Bridge's one account. What an agent may read is that
 # account's whole mailbox, whatever it passes: the grant is the permission.
 base: http://127.0.0.1:1143
+check: search
 calls:
   search:
     kind: read
