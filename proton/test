@@ -21,6 +21,10 @@
 #              line it says; and, of every command the stub saw, that all of
 #              them were reads, the password never went in the clear and no
 #              output held it.
+#   exit       this file run again, as a process that dies after its temp dir is
+#              made (an openssl that fails ends it at the certificate), to hold
+#              that the dir is gone: cleanup runs at every exit, not only after
+#              the last line.
 #   yardr      the real yardr in a scratch yard (its own home, an environment
 #              of nothing but HOME and PATH, a short path for its socket): the
 #              pack applied from its directory, the declaration as the yard reads
@@ -30,6 +34,7 @@
 #
 # UPDATE_GOLDEN=1 ./test writes the goldens again from what the program
 # prints; read the diff before keeping it.
+import atexit
 import datetime
 import difflib
 import importlib.machinery
@@ -109,6 +114,10 @@ def cleanup():
         shutil.rmtree(core, ignore_errors=True)
     shutil.rmtree(tmp, ignore_errors=True)
 
+
+# At exit, not as the last statement: an exception or a sys.exit anywhere below ends the run too, and
+# would leave the dirs, and from the yardr part on the scratch yard's server, behind.
+atexit.register(cleanup)
 
 # ---- the program, loaded to call its functions ---------------------------------
 loader = importlib.machinery.SourceFileLoader("proton_imap", PROGRAM)
@@ -724,6 +733,32 @@ ok("every login was the one in PROTON_BRIDGE, split at its colon", all(login in 
 ok("no output of any run held the password or the login", leaks == [], leaks)
 
 # =====================================================================================
+# exit
+# =====================================================================================
+# A run that dies after its temp dir is made must not leave it. Only a process shows that, so this
+# file is run again with an openssl that fails: the certificate is the first step after the dir is
+# made, and it exits there. The stand-in writes its arguments down, and they name the dir that run made.
+# The copy is told it is one, so that if it ever got as far as this it would not start another.
+if "PROTON_TEST_COPY" not in os.environ:
+    standin = tmp + "/standin"
+    os.mkdir(standin)
+    with open(standin + "/openssl", "w") as f:
+        f.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shlex.quote(standin + "/args") + "\nexit 1\n")
+    os.chmod(standin + "/openssl", 0o755)
+    # The copy takes a fraction of a second. The timeout is for one that does not stop at the certificate.
+    exited = subprocess.run([sys.executable, os.path.join(HERE, "test")], capture_output=True, text=True, timeout=60,
+                            env=dict(os.environ, PATH=standin + os.pathsep + os.environ["PATH"], PROTON_TEST_COPY="1"))
+    asked = open(standin + "/args").read() if os.path.exists(standin + "/args") else ""
+    keyout = re.search(r"^-keyout\n(/tmp/protont\.[^/\n]+)/key\.pem$", asked, re.M)
+    ok("a copy of this file with an openssl that fails exits 1 at the certificate, after it made its temp dir",
+       exited.returncode == 1 and "certificate could not be made" in exited.stdout and keyout is not None,
+       (exited.returncode, exited.stdout[-200:], exited.stderr[-200:], asked))
+    ok("that temp dir is gone when the copy has exited", keyout is not None and not os.path.exists(keyout.group(1)), keyout and keyout.group(1))
+    if keyout:
+        # what a run that did not clean up would have left: this run does not add to it
+        shutil.rmtree(keyout.group(1), ignore_errors=True)
+
+# =====================================================================================
 # yardr
 # =====================================================================================
 core = tempfile.mkdtemp(prefix="protonc.", dir="/tmp")
@@ -862,6 +897,5 @@ else:
     ok("the login the stand-in saw was never in the clear", yard_stub.clear_logins == 0 and yard_stub.violations == [])
 
 ok("no output of any yardr command held the password or the login", leaks == [], leaks)
-cleanup()
 print("test: proton: %s" % ("all ok" if not failed else "FAILED (%d)" % len(failed)))
 sys.exit(1 if failed else 0)

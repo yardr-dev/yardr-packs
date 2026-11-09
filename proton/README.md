@@ -92,10 +92,11 @@ The base is `http://127.0.0.1:1143`, Bridge's default address. It says `http://`
 
 ## The tests
 
-Run `./test` in this directory, or `sh .yardr/test` from the repository, which also runs `yardr pack check`. The test needs `openssl` (for the stand-in's throwaway certificate), `yardr` and Python 3.9 or newer, and it fails if any is missing instead of skipping. It needs no network and no secret, never touches a live Bridge, and takes under half a minute. It has three parts, cheapest first:
+Run `./test` in this directory, or `sh .yardr/test` from the repository, which also runs `yardr pack check`. The test needs `openssl` (for the stand-in's throwaway certificate), `yardr` and Python 3.9 or newer, and it fails if any is missing instead of skipping. It needs no network and no secret, never touches a live Bridge, and takes under half a minute. It has four parts, cheapest first:
 
 1. The program's own functions, called in the test's process. They cover the query translator (tables of what each `q` becomes and is refused for), how a search with accents splits into commands, which hosts skip certificate checks, the parsers for imaplib's answers, HTML to text, the 60 KB bound, the deadline and the timeout.
 2. The program as a process, run the way the yard runs it, against the stand-in. This covers each call's answer (in goldens where the shape matters), big, odd and missing mail, each way a call fails, and an audit of every command the stand-in saw.
-3. The real yardr in a scratch yard. It applies the pack from this directory, reads the declaration back, runs the grants SETUP.md teaches exactly as written, and makes each call through `yardr call`, comparing the answer with what the program gives on its own.
+3. The test itself, run again as a process that dies after its temp dir is made. The copy gets an `openssl` that fails, so it exits at the certificate, and the test checks that it removed its temp dir. That holds the test to cleaning up on every exit, not only after its last line.
+4. The real yardr in a scratch yard. It applies the pack from this directory, reads the declaration back, runs the grants SETUP.md teaches exactly as written, and makes each call through `yardr call`, comparing the answer with what the program gives on its own.
 
 `UPDATE_GOLDEN=1 ./test` rewrites the goldens in `testdata/golden/` from what the program prints. Read the diff before you keep it.
