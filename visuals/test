@@ -1,0 +1,111 @@
+#!/bin/sh
+# The visuals pack's tests: what the gate runs beside yardr pack check.
+# Needs no network, no secret and no yardr, and is done in well under a second.
+# The pack is text, so there is nothing to run. What the test pins is what a
+# later edit could lose without a sound:
+#
+#   role      roles/visual-designer.md carries the distinctness rule, the
+#             exact-size mechanics (Chrome run directly, the PNG shot and its
+#             check, the print PDF wrapper and its check, the frame under 500
+#             wide)
+#             and the watch (the command with the bead's id, how a file's
+#             address is made, and the two notes that carry the addresses)
+#   stages    each stage file has its exit line, directions.md names the
+#             finished PNG and PDF, the role's distinctness rule and the
+#             address of each file on the watch, and pick.md has the card of
+#             its moves
+#   shape     the decisions of pack.yaml: the pack's own type and group, no
+#             assembly, the yardmaster hearing pick and carrying no role
+#   closed    no role or stage file points at a file the import does not install
+set -u
+cd "$(dirname "$0")" || exit 1
+fail=0
+
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+# has <file> <fixed text>: the text is in the file.
+has() { grep -qF -- "$2" "$1"; }
+
+role=roles/visual-designer.md
+
+# ---- the role ---------------------------------------------------------------
+# What the stage files name, so it stays in the role: the distinctness rule and
+# the exact-size mechanics. And what the mechanics teach, so that an edit cannot
+# drop a step without a sound: Chrome run directly with its window and shot
+# flags, what `file` names for the PNG, the print PDF with its page rule and
+# its MediaBox check, and the frame under 500 wide. And the watch the designer
+# starts for the person: the command with the bead's id, how a file's address
+# is made from what the command prints, what to do when it prints none (a yardr
+# without the watch ends 0 on it), the note that carries the addresses while
+# the designer builds, and the line of the shots note that carries them after.
+for t in 'The distinctness rule' '--window-size=<W>,<H>' '--screenshot=' \
+         'PNG image data, <W> x <H>' '--print-to-pdf=' '@page' 'MediaBox' \
+         'data:image/svg+xml;base64,' 'file://$d/<n>-<name>-print.html' \
+         'Print that wrapper, not the SVG or a different direction file' \
+         'Under 500 wide' 'directions/<n>-<name>.svg' '--file' \
+         'yardr preview watch $YARDR_BEAD directions' 'followed by its file name' \
+         'If the command prints no `opens at` line' \
+         'Put the three addresses on a note at once' 'its address on the watch (step 3)'; do
+  has "$role" "$t"
+  ok "role: carries '$t'" $?
+done
+
+# ---- the stage files --------------------------------------------------------
+# The exit line is the lead-in of each stage's list of what must hold.
+for row in 'backlog|Before it is sent to `directions`' \
+           'directions|Before the bead leaves as `done`:' \
+           'pick|A bead leaves `pick` when'; do
+  f=flows/visual/${row%%|*}.md
+  line=${row#*|}
+  has "$f" "$line"
+  ok "$f: its exit line '$line'" $?
+  head -1 "$f" | grep -q '^summary: .'
+  ok "$f: opens with a summary line" $?
+done
+grep -q '^## Ask$' flows/visual/pick.md && grep -q '^kind: moves$' flows/visual/pick.md
+ok "flows/visual/pick.md: ends in the card of its moves (kind: moves)" $?
+has flows/visual/directions.md 'your role'"'"'s distinctness rule'
+ok "flows/visual/directions.md: names the role's distinctness rule" $?
+has flows/visual/directions.md 'directions/<n>-<name>.png'
+ok "flows/visual/directions.md: its exit names the finished PNG at the exact size" $?
+has flows/visual/directions.md 'directions/<n>-<name>.pdf'
+ok "flows/visual/directions.md: its exit names the PDF of a print brief" $?
+has flows/visual/directions.md 'address on the watch'
+ok "flows/visual/directions.md: its exit names the address of each file on the watch" $?
+has flows/visual/backlog.md 'the size:'
+ok "flows/visual/backlog.md: the brief names the size" $?
+
+# ---- pack.yaml --------------------------------------------------------------
+yaml=$(grep -v '^ *#' pack.yaml)
+y() { printf '%s\n' "$yaml" | grep -q "$@"; }
+y '^    type: visual$'
+ok "pack.yaml: the flow is for the pack's own type visual" $?
+y 'directions: { group: visual-designers, file: flows/visual/directions.md, outcomes: { done: pick, question: pick }, manual: \[backlog\] }'
+ok "pack.yaml: directions is worked by visual-designers, and done and question both go to pick" $?
+y 'pick:       { group: decisions,        file: flows/visual/pick.md,       manual: \[picked, directions, backlog\] }'
+ok "pack.yaml: pick moves by hand to picked, directions or backlog" $?
+y 'picked:     { end: true }'
+ok "pack.yaml: the flow ends at picked" $?
+y 'visual-designers: { agent: roles/visual-designer.md, limit: 1 }'
+ok "pack.yaml: the visual designers are a group of their own, one at a time" $?
+! y 'builders'
+ok "pack.yaml: no group of the depot's builders" $?
+! y ' designers[^_]'
+ok "pack.yaml: no group of webdesign's designers" $?
+! y 'run:'
+ok "pack.yaml: no script group, so nothing lands" $?
+y 'stages: \[pick\]'
+ok "pack.yaml: the yardmaster hears a bead enter pick" $?
+! y '^    role:'
+ok "pack.yaml: the yardmaster carries no role" $?
+
+# ---- closed -----------------------------------------------------------------
+# An import installs the role, the stage files and the setup notes: a role or a
+# stage file that sends its reader to another file of the pack sends it nowhere.
+! grep -n 'THIRD_PARTY_NOTICES\|README\|SETUP\.md' "$role" flows/visual/*.md
+ok "role and stage files: point at no file of the pack that the import leaves behind" $?
+
+if [ "$fail" = 0 ]; then echo "test: visuals: all ok"; else echo "test: visuals: FAILED"; fi
+exit $fail
