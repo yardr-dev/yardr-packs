@@ -1,0 +1,181 @@
+# Infomaniak mail as a declared source: the twin of google-mail. It lists
+# the mailboxes and their folders, searches and reads mail, lists drafts, and
+# writes drafts. What it never does is send: no draft is sent, and nothing is
+# marked, flagged, moved, archived or deleted, in a mailbox or in a folder.
+# Sending stays the person's; the yard writes the draft, the person presses
+# send. The call names are google-mail's where the service has the call, and
+# its arguments and answers are where the service allows; the service's own
+# ids (a mailbox, a folder) and filters are arguments beside them.
+#
+# These calls are Infomaniak's webmail backend. developer.infomaniak.com does
+# not document them and they may change without notice: they are taken from
+# Infomaniak's own server, github.com/Infomaniak/mcp-server-mail, read on 10
+# November 2026 at main 392ee8a (6 November, package 2.1.0): README.md,
+# src/index.ts, src/mail-client.ts and tests/mail-client.test.js, whose
+# mocked answers are the shapes this pack's fixtures follow. What was read:
+#   - Every answer is {result, data}, so every call keeps both.
+#   - GET /api/mailbox?with=aliases,permissions,accountId,count_users lists
+#     the mailboxes, each with uuid, email, mailbox, is_primary, hosting_id
+#     and aliases; the server takes the first as its primary. A mailbox's
+#     uuid is in every other path: /api/mail/{uuid}/...
+#   - GET /mail/{uuid}/folder?with=ik-static is the folder tree: id, name,
+#     separator, role (INBOX, DRAFT, SENT, ARCHIVE, TRASH), unread_count,
+#     total_count and children.
+#   - GET /mail/{uuid}/folder/{folder}/message lists a folder's mail:
+#     offset, limit, thread=on (threads) or off (messages) and severywhere=0
+#     or 1. With 1 the search runs in every folder and the path's folder only
+#     anchors it (the server gives its INBOX). The terms are scontains (body
+#     and metadata), sfrom, sto, ssubject, and sfromdate and stodate, each
+#     as "2026-06-01 00:00:00". The answer is data.threads: uid, subject,
+#     from, to, date, messages_count, unseen_messages, and messages with
+#     uid ("<number>@<folder id>"), preview, folder_id and folder.
+#   - GET /mail/{uuid}/folder/{folder}/message/{number} reads one message,
+#     with prefered_format=html (the service's spelling) and with=
+#     auto_uncrypt,thread_context: uid, msg_id, subject, from, to, cc, bcc,
+#     date, body, html, preview, attachments, seen, flagged, folder, headers.
+#   - POST /mail/{uuid}/draft writes a draft from one whole message whose
+#     action is "save", and answers {uuid, uid}. The server sends a draft by
+#     a PUT to /mail/{uuid}/draft/{draft uuid} with the same message and
+#     action "send". The action is what tells a draft from a mail sent, and
+#     whether a POST with "send" would send too was not tried, so it is
+#     treated as if it would: build-draft, beside this file, is the one place
+#     that writes the message, sets save and nothing else, and takes no other
+#     argument; the pack's test holds every draft to it.
+#
+# Left out, because the service has no counterpart: thread, a thread read
+# whole (the server lists a folder's threads and reads one message, which
+# search and message do here; message asks the service for its thread_context
+# and keeps whatever it answers, which is untried), and draft_edit, a draft
+# edited from its id (a PUT to /draft/{uuid} replaces the whole message, and
+# the server keeps each draft's state in its own memory to do it; to build
+# that here would take a read first, and a request built from several is no
+# call of this file). A draft that changed is written again, and the old one
+# stays in Drafts, which no call here deletes. Also left out: raw, bcc, a
+# thread to answer by its id (a reply takes the three headers message
+# shows), attachments, the sending identity, contacts, folders made or
+# removed, and everything that moves, marks or deletes mail.
+#
+# Not tried: no request was made to mail.infomaniak.com, because there was no
+# account to make one with. Every call was run through the real yardr against
+# a stand-in that answers the server's own mocks (README.md, "What was
+# checked"). Where this file and the service differ, the service is right.
+#
+# The service takes 60 requests a minute. A token made in the manager with the
+# scope workspace:mail opens every mailbox of its user, and one token does
+# both the reads and the draft: Infomaniak scopes it by product, not by
+# read and write.
+#
+# Infomaniak takes no idempotency key, so the file names none: a draft tried
+# again after a lost answer is written twice.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: infomaniak-mail
+about: Infomaniak mail read and drafts. Lists mailboxes and folders, searches and reads mail, lists drafts, and writes drafts; sends nothing.
+
+# The name of the variable, never the value. A token made in the manager with
+# the scope workspace:mail, sent as a Bearer token and typed unseen at setup.
+credential:
+  env: INFOMANIAK_MAIL_TOKEN
+  header: "Authorization: Bearer {credential}"
+
+# base is the webmail's API. The mailbox is a path of each call, not a part
+# of base, because the call that finds it, mailboxes, is not under one.
+base: https://mail.infomaniak.com/api
+# mailboxes needs no argument and shows at once that the token is taken.
+check: mailboxes
+calls:
+  mailboxes:
+    kind: read
+    about: List the mailboxes the token opens, each with its uuid (the mailbox every other call takes), its address and its aliases
+    request:
+      method: GET
+      path: /mailbox
+      query: { with: "aliases,permissions,accountId,count_users" }
+    answer: { select: [result, data] }
+  folders:
+    kind: read
+    about: List a mailbox's folders, each with its id and its role (INBOX, DRAFT, SENT, ARCHIVE, TRASH)
+    params:
+      mailbox: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }   # a uuid as mailboxes gives it
+    request:
+      method: GET
+      path: /mail/{mailbox}/folder
+      query: { with: "ik-static" }
+    answer: { select: [result, data] }
+  search:
+    kind: read
+    about: Search mail, one page of at most 50
+    params:
+      mailbox: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }
+      # The folder is in the path. With everywhere 1 it only anchors the search
+      # in every folder: give the INBOX's id, as the server does.
+      folder: { type: string, pattern: "^[A-Za-z0-9_=+/-]{1,512}$", max: 512, log: true }   # an id as folders gives it
+      q: { type: string, max: 1000, optional: true }   # free text in the body and the headers, no syntax; the service's scontains
+      from: { type: string, max: 254, optional: true }   # an address or a name in From
+      to: { type: string, max: 254, optional: true }   # an address or a name in To
+      subject: { type: string, max: 500, optional: true }
+      since: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", optional: true }   # a date and a time as the service takes them, 2026-06-01 00:00:00
+      before: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", optional: true }
+      everywhere: { type: enum, values: ["0", "1"], default: "1" }   # 1 searches every folder, 0 only the folder given
+      maxResults: { type: string, pattern: "^([1-9]|[1-4][0-9]|50)$" }   # 1 to 50, always given, as google-mail's
+      offset: { type: string, pattern: "^[0-9]{1,6}$", default: "0" }   # how many results to skip: the next page of a search is offset=maxResults
+    request:
+      method: GET
+      path: /mail/{mailbox}/folder/{folder}/message
+      query: { offset: "{offset}", thread: "off", severywhere: "{everywhere}", limit: "{maxResults}", scontains: "{q}", sfrom: "{from}", sto: "{to}", ssubject: "{subject}", sfromdate: "{since}", stodate: "{before}" }
+    # Each message of data.threads has its uid, "<number>@<folder id>": message takes the number and the folder id.
+    answer: { select: [result, data], max: 262144 }
+  message:
+    kind: read
+    about: Read one message, with its headers and its text
+    params:
+      mailbox: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }
+      folder: { type: string, pattern: "^[A-Za-z0-9_=+/-]{1,512}$", max: 512, log: true }   # the message's own folder_id as search shows it, which is not always the folder searched
+      id: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }   # the number before the @ in a message's uid
+    request:
+      method: GET
+      path: /mail/{mailbox}/folder/{folder}/message/{id}
+      query: { prefered_format: "html", with: "auto_uncrypt,thread_context" }
+    answer: { select: [result, data], max: 1048576 }   # the HTML and the text both come; an answer over the bound is refused, not cut
+  drafts:
+    kind: read
+    about: List drafts, one page of at most 50
+    params:
+      mailbox: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }
+      # The folder whose role folders shows as DRAFT. The request is a folder's
+      # list, so it takes any folder's id; a grant of this call is a grant to
+      # list any folder's threads, with their previews.
+      folder: { type: string, pattern: "^[A-Za-z0-9_=+/-]{1,512}$", max: 512, log: true }
+      maxResults: { type: string, pattern: "^([1-9]|[1-4][0-9]|50)$" }
+      offset: { type: string, pattern: "^[0-9]{1,6}$", default: "0" }
+    request:
+      method: GET
+      path: /mail/{mailbox}/folder/{folder}/message
+      query: { offset: "{offset}", thread: "on", severywhere: "0", limit: "{maxResults}" }
+    answer: { select: [result, data], max: 262144 }   # a draft is a thread of one message: its uid is in data.threads[].messages[]
+  draft:
+    kind: update
+    about: Write a draft, never send one
+    params:
+      mailbox: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }
+      # The mailbox's own address as mailboxes shows it, or one of its aliases.
+      # The service sends from its default identity whichever is given; the
+      # message names one.
+      from: { type: string, pattern: "^[^@[:space:]]+@[^@[:space:]]+$", max: 254, log: true }
+      to: { type: string, pattern: "^[^@[:space:]]+@[^@[:space:]]+$", max: 254, log: true }   # one address, as google-mail's
+      cc: { type: string, pattern: "^[^@[:space:]]+@[^@[:space:]]+$", max: 254, optional: true, log: true }   # one address beside to, or none
+      subject: { type: string, max: 500, pattern: '^[^\r\n]*$' }   # free text, one line
+      body: { type: string, max: 100000 }   # plain text; the program makes the HTML
+      # To answer a message: its msg_id, its headers' references with its
+      # msg_id added, and its uid, all as message shows them. A draft that
+      # names none is a new mail.
+      in_reply_to: { type: string, max: 998, pattern: "^[^[:space:]]+$", optional: true }
+      references: { type: string, max: 4000, pattern: '^[^\r\n]*$', optional: true }
+      in_reply_to_uid: { type: string, max: 600, pattern: "^[0-9]+@[A-Za-z0-9_=+/-]+$", optional: true }
+    request:
+      method: POST
+      path: /mail/{mailbox}/draft
+    build: [build-draft]
+    answer: { select: [result, data] }   # data holds the draft's uuid and uid

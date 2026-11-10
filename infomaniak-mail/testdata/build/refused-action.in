@@ -1,0 +1,1 @@
+{"params": {"mailbox": "mb", "from": "yardr@example.com", "to": "alice@example.com", "subject": "Hi", "body": "Hi", "action": "send"}}

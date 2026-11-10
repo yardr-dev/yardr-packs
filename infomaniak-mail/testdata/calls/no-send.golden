@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail has no call \"send\" (it has: mailboxes, folders, search, message, drafts, draft)"
+}
+--- stderr

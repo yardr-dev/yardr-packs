@@ -1,0 +1,79 @@
+{
+  "result": "success",
+  "data": [
+    {
+      "id": "eJzz9HPyjwAABGYBgQ==",
+      "name": "INBOX",
+      "separator": "/",
+      "role": "INBOX",
+      "unread_count": 2,
+      "total_count": 14,
+      "children": []
+    },
+    {
+      "id": "eJxzKUpMKykGAAfpAmU=",
+      "name": "Drafts",
+      "separator": "/",
+      "role": "DRAFT",
+      "unread_count": 0,
+      "total_count": 1,
+      "children": []
+    },
+    {
+      "id": "eJwLTs0rAQADzwGb",
+      "name": "Sent",
+      "separator": "/",
+      "role": "SENT",
+      "unread_count": 0,
+      "total_count": 9,
+      "children": []
+    },
+    {
+      "id": "eJxzLErOyCxLLQYADcsDNg==",
+      "name": "Archives",
+      "separator": "/",
+      "role": "ARCHIVE",
+      "unread_count": 0,
+      "total_count": 120,
+      "children": []
+    },
+    {
+      "id": "eJwLKUoszgAABeICAw==",
+      "name": "Trash",
+      "separator": "/",
+      "role": "TRASH",
+      "unread_count": 0,
+      "total_count": 3,
+      "children": []
+    },
+    {
+      "id": "eJwLKMrPSi0pBgALQALo",
+      "name": "Projets",
+      "separator": "/",
+      "role": null,
+      "unread_count": 0,
+      "total_count": 0,
+      "children": [
+        {
+          "id": "eJwLKMrPSi0p1j/cWXJ4pYKRgZEZAEkpBy0=",
+          "name": "Été 2026",
+          "separator": "/",
+          "role": null,
+          "unread_count": 0,
+          "total_count": 0,
+          "children": [
+            {
+              "id": "eJwLKMrPSi0p1j/cWXJ4pYKRgZGZflh+ZWJ6qsLhBQpRh/cUZSZnAAAPNQ7p",
+              "name": "Voyage à Zürich",
+              "separator": "/",
+              "role": null,
+              "unread_count": 0,
+              "total_count": 4,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

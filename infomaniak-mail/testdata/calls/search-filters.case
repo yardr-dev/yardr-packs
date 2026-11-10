@@ -1,0 +1,14 @@
+=== args
+search
+mailbox=8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b
+folder=eJzz9HPyjwAABGYBgQ==
+from=alice@example.com
+to=yardr@example.com
+subject=Invoice
+since=2026-06-01 00:00:00
+before=2026-07-01 00:00:00
+everywhere=0
+maxResults=50
+offset=50
+=== answer
+@search

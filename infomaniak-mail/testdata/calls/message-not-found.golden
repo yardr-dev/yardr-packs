@@ -1,0 +1,12 @@
+--- requests
+GET /api/mail/8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b/folder/eJzz9HPyjwAABGYBgQ==/message/99999?prefered_format=html&with=auto_uncrypt%2Cthread_context
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call message: the service answered 404"
+}
+--- stderr

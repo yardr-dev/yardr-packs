@@ -1,0 +1,61 @@
+{
+  "result": "success",
+  "data": {
+    "threads": [
+      {
+        "uid": "t-20",
+        "subject": "Invoice June",
+        "from": [
+          {
+            "name": "Alice Martin",
+            "email": "alice@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Yardr",
+            "email": "yardr@example.com"
+          }
+        ],
+        "date": "2026-06-15T08:00:00+0200",
+        "messages_count": 1,
+        "unseen_messages": 1,
+        "messages": [
+          {
+            "uid": "20@eJzz9HPyjwAABGYBgQ==",
+            "preview": "Hello, your invoice for June is attached.",
+            "folder_id": "eJzz9HPyjwAABGYBgQ==",
+            "folder": "INBOX"
+          }
+        ]
+      },
+      {
+        "uid": "t-10",
+        "subject": "Re: Invoice June",
+        "from": [
+          {
+            "name": "Yardr",
+            "email": "yardr@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Alice Martin",
+            "email": "alice@example.com"
+          }
+        ],
+        "date": "2026-06-16T09:30:00+0200",
+        "messages_count": 1,
+        "unseen_messages": 0,
+        "messages": [
+          {
+            "uid": "10@eJwLTs0rAQADzwGb",
+            "preview": "Thanks, paid today.",
+            "folder_id": "eJwLTs0rAQADzwGb",
+            "folder": "Sent"
+          }
+        ]
+      }
+    ]
+  }
+}

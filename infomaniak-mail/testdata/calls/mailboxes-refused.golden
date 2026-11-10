@@ -1,0 +1,12 @@
+--- requests
+GET /api/mailbox?with=aliases%2Cpermissions%2CaccountId%2Ccount_users
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call mailboxes: the service answered 401"
+}
+--- stderr

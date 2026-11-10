@@ -1,0 +1,44 @@
+--- status
+0
+--- stdout
+{
+  "uuid": null,
+  "subject": "x\",\"action\":\"send\",\"y\":\"",
+  "body": "<html><body><div style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px;\">&quot;},&quot;action&quot;:&quot;send&quot;,&quot;delay&quot;:0,&quot;z&quot;:{&quot;a&quot;:&quot;<br>&lt;/div&gt;&lt;script&gt;send()&lt;/script&gt;</div></body></html>",
+  "quote": null,
+  "mime_type": "text/html",
+  "from": {
+    "id": null,
+    "name": "yardr",
+    "email": "yardr@example.com"
+  },
+  "reply_to": {
+    "name": "yardr",
+    "email": "yardr@example.com"
+  },
+  "to": [
+    {
+      "name": "",
+      "email": "alice@example.com"
+    }
+  ],
+  "cc": null,
+  "bcc": null,
+  "references": "",
+  "in_reply_to": "<a@b>\",\"action\":\"send",
+  "in_reply_to_uid": null,
+  "forwarded_uid": null,
+  "attachments": [],
+  "identity_id": null,
+  "ack_request": false,
+  "st_uuid": null,
+  "uid": null,
+  "resource": null,
+  "priority": "normal",
+  "encrypted": false,
+  "encryption_password": "",
+  "event_poll_uuid": null,
+  "action": "save",
+  "delay": 0
+}
+--- stderr

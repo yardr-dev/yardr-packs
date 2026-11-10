@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+# build-draft: the request body of the draft call of the infomaniak-mail
+# source. The yard runs it for each draft (the call's build in
+# infomaniak-mail.yaml): the call's parameters are on stdin as {"params":
+# {...}}, and one JSON object, the message the service wants, goes to stdout.
+# A refusal is one line on stderr and a non-zero exit, and nothing is sent.
+# It makes no request and reads no credential.
+#
+# Why a program and not a body template: the service takes a draft as one
+# whole message, HTML for its text and each recipient an object, and a
+# template can neither escape a text into HTML nor leave a missing cc as null.
+# The message is the one createDraft of Infomaniak's own server builds
+# (github.com/Infomaniak/mcp-server-mail, src/mail-client.ts, read 10 November
+# 2026), field for field and in its order, for the same arguments.
+#
+# The one thing that must hold: what tells a draft from a mail sent is the
+# message's "action", "save" or "send" (the server sends a draft by the same
+# message with "send"). Here "action" is written below as "save", nothing
+# reads it from the parameters, and every message is built from the
+# parameters listed in PARAMS: a key the call does not declare is refused, not
+# passed on. The pack's test holds each message to action save.
+#
+# Where the service decides and this file does not: the sender. The service
+# builds the From header from the account's default sending identity, and
+# ignores the display name here, so identity_id is null, as the server sends it
+# where it finds no identity. The "from" parameter is the mailbox's own address
+# as `mailboxes` shows it, because the message names one.
+#
+# Needs Python 3.9 or newer, and nothing beyond its standard library.
+import json
+import sys
+
+# The parameters of the call, and which must be given. mailbox is the path's:
+# it is in the request's address, and no part of the message.
+PARAMS = {"mailbox", "from", "to", "cc", "subject", "body", "in_reply_to", "in_reply_to_uid", "references"}
+REQUIRED = ("from", "to", "subject", "body")
+
+# A header is one line: these are the fields the service writes into one.
+ONE_LINE = ("from", "to", "cc", "subject", "in_reply_to", "in_reply_to_uid", "references")
+
+# The server's escapeHtml, one pass over the text: a replacement is never
+# escaped again.
+ESCAPES = str.maketrans({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})
+STYLE = "font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px;"
+
+
+def refuse(words):
+    sys.stderr.write("build-draft: %s\n" % words)
+    sys.exit(1)
+
+
+def html(text):
+    return '<html><body><div style="%s">%s</div></body></html>' % (STYLE, text.translate(ESCAPES).replace("\n", "<br>"))
+
+
+def recipients(address):
+    # The server's parseRecipients splits a comma-separated string; the call
+    # takes one address for each of to and cc, as google-mail's draft does.
+    return [{"name": "", "email": address}] if address else None
+
+
+def build(params):
+    for key in sorted(params):
+        if key not in PARAMS:
+            refuse("%s is not a parameter of a draft" % key)
+        if not isinstance(params[key], str):
+            refuse("%s is no text" % key)
+    missing = [key for key in REQUIRED if key not in params]
+    if missing:
+        refuse("a draft needs %s" % ", ".join(missing))
+    for key in ONE_LINE:
+        if "\n" in params.get(key, "") or "\r" in params.get(key, ""):
+            refuse("%s holds a line break: a header is one line" % key)
+    sender = params["from"]
+    name = sender.split("@")[0]
+    return {
+        "uuid": None,
+        "subject": params["subject"],
+        "body": html(params["body"]),
+        "quote": None,
+        "mime_type": "text/html",
+        "from": {"id": None, "name": name, "email": sender},
+        "reply_to": {"name": name, "email": sender},
+        "to": recipients(params["to"]),
+        "cc": recipients(params.get("cc")),
+        "bcc": None,
+        "references": params.get("references", ""),
+        "in_reply_to": params.get("in_reply_to") or None,
+        "in_reply_to_uid": params.get("in_reply_to_uid") or None,
+        "forwarded_uid": None,
+        "attachments": [],
+        "identity_id": None,
+        "ack_request": False,
+        "st_uuid": None,
+        "uid": None,
+        "resource": None,
+        "priority": "normal",
+        "encrypted": False,
+        "encryption_password": "",
+        "event_poll_uuid": None,
+        "action": "save",
+        "delay": 0,
+    }
+
+
+def main():
+    try:
+        request = json.loads(sys.stdin.buffer.read())
+    except ValueError:
+        refuse("stdin is no JSON")
+    params = request.get("params") if isinstance(request, dict) else None
+    if not isinstance(params, dict):
+        refuse('stdin is no {"params": {...}}')
+    sys.stdout.write(json.dumps(build(params), separators=(",", ":")) + "\n")
+
+
+if __name__ == "__main__":
+    main()

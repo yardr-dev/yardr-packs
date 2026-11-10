@@ -1,0 +1,160 @@
+#!/bin/sh
+# The infomaniak-mail pack's tests: what the gate runs beside yardr pack
+# check. Needs no network and no secret, done in seconds. Needs jq, python3
+# and yardr, and fails without any of them: a part that was skipped would
+# leave the pack unpinned.
+#
+#   build  build-draft as a process, run as the yard runs it, over
+#          testdata/build/*.in: the message it makes for each input, field
+#          for field and in the order of Infomaniak's own server, the text
+#          escaped as that server escapes it, and what it refuses in words.
+#          Every message it makes is held to action save.
+#   core   testdata/core.sh: the real yardr in a scratch yard. The
+#          declaration as the yard reads it, the presets and the grants
+#          SETUP.md teaches, the check, and each testdata/calls/*.case, one
+#          `yardr call` against a stand-in for Infomaniak's mail API on a
+#          loopback port (testdata/standin.py) that answers the fixtures of
+#          testdata/answers/, which follow the mocked answers of the
+#          server's own tests. A case's golden holds the request the
+#          stand-in saw (method, path and query as they arrived, headers,
+#          body), the exit status, what the call kept of the answer and what
+#          it said on stderr; a call the declaration should turn away shows
+#          as no request at all. All the requests together are held to the
+#          calls that read, and the one that writes a draft with action
+#          save. The token the yard was given is a made-up string: it must
+#          reach the stand-in as a bearer token and be in no file of the
+#          yard but the env file, and in no output.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the programs
+# print; read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+
+for tool in jq python3; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
+
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn comes,
+# and the yard's server, which its first command starts, would outlive the
+# directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# ---- build-draft ---------------------------------------------------------------
+mkdir "$tmp/work" "$tmp/home"
+# build_run <stdin file> runs the program as the yard does, in a bare
+# environment, from a directory of its own: stdout is in $tmp/b.out, stderr in
+# $tmp/b.err, the status in $rc. PYTHONDONTWRITEBYTECODE is the test's and not
+# the yard's: Apple's python3 3.9, the one a Mac has without another, caches the
+# bytecode of the standard library it imports under $HOME/Library/Caches, and
+# the check that the program writes no file below is of the program's own.
+build_run() {
+  (cd "$tmp/work" && env -i PATH="$PATH" HOME="$tmp/home" PYTHONDONTWRITEBYTECODE=1 "$here/build-draft") <"$1" >"$tmp/b.out" 2>"$tmp/b.err"
+  rc=$?
+}
+
+# The fields of the message, in the order createDraft of Infomaniak's server
+# writes them (src/mail-client.ts, read 10 November 2026).
+want_keys='["uuid","subject","body","quote","mime_type","from","reply_to","to","cc","bcc","references","in_reply_to","in_reply_to_uid","forwarded_uid","attachments","identity_id","ack_request","st_uuid","uid","resource","priority","encrypted","encryption_password","event_poll_uuid","action","delay"]'
+
+for c in testdata/build/*.in; do
+  n=$(basename "$c" .in)
+  build_run "$c"
+  {
+    echo "--- status"
+    echo "$rc"
+    echo "--- stdout"
+    if [ -s "$tmp/b.out" ]; then jq . "$tmp/b.out" 2>/dev/null || cat "$tmp/b.out"; fi
+    echo "--- stderr"
+    cat "$tmp/b.err"
+  } >"$tmp/b.golden"
+  check "build $n" "$tmp/b.golden" "testdata/build/$n.golden"
+  case $n in
+    refused-*)
+      # A refusal is one line, makes no message, and says nothing of the input's values.
+      [ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && [ "$(wc -l <"$tmp/b.err" | tr -d ' ')" = 1 ] && grep -q '^build-draft: ' "$tmp/b.err"
+      ok "build $n is one refusal line with no message" $? "exit $rc, stdout $(wc -c <"$tmp/b.out") bytes, stderr: $(cat "$tmp/b.err")"
+      ;;
+    *)
+      # Every message has the server's fields in the server's order and is a draft: save, no delay, no
+      # identity, no attachment, one recipient list and no bcc, whatever the text said.
+      [ "$rc" = 0 ] && jq -e --argjson keys "$want_keys" '
+        (keys_unsorted == $keys) and .action == "save" and .delay == 0 and .mime_type == "text/html"
+        and .identity_id == null and .attachments == [] and .bcc == null and .uuid == null and .uid == null
+        and (.to | length) == 1 and (.cc == null or (.cc | length) == 1)' "$tmp/b.out" >/dev/null
+      ok "build $n is a draft with the server's fields: action save, no delay, no identity" $? "exit $rc: $(head -c 300 "$tmp/b.err")"
+      ;;
+  esac
+done
+
+# The server's own expectation of its escaping, which its test spells out for
+# this text (tests/mail-client.test.js, "createDraft escapes plain text body
+# before wrapping it in HTML"): the text is escaped once and a newline is a <br>.
+build_run testdata/build/escape.in
+jq -e '(.body | contains("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;<br>Tom &amp; Jerry &quot;quote&quot;")) and (.body | contains("<script>") | not)' "$tmp/b.out" >/dev/null
+ok "build escapes the text as the server does and puts none of it in a tag" $?
+
+# Values that look like the message's own fields stay text: the action and the
+# subject come out as they went in, and the one key "action" is save.
+build_run testdata/build/injection.in
+jq -e '.action == "save" and .subject == "x\",\"action\":\"send\",\"y\":\"" and .in_reply_to == "<a@b>\",\"action\":\"send" and (has("y") | not) and (has("z") | not)' "$tmp/b.out" >/dev/null
+ok "build keeps a value that looks like JSON as text, and the action stays save" $?
+
+# A reply carries its three headers, a new mail none, as the server's test of an
+# explicit in_reply_to and references expects.
+build_run testdata/build/reply.in
+jq -e '.in_reply_to == "<invoice-june@example.com>" and .references == "<ledger-2026@example.com> <invoice-june@example.com>" and .in_reply_to_uid == "20@eJzz9HPyjwAABGYBgQ==" and .cc == [{"name":"","email":"accounts@example.com"}]' "$tmp/b.out" >/dev/null
+ok "build gives a reply its in_reply_to, references and in_reply_to_uid, and cc as one recipient" $?
+build_run testdata/build/new.in
+jq -e '.in_reply_to == null and .in_reply_to_uid == null and .references == "" and .cc == null and .from == {"id":null,"name":"yardr","email":"yardr@example.com"} and .reply_to == {"name":"yardr","email":"yardr@example.com"} and .to == [{"name":"","email":"alice@example.com"}]' "$tmp/b.out" >/dev/null
+ok "build gives a new mail no reply headers, the server's null and empty values, and the sender's local part as its name" $?
+
+# The program makes no request and writes nothing: no file in its directory or
+# its home, and it holds no address or credential of the service.
+[ -z "$(find "$tmp/work" "$tmp/home" -type f 2>/dev/null)" ]
+ok "build writes no file" $?
+! grep -n -i -e 'urllib' -e 'http\.client' -e 'socket' -e 'subprocess' -e 'INFOMANIAK_MAIL_TOKEN' -e 'environ' build-draft | grep -v '^[0-9]*:#' | grep -q .
+ok "build-draft imports nothing that reaches a network or the environment, and names no token" $?
+
+# ---- core ----------------------------------------------------------------------
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: infomaniak-mail: all ok"; else echo "test: infomaniak-mail: FAILED"; fi
+exit $fail

@@ -1,0 +1,36 @@
+# Infomaniak mail as a pack of kind source: the integration, imported into
+# the yard and into no depot. What Infomaniak mail is here: the declared
+# source infomaniak-mail, the twin of google-mail. It lists the mailboxes
+# and folders, searches and reads mail, lists drafts, and writes drafts, and
+# sends nothing. Its one update, draft, builds its request body with one
+# program the pack brings beside its declaration, build-draft, which is the
+# only place that says what the request does with the mail it is given.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-mail
+#
+# The source is named infomaniak-mail: a pack is named after the service it
+# talks to. A pack of kind source asks no grants at import, so what a crew
+# member may call is granted afterwards, by the setup notes. Every agent
+# granted a call acts as the one token's user: it reaches every mailbox that
+# user may open, whatever it asks for.
+name: infomaniak-mail
+kind: source
+setup: SETUP.md
+
+sources:
+  infomaniak-mail:
+    declaration: infomaniak-mail.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. A preset names read, every read call, or
+# a call by its name: no word stands for every update, so drafts names draft.
+presets:
+  read:
+    about: Read mailboxes, folders, mail and drafts; write nothing
+    grants:
+      infomaniak-mail: [read]
+  drafts:
+    about: Read mail, and write drafts the person sends
+    grants:
+      infomaniak-mail: [read, draft]

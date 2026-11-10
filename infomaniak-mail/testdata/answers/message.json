@@ -1,0 +1,51 @@
+{
+  "result": "success",
+  "data": {
+    "uid": "20",
+    "msg_id": "<invoice-june@example.com>",
+    "subject": "Invoice June",
+    "from": [
+      {
+        "name": "Alice Martin",
+        "email": "alice@example.com"
+      }
+    ],
+    "to": [
+      {
+        "name": "Yardr",
+        "email": "yardr@example.com"
+      }
+    ],
+    "cc": [
+      {
+        "name": "Accounts",
+        "email": "accounts@example.com"
+      }
+    ],
+    "bcc": [],
+    "date": "2026-06-15T08:00:00+0200",
+    "body": {
+      "value": "Hello,\nYour invoice for June is attached.\n",
+      "type": "text/plain"
+    },
+    "html": "<p>Hello,</p><p>Your invoice for June is attached.</p>",
+    "preview": "Hello, your invoice for June is attached.",
+    "has_attachments": true,
+    "seen": false,
+    "flagged": false,
+    "folder": "INBOX",
+    "headers": {
+      "subject": "Invoice June",
+      "references": "<ledger-2026@example.com>"
+    },
+    "attachments": [
+      {
+        "part_id": 2,
+        "name": "invoice-june.pdf",
+        "mime_type": "application/pdf",
+        "size": 12450,
+        "resource": "/api/mail/8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b/folder/eJzz9HPyjwAABGYBgQ==/message/20/attachment/2"
+      }
+    ]
+  }
+}

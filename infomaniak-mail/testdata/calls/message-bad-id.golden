@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call message: parameter id is 23 characters, and at most 12"
+}
+--- stderr

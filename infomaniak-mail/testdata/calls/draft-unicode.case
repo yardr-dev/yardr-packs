@@ -1,0 +1,9 @@
+=== args
+draft
+mailbox=8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b
+from=yardr@example.com
+to=alice@example.com
+subject=Café ☕ — 日本語 😀
+body=Voyage à Zürich: €120 — Été 2026 😀
+=== answer
+@draft

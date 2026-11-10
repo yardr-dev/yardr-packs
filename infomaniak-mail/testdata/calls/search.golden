@@ -1,0 +1,70 @@
+--- requests
+GET /api/mail/8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b/folder/eJzz9HPyjwAABGYBgQ==/message?limit=10&offset=0&scontains=invoice+%26+more&severywhere=1&thread=off
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "data": {
+    "threads": [
+      {
+        "date": "2026-06-15T08:00:00+0200",
+        "from": [
+          {
+            "email": "alice@example.com",
+            "name": "Alice Martin"
+          }
+        ],
+        "messages": [
+          {
+            "folder": "INBOX",
+            "folder_id": "eJzz9HPyjwAABGYBgQ==",
+            "preview": "Hello, your invoice for June is attached.",
+            "uid": "20@eJzz9HPyjwAABGYBgQ=="
+          }
+        ],
+        "messages_count": 1,
+        "subject": "Invoice June",
+        "to": [
+          {
+            "email": "yardr@example.com",
+            "name": "Yardr"
+          }
+        ],
+        "uid": "t-20",
+        "unseen_messages": 1
+      },
+      {
+        "date": "2026-06-16T09:30:00+0200",
+        "from": [
+          {
+            "email": "yardr@example.com",
+            "name": "Yardr"
+          }
+        ],
+        "messages": [
+          {
+            "folder": "Sent",
+            "folder_id": "eJwLTs0rAQADzwGb",
+            "preview": "Thanks, paid today.",
+            "uid": "10@eJwLTs0rAQADzwGb"
+          }
+        ],
+        "messages_count": 1,
+        "subject": "Re: Invoice June",
+        "to": [
+          {
+            "email": "alice@example.com",
+            "name": "Alice Martin"
+          }
+        ],
+        "uid": "t-10",
+        "unseen_messages": 0
+      }
+    ]
+  },
+  "result": "success"
+}
+--- stderr

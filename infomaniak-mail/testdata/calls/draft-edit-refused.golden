@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call draft: \"uuid\" is no parameter of the call (it takes: mailbox, from, to, cc, subject, body, in_reply_to, references, in_reply_to_uid)"
+}
+--- stderr

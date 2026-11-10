@@ -1,0 +1,44 @@
+--- status
+0
+--- stdout
+{
+  "uuid": null,
+  "subject": "Invoice June",
+  "body": "<html><body><div style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px;\">Hello Alice,<br>Thanks for the invoice.<br></div></body></html>",
+  "quote": null,
+  "mime_type": "text/html",
+  "from": {
+    "id": null,
+    "name": "yardr",
+    "email": "yardr@example.com"
+  },
+  "reply_to": {
+    "name": "yardr",
+    "email": "yardr@example.com"
+  },
+  "to": [
+    {
+      "name": "",
+      "email": "alice@example.com"
+    }
+  ],
+  "cc": null,
+  "bcc": null,
+  "references": "",
+  "in_reply_to": null,
+  "in_reply_to_uid": null,
+  "forwarded_uid": null,
+  "attachments": [],
+  "identity_id": null,
+  "ack_request": false,
+  "st_uuid": null,
+  "uid": null,
+  "resource": null,
+  "priority": "normal",
+  "encrypted": false,
+  "encryption_password": "",
+  "event_poll_uuid": null,
+  "action": "save",
+  "delay": 0
+}
+--- stderr

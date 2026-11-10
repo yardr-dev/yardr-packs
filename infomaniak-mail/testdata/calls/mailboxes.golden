@@ -1,0 +1,24 @@
+--- requests
+GET /api/mailbox?with=aliases%2Cpermissions%2CaccountId%2Ccount_users
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "data": [
+    {
+      "aliases": [
+        "hello@example.com"
+      ],
+      "email": "yardr@example.com",
+      "hosting_id": 123456,
+      "is_primary": true,
+      "mailbox": "yardr",
+      "uuid": "8f1a2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    }
+  ],
+  "result": "success"
+}
+--- stderr

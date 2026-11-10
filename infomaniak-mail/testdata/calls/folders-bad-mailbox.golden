@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call folders: parameter mailbox does not match its pattern ^[A-Za-z0-9_-]{1,64}$"
+}
+--- stderr

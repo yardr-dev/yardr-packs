@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-mail, call search: parameter maxResults does not match its pattern ^([1-9]|[1-4][0-9]|50)$"
+}
+--- stderr

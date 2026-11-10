@@ -1,0 +1,390 @@
+{
+  "about": "Infomaniak mail read and drafts. Lists mailboxes and folders, searches and reads mail, lists drafts, and writes drafts; sends nothing.",
+  "base": "https://mail.infomaniak.com/api",
+  "calls": [
+    {
+      "about": "List the mailboxes the token opens, each with its uuid (the mailbox every other call takes), its address and its aliases",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "mailboxes",
+      "request": {
+        "method": "GET",
+        "path": "/mailbox",
+        "query": [
+          {
+            "key": "with",
+            "value": "aliases,permissions,accountId,count_users"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List a mailbox's folders, each with its id and its role (INBOX, DRAFT, SENT, ARCHIVE, TRASH)",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "folders",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "mailbox",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/mail/{mailbox}/folder",
+        "query": [
+          {
+            "key": "with",
+            "value": "ik-static"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Search mail, one page of at most 50",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "search",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "mailbox",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 512,
+          "name": "folder",
+          "pattern": "^[A-Za-z0-9_=+/-]{1,512}$",
+          "type": "string"
+        },
+        {
+          "max": 1000,
+          "name": "q",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "max": 254,
+          "name": "from",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "max": 254,
+          "name": "to",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "subject",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "since",
+          "optional": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "name": "before",
+          "optional": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "default": "1",
+          "name": "everywhere",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "name": "maxResults",
+          "pattern": "^([1-9]|[1-4][0-9]|50)$",
+          "type": "string"
+        },
+        {
+          "default": "0",
+          "name": "offset",
+          "optional": true,
+          "pattern": "^[0-9]{1,6}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/mail/{mailbox}/folder/{folder}/message",
+        "query": [
+          {
+            "key": "offset",
+            "value": "{offset}"
+          },
+          {
+            "key": "thread",
+            "value": "off"
+          },
+          {
+            "key": "severywhere",
+            "value": "{everywhere}"
+          },
+          {
+            "key": "limit",
+            "value": "{maxResults}"
+          },
+          {
+            "key": "scontains",
+            "value": "{q}"
+          },
+          {
+            "key": "sfrom",
+            "value": "{from}"
+          },
+          {
+            "key": "sto",
+            "value": "{to}"
+          },
+          {
+            "key": "ssubject",
+            "value": "{subject}"
+          },
+          {
+            "key": "sfromdate",
+            "value": "{since}"
+          },
+          {
+            "key": "stodate",
+            "value": "{before}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Read one message, with its headers and its text",
+      "answer": {
+        "max": 1048576,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "message",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "mailbox",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 512,
+          "name": "folder",
+          "pattern": "^[A-Za-z0-9_=+/-]{1,512}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "id",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/mail/{mailbox}/folder/{folder}/message/{id}",
+        "query": [
+          {
+            "key": "prefered_format",
+            "value": "html"
+          },
+          {
+            "key": "with",
+            "value": "auto_uncrypt,thread_context"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List drafts, one page of at most 50",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "kind": "read",
+      "name": "drafts",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "mailbox",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 512,
+          "name": "folder",
+          "pattern": "^[A-Za-z0-9_=+/-]{1,512}$",
+          "type": "string"
+        },
+        {
+          "name": "maxResults",
+          "pattern": "^([1-9]|[1-4][0-9]|50)$",
+          "type": "string"
+        },
+        {
+          "default": "0",
+          "name": "offset",
+          "optional": true,
+          "pattern": "^[0-9]{1,6}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/mail/{mailbox}/folder/{folder}/message",
+        "query": [
+          {
+            "key": "offset",
+            "value": "{offset}"
+          },
+          {
+            "key": "thread",
+            "value": "on"
+          },
+          {
+            "key": "severywhere",
+            "value": "0"
+          },
+          {
+            "key": "limit",
+            "value": "{maxResults}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Write a draft, never send one",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data"
+        ]
+      },
+      "build": [
+        "build-draft"
+      ],
+      "kind": "update",
+      "name": "draft",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "mailbox",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 254,
+          "name": "from",
+          "pattern": "^[^@[:space:]]+@[^@[:space:]]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 254,
+          "name": "to",
+          "pattern": "^[^@[:space:]]+@[^@[:space:]]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 254,
+          "name": "cc",
+          "optional": true,
+          "pattern": "^[^@[:space:]]+@[^@[:space:]]+$",
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "subject",
+          "pattern": "^[^\\r\\n]*$",
+          "type": "string"
+        },
+        {
+          "max": 100000,
+          "name": "body",
+          "type": "string"
+        },
+        {
+          "max": 998,
+          "name": "in_reply_to",
+          "optional": true,
+          "pattern": "^[^[:space:]]+$",
+          "type": "string"
+        },
+        {
+          "max": 4000,
+          "name": "references",
+          "optional": true,
+          "pattern": "^[^\\r\\n]*$",
+          "type": "string"
+        },
+        {
+          "max": 600,
+          "name": "in_reply_to_uid",
+          "optional": true,
+          "pattern": "^[0-9]+@[A-Za-z0-9_=+/-]+$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/mail/{mailbox}/draft"
+      }
+    }
+  ],
+  "check": "mailboxes",
+  "credential": {
+    "env": "INFOMANIAK_MAIL_TOKEN",
+    "header": "Authorization: Bearer {credential}"
+  },
+  "name": "infomaniak-mail"
+}

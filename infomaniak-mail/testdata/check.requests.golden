@@ -1,0 +1,4 @@
+GET /api/mailbox?with=aliases%2Cpermissions%2CaccountId%2Ccount_users
+  auth: ok
+  accept: application/json
+  user-agent: yardr
