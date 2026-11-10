@@ -1,0 +1,26 @@
+--- requests
+GET /1/calendar/pim/calendar
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "data": {
+    "calendars": [
+      {
+        "default": true,
+        "id": 41,
+        "name": "Personal"
+      },
+      {
+        "default": false,
+        "id": 52,
+        "name": "Team"
+      }
+    ]
+  },
+  "result": "success"
+}
+--- stderr

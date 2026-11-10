@@ -1,0 +1,10 @@
+--- requests
+GET /1/calendar/pim/event/45
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+1
+--- stdout
+--- stderr
+infomaniak-calendar/build-edit: event 45 recurs: a change would be to the whole series, and a recurring event is only read here

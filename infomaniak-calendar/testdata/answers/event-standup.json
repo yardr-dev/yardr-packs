@@ -1,0 +1,31 @@
+{
+  "result": "success",
+  "data": {
+    "id": 42,
+    "calendar_id": 41,
+    "title": "Standup",
+    "description": "Daily sync",
+    "start": "2026-10-22T09:00:00+02:00",
+    "end": "2026-10-22T09:15:00+02:00",
+    "timezone_start": "Europe/Zurich",
+    "timezone_end": "Europe/Zurich",
+    "location": "Salle Nyon",
+    "url": "https://meet.example.com/abc",
+    "categories": ["work"],
+    "color": "blue",
+    "sequence": 3,
+    "freebusy": "busy",
+    "type": "event",
+    "fullday": false,
+    "private": false,
+    "attendees": [
+      { "className": "Attendee", "contactId": 95022716, "address": "ada@example.com", "name": "Ada Example", "state": "ACCEPTED", "organizer": true },
+      { "className": "Attendee", "address": "bob@example.com", "name": "bob@example.com", "state": "NEEDS-ACTION", "organizer": false }
+    ],
+    "alarms": [{ "trigger": "-PT15M" }],
+    "attachments": [],
+    "rrule": "",
+    "meet_room_url": "",
+    "bookable_resource_id": "res-uuid-1"
+  }
+}

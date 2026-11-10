@@ -1,0 +1,42 @@
+# Infomaniak Calendar as a pack of kind source: the integration, imported
+# into the yard and into no depot. What it is here: the declared source
+# infomaniak-calendar, which lists the calendars, lists a calendar's events
+# in a window, reads one event, and creates and edits timed events without
+# inviting anyone, all through the calendar API behind Infomaniak's own
+# calendar app. It is the twin of google-calendar (in the yardr repository),
+# with that pack's call names and arguments wherever the service allows;
+# README.md says where it does not.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-calendar
+#
+# The source is named infomaniak-calendar: a pack is named after the service
+# it talks to. Its credential is a token made in Infomaniak's manager, typed
+# unseen at setup, so nothing is minted. A pack of kind source asks no grants
+# at import, so what a crew member may call is granted afterwards, by the
+# setup notes. Every agent granted a call acts as the one Infomaniak user the
+# token was made for.
+name: infomaniak-calendar
+kind: source
+setup: SETUP.md
+
+sources:
+  infomaniak-calendar:
+    declaration: infomaniak-calendar.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. read covers every read call and no
+# update; each update is granted by its name, so create and edit are apart.
+presets:
+  read:
+    about: List the calendars, list a calendar's events and read one event; change nothing
+    grants:
+      infomaniak-calendar: [read]
+  create:
+    about: List and read events, and create timed ones; no invitations go out
+    grants:
+      infomaniak-calendar: [read, create]
+  everything:
+    about: List, read, create and edit events; no invitations go out
+    grants:
+      infomaniak-calendar: [read, create, edit]

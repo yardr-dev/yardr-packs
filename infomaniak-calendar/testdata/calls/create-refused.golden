@@ -1,0 +1,14 @@
+--- requests
+POST /1/calendar/pim/event
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"attendees":[],"calendar_id":"41","end":"2026-10-24 13:00:00","freebusy":"busy","fullday":false,"notifyAttendees":false,"start":"2026-10-24 12:00:00","timezone_end":"Europe/Zurich","timezone_start":"Europe/Zurich","title":"Lunch with Ada","type":"event"}
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-calendar, call create: the service answered 422"
+}
+--- stderr

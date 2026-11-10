@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-calendar, call edit: infomaniak-calendar/build-edit: nothing to change: give at least one of summary, start, end, description and location"
+}
+--- stderr

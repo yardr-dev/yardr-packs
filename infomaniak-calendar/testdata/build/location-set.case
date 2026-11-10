@@ -1,0 +1,4 @@
+=== params
+{"params": {"eventId": "43", "location": "Cabinet, Rue du Lac 1"}}
+=== routes
+GET /1/calendar/pim/event/43 200 @event-plain

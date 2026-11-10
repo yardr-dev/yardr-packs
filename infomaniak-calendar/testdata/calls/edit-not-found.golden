@@ -1,0 +1,12 @@
+--- requests
+GET /1/calendar/pim/event/99
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-calendar, call edit: infomaniak-calendar/build-edit: event 99 could not be read: Event not found"
+}
+--- stderr

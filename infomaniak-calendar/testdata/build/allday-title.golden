@@ -1,0 +1,32 @@
+--- requests
+GET /1/calendar/pim/event/44
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+0
+--- stdout
+{
+  "alarms": [],
+  "attachments": [],
+  "attendees": [],
+  "calendar_id": 41,
+  "color": "green",
+  "description": "",
+  "end": "2026-10-27 00:00:00",
+  "freebusy": "free",
+  "fullday": true,
+  "id": 44,
+  "imip_request": false,
+  "meet_room_url": "",
+  "notifyAttendees": false,
+  "parent_updated": false,
+  "private": false,
+  "rrule": "",
+  "start": "2026-10-26 00:00:00",
+  "timezone_end": "Europe/Zurich",
+  "timezone_start": "Europe/Zurich",
+  "title": "Public holiday (CH)",
+  "type": "event"
+}
+--- stderr

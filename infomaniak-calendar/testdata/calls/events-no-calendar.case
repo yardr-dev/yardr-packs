@@ -1,0 +1,6 @@
+=== args
+events
+timeMin=2026-10-20 00:00:00
+timeMax=2026-10-27 23:59:59
+=== routes
+GET /1/calendar/pim/event 200 @events

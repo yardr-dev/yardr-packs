@@ -1,0 +1,4 @@
+GET /1/calendar/pim/calendar
+  auth: ok
+  accept: application/json
+  user-agent: yardr

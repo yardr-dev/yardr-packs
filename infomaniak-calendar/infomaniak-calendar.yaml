@@ -1,0 +1,201 @@
+# Infomaniak Calendar as a declared source: the calendars listed, a
+# calendar's events listed in a window and one read, and a timed event
+# created and edited without inviting anyone, through the calendar API under
+# /1/calendar/pim at api.infomaniak.com. It is the twin of google-calendar
+# (packs/google-calendar in the yardr repository) and keeps that file's call
+# names (events, event, calendars, create, edit) and arguments (calendarId,
+# timeMin, timeMax, eventId, summary, start, end, description, location)
+# where the service has a counterpart. What it never does is send an
+# invitation: an event it creates has no attendees and notifyAttendees
+# false, and one it edits keeps the attendees it had and sends no mail about
+# the change. Nor does it delete or move an event, book a room, set a
+# recurrence, or read the address book.
+#
+# Checked against Infomaniak's own MCP server for its calendar
+# (github.com/Infomaniak/mcp-server-calendar, main at 358a61c, whose last
+# commit is of 3 November 2026), read on 10 November 2026:
+# src/calendar-client.ts, src/index.ts, README.md, tests/verify.mjs,
+# tests/timezone.test.mjs and tests/fixtures/timezone-probe.mjs. These
+# routes are in no page of developer.infomaniak.com, so that client is the
+# only source, and nothing was sent to the service: README.md, "What was
+# checked", says what is pinned by fixtures shaped after that client and
+# what is not tried. What the client does that this file relies on:
+#
+#   GET /1/calendar/pim/calendar answers {result, data: {calendars}}, each
+#     calendar with an id (a number in its tests), a name and a default
+#     flag. Its client picks the default calendar itself when none is
+#     named, so a declared call cannot: calendarId is always given.
+#   GET /1/calendar/pim/event takes calendar_id, from and to and answers
+#     {result, data: [events]}. from and to are a wall clock,
+#     'YYYY-MM-DD HH:MM:SS', in the account's profile timezone.
+#   GET /1/calendar/pim/event/{id} answers {result, data: event}.
+#   POST /1/calendar/pim/event takes {title, start, end, description,
+#     freebusy, type, calendar_id, fullday, timezone_start, timezone_end,
+#     attendees, notifyAttendees} (and rrule, left out here) and answers
+#     {result, data}. Its start and end are the same wall clock, and the
+#     zone is a name in timezone_start and timezone_end.
+#   PUT /1/calendar/pim/event/{id} is the update: the whole event, sent
+#     again with the change, and no patch. Its client reads the event first
+#     and sends every field back (id, calendar_id, title, description,
+#     start, end, timezone_start, timezone_end, freebusy, type, fullday,
+#     private, location where there is one, color, attendees, alarms,
+#     attachments, rrule, meet_room_url, bookable_resource_id,
+#     notifyAttendees, parent_updated, imip_request), and its tests say a
+#     PUT that left out location and color lost them.
+#   Headers: Authorization: Bearer <token> and Content-Type
+#     application/json. The scopes its README asks for are
+#     workspace:calendar and user_info.
+#
+# Where google-calendar has no counterpart, the file leaves it out:
+#
+#   q and maxResults: the client sends neither, and takes the one answer
+#     the service gives, with no page after it (no nextPageToken), so no
+#     paging is declared. Not tried: whether a long window is cut. A window
+#     too big for the answer's bound is refused, not cut: ask for less.
+#   calendarId of primary, or an address: a calendar is the id calendars
+#     lists, and the one marked default there is the account's own.
+#   calendarId on event and edit: their routes name the event alone, and
+#     edit never moves an event to another calendar.
+#   attendees and sendUpdates: nobody is invited, as in the twin.
+#   htmlLink: nothing the client reads is a link to the event.
+#   all-day events and recurrence, as in the twin: an event created is
+#     timed and recurs never. edit refuses an event that recurs, and the
+#     times of an all-day one, which build-edit's head says the reasons of.
+#
+# Where the service differs in shape, the file says what is sent and keeps
+# the service's own answer (the key is data, not items, and an event is the
+# service's: title, start and end as text, timezone_start, attendees with an
+# address and a state, and the rest the client names). Each answer keeps
+# result and error beside data, so that a failure the service answers
+# with a 200 is seen and no write reads as done with an empty answer; a
+# 4xx or 5xx is refused by the yard, which shows its status alone:
+#
+#   Times. The service takes a wall clock and the account's profile
+#     timezone decides what it means. Its client turns any value that
+#     carries an offset into that wall clock first, from GET /2/profile,
+#     which a declared call cannot do. So timeMin, timeMax, start and end
+#     take 'YYYY-MM-DD HH:MM:SS' alone, and an RFC 3339 value is refused
+#     before anything is sent. A created event also names its zone, which
+#     the body holds as timezone_start and timezone_end, so create takes
+#     timezone, an IANA name, as a required argument. An edited event keeps
+#     the zones it has, and the wall clock given to edit is in them.
+#   edit. The update being a PUT of the whole event, a body of the given
+#     fields alone would take the rest out of the event. So edit names a
+#     build command, infomaniak-calendar/build-edit, beside this file: it
+#     reads the event with the credential, changes only what was given,
+#     sends attendees, alarms, location and the rest back as they were, and
+#     sets notifyAttendees and imip_request false. An edit is therefore two
+#     requests to the service, a GET and the PUT. It refuses, in words and
+#     with nothing sent, a call that gives nothing to change, an event it
+#     cannot read, an event with no timezone, the times of an all-day
+#     event, and an event that recurs.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+#
+# Limits. Infomaniak allows 60 requests a minute (the figure of the proposal
+# these packs come from, which read it in the developer portal; the portal
+# needs a script to show its pages, and was not read again). yardr
+# holds a caller to 60 calls an hour of a source and 10 updates, which is
+# stricter: SETUP.md says how to raise it. The service has no webhook for
+# the calendar, so the file has no hook.
+#
+# The service takes no idempotency key as far as its client shows, so the
+# file names none: an event created again after a lost answer is made twice.
+#
+# The name is infomaniak-calendar: a pack is named after the service it
+# talks to.
+name: infomaniak-calendar
+about: Infomaniak Calendar events listed, read, created and edited without inviting anyone; calendars listed.
+
+# The name of the variable, never the value. A token made in Infomaniak's
+# manager with the scopes workspace:calendar and user_info, the pair the MCP
+# server's README asks for. Nothing in this file calls the profile, so which
+# of the two the calendar routes need is not tried. The token lasts until it
+# is revoked, and is switched off after a year unused, so no mint is named.
+credential:
+  env: INFOMANIAK_CALENDAR_TOKEN
+  header: "Authorization: Bearer {credential}"
+
+# ---- what an agent may ask of it, through `yardr call` --------------------
+# Declared requests, granted one by one; edit's body is built by a command,
+# which is never something an agent calls itself.
+#
+# base is the API's one host, and every path starts with /1/calendar/pim,
+# the prefix of the calendar routes. calendars is the check call: it takes
+# no argument, so `yardr source check infomaniak-calendar` shows at once
+# whether the token is one the service takes and holds the calendar scope.
+base: https://api.infomaniak.com
+check: calendars
+calls:
+  calendars:
+    kind: read
+    about: List the calendars, each with the id the other calls take as calendarId
+    request:
+      method: GET
+      path: /1/calendar/pim/calendar
+    answer: { select: [result, data, error] }   # data.calendars, each with its id, its name and its default flag; result and error are the service's own, so a failure it answers with a 200 shows
+  events:
+    kind: read
+    about: >-
+      List a calendar's events in a window, in one answer. timeMin and timeMax
+      are a wall clock in the account's own timezone, 'YYYY-MM-DD HH:MM:SS',
+      with no offset and no T: Infomaniak reads them so, and an RFC 3339 value
+      is refused before anything is sent. calendarId is an id calendars lists.
+    params:
+      calendarId: { type: string, pattern: "^[A-Za-z0-9_-]*[0-9][A-Za-z0-9_-]*$", max: 64, log: true }   # the id calendars lists, given always (the default is picked by the service's client). A number or a text, with a digit in it: that keeps out google-calendar's primary
+      timeMin: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$" }   # a wall clock in the account's own timezone, 2026-10-20 00:00:00: no offset, no T
+      timeMax: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$" }
+    request:
+      method: GET
+      path: /1/calendar/pim/event
+      query: { calendar_id: "{calendarId}", from: "{timeMin}", to: "{timeMax}" }
+    answer: { select: [result, data, error], max: 262144 }   # data is the list of events; the bound is the twin's
+  event:
+    kind: read
+    about: Read one event, by the id events lists
+    params:
+      eventId: { type: string, pattern: "^[1-9][0-9]{0,14}$", max: 15, log: true }   # the id events lists: a number, which edit sends back as one
+    request:
+      method: GET
+      path: /1/calendar/pim/event/{eventId}
+    answer: { select: [result, data, error] }
+  create:
+    kind: update
+    about: >-
+      Create a timed event, inviting no one. start and end are a wall clock,
+      'YYYY-MM-DD HH:MM:SS', in timezone, an IANA name such as Europe/Zurich.
+      calendarId is an id calendars lists.
+    params:
+      calendarId: { type: string, pattern: "^[A-Za-z0-9_-]*[0-9][A-Za-z0-9_-]*$", max: 64, log: true }
+      summary: { type: string, max: 500 }   # the event's title, free text: its value is in no event
+      start: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$" }   # a wall clock in the zone given below, 2026-10-24 12:00:00
+      end: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$" }   # past start, else the service refuses the event
+      timezone: { type: string, pattern: "^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}$", max: 64 }   # an IANA name, Europe/Zurich: the account's own is in its profile, and any event's timezone_start shows it
+      description: { type: string, max: 10000, optional: true }   # free text, left out, no description
+      location: { type: string, max: 500, optional: true }   # free text, left out, nowhere. The client's create never sends one, and its update does, so the field is the service's: not tried on a create
+    request:
+      method: POST
+      path: /1/calendar/pim/event
+      body: { calendar_id: "{calendarId}", title: "{summary}", start: "{start}", end: "{end}", timezone_start: "{timezone}", timezone_end: "{timezone}", description: "{description}", location: "{location}", type: event, freebusy: busy, fullday: false, attendees: [], notifyAttendees: false }   # a description or location left out leaves the key; no attendees, and notifyAttendees false, so no mail goes
+    answer: { select: [result, data, error] }
+  edit:
+    kind: update
+    about: >-
+      Change an event, only what is given: it is read, changed and sent back
+      whole, so its attendees, alarms and the rest stay as they were. start and
+      end are a wall clock in the event's own timezone. An event that recurs is
+      refused, and so are the times of an all-day one.
+    params:
+      eventId: { type: string, pattern: "^[1-9][0-9]{0,14}$", max: 15, log: true }
+      summary: { type: string, max: 500, optional: true }   # free text; left out, the title stays
+      start: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", optional: true }   # a wall clock in the event's own timezone; left out, the beginning stays
+      end: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$", optional: true }
+      description: { type: string, max: 10000, optional: true }
+      location: { type: string, max: 500, optional: true }
+    request:
+      method: PUT
+      path: /1/calendar/pim/event/{eventId}
+    build: [infomaniak-calendar/build-edit]   # reads the event, merges what was given, prints the whole PUT body; refuses a call that gives nothing to change
+    answer: { select: [result, data, error] }

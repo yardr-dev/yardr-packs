@@ -1,0 +1,7 @@
+=== args
+edit
+eventId=45
+summary=Weekly review (new name)
+=== routes
+GET /1/calendar/pim/event/45 200 @event-recurring
+PUT /1/calendar/pim/event/45 200 @updated

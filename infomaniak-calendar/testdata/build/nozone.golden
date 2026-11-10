@@ -1,0 +1,10 @@
+--- requests
+GET /1/calendar/pim/event/46
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+1
+--- stdout
+--- stderr
+infomaniak-calendar/build-edit: event 46 has no timezone_start and timezone_end: the body needs the zone, and the account's own is not read here

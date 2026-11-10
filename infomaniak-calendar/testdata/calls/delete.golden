@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-calendar has no call \"delete\" (it has: calendars, events, event, create, edit)"
+}
+--- stderr

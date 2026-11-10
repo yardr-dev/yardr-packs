@@ -1,0 +1,33 @@
+--- requests
+GET /1/calendar/pim/event/43
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+0
+--- stdout
+{
+  "alarms": [],
+  "attachments": [],
+  "attendees": [],
+  "bookable_resource_id": null,
+  "calendar_id": 41,
+  "color": null,
+  "description": "",
+  "end": "2026-10-23 16:00:00",
+  "freebusy": "busy",
+  "fullday": false,
+  "id": 43,
+  "imip_request": false,
+  "meet_room_url": "",
+  "notifyAttendees": false,
+  "parent_updated": false,
+  "private": true,
+  "rrule": "",
+  "start": "2026-10-23 14:30:00",
+  "timezone_end": "Europe/Zurich",
+  "timezone_start": "Europe/Zurich",
+  "title": "Dentist",
+  "type": "event"
+}
+--- stderr

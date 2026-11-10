@@ -1,0 +1,54 @@
+--- requests
+GET /1/calendar/pim/event/42
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+0
+--- stdout
+{
+  "alarms": [
+    {
+      "trigger": "-PT15M"
+    }
+  ],
+  "attachments": [],
+  "attendees": [
+    {
+      "address": "ada@example.com",
+      "className": "Attendee",
+      "contactId": 95022716,
+      "name": "Ada Example",
+      "organizer": true,
+      "state": "ACCEPTED"
+    },
+    {
+      "address": "bob@example.com",
+      "className": "Attendee",
+      "name": "bob@example.com",
+      "organizer": false,
+      "state": "NEEDS-ACTION"
+    }
+  ],
+  "bookable_resource_id": "res-uuid-1",
+  "calendar_id": 41,
+  "color": "blue",
+  "description": "Daily sync",
+  "end": "2026-10-22 09:15:00",
+  "freebusy": "busy",
+  "fullday": false,
+  "id": 42,
+  "imip_request": false,
+  "location": "Salle Nyon",
+  "meet_room_url": "",
+  "notifyAttendees": false,
+  "parent_updated": false,
+  "private": false,
+  "rrule": "",
+  "start": "2026-10-22 09:00:00",
+  "timezone_end": "Europe/Zurich",
+  "timezone_start": "Europe/Zurich",
+  "title": "Standup (moved)",
+  "type": "event"
+}
+--- stderr

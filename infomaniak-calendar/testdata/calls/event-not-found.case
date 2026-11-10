@@ -1,0 +1,5 @@
+=== args
+event
+eventId=99
+=== routes
+GET /1/calendar/pim/event/99 404 @error-not-found

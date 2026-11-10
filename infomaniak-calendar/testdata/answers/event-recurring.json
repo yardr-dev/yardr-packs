@@ -1,0 +1,22 @@
+{
+  "result": "success",
+  "data": {
+    "id": 45,
+    "calendar_id": 52,
+    "title": "Weekly review",
+    "description": "",
+    "start": "2026-10-19T16:00:00+02:00",
+    "end": "2026-10-19T17:00:00+02:00",
+    "timezone_start": "Europe/Zurich",
+    "timezone_end": "Europe/Zurich",
+    "freebusy": "busy",
+    "type": "event",
+    "fullday": false,
+    "private": false,
+    "attendees": [],
+    "alarms": [],
+    "attachments": [],
+    "rrule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO",
+    "meet_room_url": ""
+  }
+}

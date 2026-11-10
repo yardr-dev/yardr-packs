@@ -1,0 +1,238 @@
+{
+  "about": "Infomaniak Calendar events listed, read, created and edited without inviting anyone; calendars listed.",
+  "base": "https://api.infomaniak.com",
+  "calls": [
+    {
+      "about": "List the calendars, each with the id the other calls take as calendarId",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "read",
+      "name": "calendars",
+      "request": {
+        "method": "GET",
+        "path": "/1/calendar/pim/calendar"
+      }
+    },
+    {
+      "about": "List a calendar's events in a window, in one answer. timeMin and timeMax are a wall clock in the account's own timezone, 'YYYY-MM-DD HH:MM:SS', with no offset and no T: Infomaniak reads them so, and an RFC 3339 value is refused before anything is sent. calendarId is an id calendars lists.",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "read",
+      "name": "events",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "calendarId",
+          "pattern": "^[A-Za-z0-9_-]*[0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "name": "timeMin",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "name": "timeMax",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/1/calendar/pim/event",
+        "query": [
+          {
+            "key": "calendar_id",
+            "value": "{calendarId}"
+          },
+          {
+            "key": "from",
+            "value": "{timeMin}"
+          },
+          {
+            "key": "to",
+            "value": "{timeMax}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Read one event, by the id events lists",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "read",
+      "name": "event",
+      "params": [
+        {
+          "log": true,
+          "max": 15,
+          "name": "eventId",
+          "pattern": "^[1-9][0-9]{0,14}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/1/calendar/pim/event/{eventId}"
+      }
+    },
+    {
+      "about": "Create a timed event, inviting no one. start and end are a wall clock, 'YYYY-MM-DD HH:MM:SS', in timezone, an IANA name such as Europe/Zurich. calendarId is an id calendars lists.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "update",
+      "name": "create",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "calendarId",
+          "pattern": "^[A-Za-z0-9_-]*[0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "summary",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "name": "end",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "max": 64,
+          "name": "timezone",
+          "pattern": "^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+){0,2}$",
+          "type": "string"
+        },
+        {
+          "max": 10000,
+          "name": "description",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "location",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "attendees": [],
+          "calendar_id": "{calendarId}",
+          "description": "{description}",
+          "end": "{end}",
+          "freebusy": "busy",
+          "fullday": false,
+          "location": "{location}",
+          "notifyAttendees": false,
+          "start": "{start}",
+          "timezone_end": "{timezone}",
+          "timezone_start": "{timezone}",
+          "title": "{summary}",
+          "type": "event"
+        },
+        "method": "POST",
+        "path": "/1/calendar/pim/event"
+      }
+    },
+    {
+      "about": "Change an event, only what is given: it is read, changed and sent back whole, so its attendees, alarms and the rest stay as they were. start and end are a wall clock in the event's own timezone. An event that recurs is refused, and so are the times of an all-day one.",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "build": [
+        "infomaniak-calendar/build-edit"
+      ],
+      "kind": "update",
+      "name": "edit",
+      "params": [
+        {
+          "log": true,
+          "max": 15,
+          "name": "eventId",
+          "pattern": "^[1-9][0-9]{0,14}$",
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "optional": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "name": "end",
+          "optional": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+          "type": "string"
+        },
+        {
+          "max": 10000,
+          "name": "description",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "max": 500,
+          "name": "location",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "path": "/1/calendar/pim/event/{eventId}"
+      }
+    }
+  ],
+  "check": "calendars",
+  "credential": {
+    "env": "INFOMANIAK_CALENDAR_TOKEN",
+    "header": "Authorization: Bearer {credential}"
+  },
+  "name": "infomaniak-calendar"
+}

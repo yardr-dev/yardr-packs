@@ -1,0 +1,10 @@
+--- requests
+GET /1/calendar/pim/event/44
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+1
+--- stdout
+--- stderr
+infomaniak-calendar/build-edit: event 44 is an all-day event: its times are not changed here, only its title, description and location

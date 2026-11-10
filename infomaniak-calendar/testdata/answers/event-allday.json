@@ -1,0 +1,23 @@
+{
+  "result": "success",
+  "data": {
+    "id": 44,
+    "calendar_id": 41,
+    "title": "Public holiday",
+    "description": "",
+    "start": "2026-10-26 00:00:00",
+    "end": "2026-10-27 00:00:00",
+    "timezone_start": "Europe/Zurich",
+    "timezone_end": "Europe/Zurich",
+    "color": "green",
+    "freebusy": "free",
+    "type": "event",
+    "fullday": true,
+    "private": false,
+    "attendees": [],
+    "alarms": [],
+    "attachments": [],
+    "rrule": "",
+    "meet_room_url": ""
+  }
+}

@@ -1,0 +1,131 @@
+#!/bin/bash
+# build-edit: the edit call's request body. The service's update is a PUT of
+# the whole event, not a patch, so the body is the event as it is now with
+# the fields the call gave changed and everything else sent back as it was:
+# a PUT without location and color loses them (Infomaniak's own client
+# tests say so), and so would one without the attendees or the alarms. One
+# JSON object on stdin, {"params": {eventId, and any of summary, start, end,
+# description, location}}, one on stdout, the PUT body. The event is read
+# first, with the yard's credential: INFOMANIAK_CALENDAR_TOKEN and
+# YARDR_SOURCE_BASE, the declaration's base, are in the environment. Needs
+# curl and jq.
+#
+# Only a given field changes. The event keeps its calendar, its attendees
+# and its zones, and the body sets notifyAttendees and imip_request false,
+# so no mail goes about the change: an event it edits invites no one. A
+# start or end given is a wall clock, 'YYYY-MM-DD HH:MM:SS', in the zone the
+# event has (timezone_start for the start, timezone_end for the end), which
+# is the service's own meaning of it. What the event has that is read back
+# as the service's client reads it: start and end come back with a T and an
+# offset or a space and none, and go out as the wall clock, 19 characters.
+#
+# It refuses, in words and with nothing sent, a call that gives nothing to
+# change; an event it cannot read; an event with no timezone, since the body
+# needs one and the profile's is not read here; an all-day event whose times
+# are given, which is the service's other shape of start and end; and an
+# event that recurs, whose PUT would change the series where the twin's
+# patch changes one occurrence. Where the service answers 4xx to the PUT
+# itself, the yard shows that.
+set -euo pipefail
+in=$(cat)
+refuse() { echo "infomaniak-calendar/build-edit: $1" >&2; exit 1; }
+
+for tool in curl jq; do
+  command -v "$tool" >/dev/null 2>&1 || refuse "needs $tool on PATH"
+done
+[ -n "${INFOMANIAK_CALENDAR_TOKEN:-}" ] || refuse "INFOMANIAK_CALENDAR_TOKEN is not set"
+[ -n "${YARDR_SOURCE_BASE:-}" ] || refuse "YARDR_SOURCE_BASE is not set"
+case "$INFOMANIAK_CALENDAR_TOKEN" in *$'\n'*|*$'\r'*) refuse "INFOMANIAK_CALENDAR_TOKEN holds a line break";; esac
+
+params=$(jq -c 'if (.params | type) == "object" then .params else empty end' <<<"$in" 2>/dev/null || true)
+[ -n "$params" ] || refuse 'want {"params": {...}} on stdin'
+given() { jq -e --arg k "$1" 'has($k)' <<<"$params" >/dev/null; }
+
+# The id goes into a path: the declaration holds it to a number of at most 15
+# digits, and the program does not rely on that.
+id=$(jq -r '.eventId // ""' <<<"$params")
+case "$id" in
+  ''|0*|*[!0-9]*) refuse "eventId is no event number";;
+esac
+[ "${#id}" -le 15 ] || refuse "eventId is no event number"
+
+changes=""
+for p in summary start end description location; do
+  if given "$p"; then changes="$changes$p "; fi
+done
+[ -n "$changes" ] || refuse "nothing to change: give at least one of summary, start, end, description and location"
+
+# curl takes the token as a config line on its stdin: an argument can be read
+# by every process on the machine while curl runs.
+curl_quote() {
+  local value=$1
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  printf '"%s"' "$value"
+}
+base=${YARDR_SOURCE_BASE%/}
+code=0
+out=$(
+  {
+    printf 'url = '
+    curl_quote "$base/1/calendar/pim/event/$id"
+    printf '\nheader = '
+    curl_quote "Authorization: Bearer $INFOMANIAK_CALENDAR_TOKEN"
+    printf '\nheader = "Accept: application/json"\n'
+  } | curl -s --fail-with-body --max-time 20 -K -
+) || code=$?
+if [ "$code" != 0 ]; then
+  detail=$(jq -r '.error.description // .error.code // empty' <<<"$out" 2>/dev/null || true)
+  [ -n "$detail" ] || detail="curl exit $code"
+  refuse "event $id could not be read: $detail"
+fi
+event=$(jq -c 'if (.data | type) == "object" then .data else empty end' <<<"$out" 2>/dev/null || true)
+[ -n "$event" ] || refuse "event $id could not be read: the answer has no event in data"
+
+# What the body needs of the event, or what makes this call not one to send.
+zone_missing=$(jq -r '[(if (.timezone_start | type) == "string" and .timezone_start != "" then empty else "timezone_start" end),
+                       (if (.timezone_end | type) == "string" and .timezone_end != "" then empty else "timezone_end" end)] | join(" and ")' <<<"$event")
+[ -z "$zone_missing" ] || refuse "event $id has no $zone_missing: the body needs the zone, and the account's own is not read here"
+if jq -e '.fullday == true' <<<"$event" >/dev/null && { given start || given end; }; then
+  refuse "event $id is an all-day event: its times are not changed here, only its title, description and location"
+fi
+if jq -e '(.rrule // "") != ""' <<<"$event" >/dev/null; then
+  refuse "event $id recurs: a change would be to the whole series, and a recurring event is only read here"
+fi
+for f in start end; do
+  if ! given "$f" && ! jq -e --arg k "$f" '.[$k] | type == "string"' <<<"$event" >/dev/null; then
+    refuse "event $id has no $f to send back"
+  fi
+done
+
+jq -c -n --argjson p "$params" --argjson ev "$event" --arg id "$id" '
+  # The wall clock of a start or end as the service answers it: a T or a
+  # space, and an offset or none; 19 characters of it go back.
+  def wall: sub("T"; " ") | sub("\\+.*$"; "") | sub("Z"; "") | .[0:19];
+  def given($k; $kept): if ($p | has($k)) then $p[$k] else $kept end;
+  given("location"; $ev.location) as $location
+  | {
+      id: ($id | tonumber),
+      calendar_id: $ev.calendar_id,
+      title: given("summary"; $ev.title),
+      description: given("description"; ($ev.description // "")),
+      start: given("start"; ($ev.start | wall)),
+      end: given("end"; ($ev.end | wall)),
+      timezone_start: $ev.timezone_start,
+      timezone_end: $ev.timezone_end,
+      freebusy: ($ev.freebusy // "busy"),
+      type: ($ev.type // "event"),
+      fullday: ($ev.fullday // false),
+      private: ($ev.private // false),
+      color: ($ev.color // null),
+      attendees: ($ev.attendees // []),
+      alarms: ($ev.alarms // []),
+      attachments: ($ev.attachments // []),
+      rrule: "",
+      meet_room_url: ($ev.meet_room_url // ""),
+      notifyAttendees: false,
+      parent_updated: false,
+      imip_request: false
+    }
+  + (if ($location | type) == "string" and $location != "" then {location: $location} else {} end)
+  + (if ($ev | has("bookable_resource_id")) then {bookable_resource_id: $ev.bookable_resource_id} else {} end)'

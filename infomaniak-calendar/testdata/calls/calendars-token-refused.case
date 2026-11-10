@@ -1,0 +1,4 @@
+=== args
+calendars
+=== routes
+GET /1/calendar/pim/calendar 401 @error-token

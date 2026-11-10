@@ -1,0 +1,9 @@
+{
+  "result": "success",
+  "data": {
+    "calendars": [
+      { "id": 41, "name": "Personal", "default": true },
+      { "id": 52, "name": "Team", "default": false }
+    ]
+  }
+}

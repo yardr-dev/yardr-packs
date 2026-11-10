@@ -1,0 +1,4 @@
+=== params
+{"params": {"eventId": "42", "start": "2026-10-22 10:00:00", "end": "2026-10-22 10:30:00"}}
+=== routes
+GET /1/calendar/pim/event/42 200 @event-standup

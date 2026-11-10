@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-calendar, call create: parameter timezone is missing"
+}
+--- stderr

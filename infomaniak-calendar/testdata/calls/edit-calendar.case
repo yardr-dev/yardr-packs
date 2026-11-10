@@ -1,0 +1,7 @@
+=== args
+edit
+eventId=42
+calendarId=52
+summary=x
+=== routes
+GET /1/calendar/pim/event/42 200 @event-standup

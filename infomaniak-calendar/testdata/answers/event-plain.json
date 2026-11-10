@@ -1,0 +1,25 @@
+{
+  "result": "success",
+  "data": {
+    "id": 43,
+    "calendar_id": 41,
+    "title": "Dentist",
+    "description": null,
+    "start": "2026-10-23 14:30:00",
+    "end": "2026-10-23 15:30:00",
+    "timezone_start": "Europe/Zurich",
+    "timezone_end": "Europe/Zurich",
+    "location": null,
+    "color": null,
+    "freebusy": "busy",
+    "type": "event",
+    "fullday": false,
+    "private": true,
+    "attendees": [],
+    "alarms": [],
+    "attachments": [],
+    "rrule": null,
+    "meet_room_url": null,
+    "bookable_resource_id": null
+  }
+}

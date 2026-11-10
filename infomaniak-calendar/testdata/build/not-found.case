@@ -1,0 +1,4 @@
+=== params
+{"params": {"eventId": "99", "summary": "x"}}
+=== routes
+GET /1/calendar/pim/event/99 404 @error-not-found

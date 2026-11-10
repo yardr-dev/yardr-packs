@@ -1,0 +1,22 @@
+{
+  "result": "success",
+  "data": {
+    "id": 46,
+    "calendar_id": 41,
+    "title": "Imported",
+    "description": "",
+    "start": "2026-10-28 10:00:00",
+    "end": "2026-10-28 11:00:00",
+    "timezone_start": null,
+    "timezone_end": "",
+    "freebusy": "busy",
+    "type": "event",
+    "fullday": false,
+    "private": false,
+    "attendees": [],
+    "alarms": [],
+    "attachments": [],
+    "rrule": "",
+    "meet_room_url": ""
+  }
+}

@@ -1,0 +1,6 @@
+--- requests
+--- status
+1
+--- stdout
+--- stderr
+infomaniak-calendar/build-edit: nothing to change: give at least one of summary, start, end, description and location

@@ -1,0 +1,10 @@
+--- requests
+GET /1/calendar/pim/event/42
+  auth: ok
+  accept: application/json
+  user-agent: other
+--- status
+1
+--- stdout
+--- stderr
+infomaniak-calendar/build-edit: event 42 could not be read: the answer has no event in data
