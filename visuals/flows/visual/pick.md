@@ -4,7 +4,8 @@ For a person. What to read: the designer's note on the bead, which carries the
 three shots at the brief's exact size and names each direction
 (`yardr prime --bead <id>` prints the bead with every note in full). The
 directions are files that open on their own, on the bead's branch `yard/<bead>`
-under `directions/`; the shots are what to judge them by.
+under `directions/`; the addresses on the designer's note stay open while the
+bead is here, and the shots are what to judge them by.
 
 A bead leaves `pick` when a person moves it, with words:
 

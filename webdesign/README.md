@@ -61,7 +61,8 @@ face and one blank, because Chrome took the shot before the font arrived. Both
 passed the size check.
 
 **The watch.** Once the first page exists the designer starts
-`yardr preview watch $YARDR_BEAD mockups`. The yard serves the folder's files
+`yardr preview watch $YARDR_BEAD mockups --through pick`. The yard serves the
+folder's files
 read-only through its preview endpoint, and a page reloads in the browser
 whenever a file in the folder changes, so the person sees the three pages take
 shape. The command prints the address they open at on its `opens at` line: the
@@ -71,8 +72,9 @@ address answers 404, and so does the Open button of the watch's card on the
 Previews page. The designer therefore names each page's address, the printed
 address followed by the file name, and puts the three on a note as soon as the
 watch is up, so the person has them while the designer builds. The note with the
-shots gives them again. The watch ends by itself when the bead leaves
-`mockups`, so the shots are the record of what the person picks from.
+shots gives them again. The watch ends by itself when the bead leaves `pick`,
+so the addresses on the note are alive while the person judges; the shots are
+the record.
 
 **App screens.** The designer first decides whether the brief is for a page,
 which people read, or an app screen, which people work in: a dashboard, a
@@ -104,13 +106,17 @@ shots and the stage's exit does not depend on a judgement call.
   November 2026, and after); an older script ignores it and shoots 1280 wide. The
   mockups load their typefaces and libraries from CDNs, so the machine needs the
   network while a designer works.
-- **A yardr with `yardr preview watch`**, for the watch (yardr 26b2a52, 4
+- **A yardr with `yardr preview watch`**, for the watch (yardr d06d62f, 11
   November 2026, and after). `yardr docs watch` prints its page on a yardr that
   has the command and names the pages it has on one that does not. On an older
   yardr `yardr preview watch` prints the help of `preview` and ends 0, so the
   designer goes by the `opens at` line: with none, it puts what the command
-  printed on its note and goes on, and the shots are as before. The address is
-  the path on the yard until the yard is linked to an edge that gives the watch
+  printed on its note and goes on, and the shots are as before. A yardr with
+  the watch but without the flag (before d06d62f, 11 November 2026) refuses
+  `--through` with an error: no `opens at` line either, so the designer puts
+  the error on its note and goes on, and the shots are as before. The address
+  is the path on the yard until the yard is linked to an edge that gives the
+  watch
   a host (yardr ec29917, 4 November 2026, and after). Where the yard is linked
   and the edge refuses, the command prints the edge's words under the path.
 

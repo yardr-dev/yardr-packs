@@ -78,7 +78,7 @@ for t in 'The distinctness rule' 'contrib/shot/shot' '1280x800' 'PNG image data,
          '## App screens' '- the question first:' '- quiet panels:' '- aligned figures:' \
          '- colour spent on data:' '- believable data:' '- the phone:' \
          'SHOT_WIDTH=390' 'PNG image data, 390 x 800' \
-         'yardr preview watch $YARDR_BEAD mockups' 'followed by its file name' \
+         'yardr preview watch $YARDR_BEAD mockups --through pick' 'followed by its file name' \
          'If the command prints no `opens at` line' \
          'Put the three addresses on a note at once' 'its address on the watch (step 3)'; do
   has "$role" "$t"

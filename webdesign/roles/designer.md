@@ -74,8 +74,9 @@ by {{yardmaster}} or {{operator}} changes the bead.
    others (`git rm` the old file).
    Choose the three file names before you build the first. As soon as the first
    file is there, start a watch on the folder with
-   `yardr preview watch $YARDR_BEAD mockups` (`$YARDR_BEAD` is your bead's id).
-   The yard serves the files of `mockups/` as they stand, and a page reloads in
+   `yardr preview watch $YARDR_BEAD mockups --through pick` (`$YARDR_BEAD` is
+   your bead's id). The yard serves the files of `mockups/` as they stand,
+   and a page reloads in
    the person's browser when a file in the folder changes, so the person sees
    the pages take shape. The command prints the address the pages open at, on
    its `opens at` line. The folder itself answers 404, so a page's address is
@@ -85,7 +86,7 @@ by {{yardmaster}} or {{operator}} changes the bead.
    the person can open them while you build; a page opens once its file exists.
    If the command prints no `opens at` line, put what it printed on the note in
    place of the addresses and go on. The watch ends by itself when the bead
-   leaves `mockups`, and `yardr docs watch` says what it serves and what else
+   leaves `pick`, and `yardr docs watch` says what it serves and what else
    ends it. The watch is for the person to look at; the shots still come from
    your own server (Shot mechanics, below).
    Done when three files are committed and the note with their addresses is on

@@ -19,9 +19,11 @@ A brief for an app screen (a dashboard, an admin view, settings, an inbox) is
 shot a second time at phone width, which needs a shot script that takes a width
 (`SHOT_WIDTH`, in yardr from 4 November 2026).
 
-A designer starts a watch on the mockups while it builds (`yardr preview watch`,
-in yardr from 4 November 2026), so that a person can open the pages in a
-browser as they take shape. The designer's notes give the address of each page:
+A designer starts a watch on the mockups while it builds
+(`yardr preview watch --through pick`, in yardr from 11 November 2026), so
+that a person can open the pages in a browser as they take shape. The watch
+stays open until the bead leaves `pick`, so its addresses are still alive
+when the person judges. The designer's notes give the address of each page:
 the address the command prints, followed by the page's file name. The command
 prints the host the yard's edge gave the watch where the yard is linked to an
 edge that gives one, and the path `/preview/<app>/` on the yard otherwise.
@@ -34,7 +36,9 @@ edge that gives one, and the path `/preview/<app>/` on the yard otherwise.
    prints the first line of the page on the watch, and on a yardr that has no
    watch says `no doc named "watch"`. Its designers get no `opens at` line from
    the command, and put what it printed on their notes in place of the
-   addresses:
+   addresses. Where the yardr has the watch but not the flag (before 11
+   November 2026) the command refuses `--through` with an error, and its
+   designers put the error on their notes the same way:
    ```sh
    yardr depot show yardr
    ```
@@ -103,8 +107,8 @@ edge that gives one, and the path `/preview/<app>/` on the yard otherwise.
    its file changes, and a page the designer has not built yet answers 404 until
    it has. The Previews page of the web view lists the watch as well, but its
    Open button opens the folder, which answers 404: the pages are at the
-   addresses in the note. The watch ends when the bead leaves `mockups`, and the
-   shots on the last note are the record.
+   addresses in the note. The watch stays open until the bead leaves `pick`,
+   and the shots on the last note are the record.
 6. **The pick.** When the designer is done the bead waits in `pick`, and the yard
    puts a card on it that offers the moves. The person reads the shots on the
    designer's note (`yardr prime --bead <id>` prints it, and the web view shows

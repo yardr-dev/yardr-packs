@@ -45,7 +45,7 @@ for t in 'The distinctness rule' '--window-size=<W>,<H>' '--screenshot=' \
          'data:image/svg+xml;base64,' 'file://$d/<n>-<name>-print.html' \
          'Print that wrapper, not the SVG or a different direction file' \
          'Under 500 wide' 'directions/<n>-<name>.svg' '--file' \
-         'yardr preview watch $YARDR_BEAD directions' 'followed by its file name' \
+         'yardr preview watch $YARDR_BEAD directions --through pick' 'followed by its file name' \
          'If the command prints no `opens at` line' \
          'Put the three addresses on a note at once' 'its address on the watch (step 3)'; do
   has "$role" "$t"

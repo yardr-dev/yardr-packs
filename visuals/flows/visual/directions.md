@@ -16,8 +16,8 @@ Before the bead leaves as `done`:
   last commit, and says that commit's short SHA;
 - the same note gives each file's address on the watch (the address
   `yardr preview watch` printed, then the file name), or what the command
-  printed when it gave none; the watch ends when the bead leaves `directions`,
-  so the shots are the record;
+  printed when it gave none; the watch stays open until the bead leaves
+  `pick`, and the shots are the record;
 - the same note names each direction's idea, type pairing and palette, and
   your role's distinctness rule holds for the three.
 

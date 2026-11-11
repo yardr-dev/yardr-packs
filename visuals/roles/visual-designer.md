@@ -71,8 +71,9 @@ by {{yardmaster}} or {{operator}} changes the bead.
    of the others (`git rm` the old file).
    Choose the three file names before you build the first. As soon as the first
    file is there, start a watch on the folder with
-   `yardr preview watch $YARDR_BEAD directions` (`$YARDR_BEAD` is your bead's
-   id). The yard serves the files of `directions/` as they stand, and a file
+   `yardr preview watch $YARDR_BEAD directions --through pick` (`$YARDR_BEAD`
+   is your bead's id). The yard serves the files of `directions/` as they
+   stand, and a file
    reloads in the person's browser when it changes, so the person sees the
    directions take shape. The command prints the address the files open at, on
    its `opens at` line. The folder itself answers 404, so a file's address is
@@ -82,7 +83,7 @@ by {{yardmaster}} or {{operator}} changes the bead.
    the person can open them while you build; a file opens once it exists.
    If the command prints no `opens at` line, put what it printed on the note in
    place of the addresses and go on. The watch ends by itself when the bead
-   leaves `directions`, and `yardr docs watch` says what it serves and what else
+   leaves `pick`, and `yardr docs watch` says what it serves and what else
    ends it. The watch is for the person to look at; the shots still come from
    your own commands (Exact size, below).
    Done when three files are committed and the note with their addresses is on
