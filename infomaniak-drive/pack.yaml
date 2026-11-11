@@ -1,0 +1,43 @@
+# Infomaniak kDrive as a pack of kind source: the integration, imported
+# into the yard and into no depot. What kDrive is here: the declared
+# source infomaniak-drive, the twin of google-drive. It lists a
+# folder's files, reads one file's metadata, searches files, lists a
+# file's comments and downloads one file's content, and it uploads
+# files, writes comments and makes share links. Its one program,
+# drive-file, sends the upload and answers the download, which no
+# declaration says; every other call is the declaration's own request.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-drive
+#
+# The source is named infomaniak-drive: a pack is named after the
+# service it talks to. A pack of kind source asks no grants at import,
+# so what a crew member may call is granted afterwards, by the setup
+# notes. Every agent granted a call acts as the one token's user: it
+# reaches every drive that user may open, whatever it asks for.
+name: infomaniak-drive
+kind: source
+setup: SETUP.md
+
+sources:
+  infomaniak-drive:
+    declaration: infomaniak-drive.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. A preset names read, every read call, or
+# a call by its name: no word stands for every update, so make names upload
+# and comment, and everything those and share. A share link is public to
+# whoever holds it, so it stands apart in everything, as in the twin.
+presets:
+  read:
+    about: List, read, search and download files and comments; write nothing
+    grants:
+      infomaniak-drive: [read]
+  make:
+    about: Read files, upload files and write comments; share nothing
+    grants:
+      infomaniak-drive: [read, upload, comment]
+  everything:
+    about: Read, upload and comment, and make share links for any file
+    grants:
+      infomaniak-drive: [read, upload, comment, share]

@@ -1,0 +1,18 @@
+--- requests
+GET /api/3/drive/12/files/45
+  auth: ok
+  user-agent: yardr
+GET /api/2/drive/12/files/45/download
+  auth: ok
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "content": "Hello, kDrive.\n",
+  "encoding": "text",
+  "mime_type": "text/plain",
+  "name": "hello.txt",
+  "size": 15
+}
+--- stderr

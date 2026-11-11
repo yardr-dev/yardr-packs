@@ -1,0 +1,238 @@
+# Infomaniak kDrive as a declared source: the twin of google-drive. A
+# folder's files listed, one file's metadata read, files searched,
+# a file's comments listed, one file's content downloaded, and, as
+# updates, a file uploaded, a comment written and a share link made.
+# What it never does: no delete, no trash read or emptied, no restore,
+# no rename, no move, no copy, no access granted to anyone (the share
+# link is the one exception), and no office document edited: the
+# service has no call that writes into one.
+#
+# The call names are google-drive's where the service has the call, and
+# its arguments and answers are where the service allows; the service's
+# own ids (a drive, a folder) are arguments beside them. Where the
+# service splits what the twin joins, the calls split too: the twin's
+# files lists with a q, and here files lists a folder and search is a
+# call of its own, because list and search are two addresses.
+#
+# What was read, on 11 November 2026:
+#   - Infomaniak's own server, github.com/Infomaniak/mcp-server-kdrive,
+#     at main 8e4b29e (10 November 2026, package 1.2.0): README.md,
+#     src/index.ts, src/kdrive-client.ts and tests/verify.mjs. From it
+#     come the drive id from the webapp's URL, the root folder's id 1,
+#     the upload as octet-stream with directory_id, file_name and
+#     total_size in the query, and the download as bytes.
+#   - developer.infomaniak.com, the operation pages for GET /2/drive,
+#     GET /2/drive/{drive_id}, GET /3/drive/{drive_id}/files/search,
+#     GET .../files/{file_id}/files, GET .../files/{file_id}, GET
+#     .../files/{file_id}/name, GET /2/.../files/{file_id}/download,
+#     GET and POST /2/.../files/{file_id}/comments, POST
+#     /2/.../files/{file_id}/comments/{comment_id}, POST
+#     /2/.../files/{file_id}/link, GET .../link, POST
+#     /3/drive/{drive_id}/upload and POST
+#     .../files/{file_id}/directory. From them come every address,
+#     query, body field and answer shape here. The server and the pages
+#     disagree on the share link's rights (the server sends inherit,
+#     password or public; the pages take password or public): the file
+#     follows the pages.
+#   - google-drive in the yardr repository (packs/google-drive), for
+#     the names and arguments.
+#
+# What the pages say that this file relies on:
+#   - Every answer is {result, data}, so every call keeps both, and
+#     error beside them where the service sends one, so that a failure
+#     answered with a 200 is seen. A 4xx or 5xx is refused by the yard,
+#     which shows its status alone.
+#   - A drive id and a file id are integers. The root folder is 1, and
+#     from there every other file is reached. GET /2/drive lists the
+#     drives, but it takes an account id this file has no call to find,
+#     so the drive is an argument of every call, read off the webapp's
+#     URL at setup as the server's README does; there is no drives call.
+#   - GET /3/drive/{drive}/files/{folder}/files lists a folder, with
+#     type[] of file or dir, limit 5 to 1000 (10 where left out) and a
+#     cursor, and answers data with cursor, has_more and response_at.
+#     No cursor is declared, so one page is all a call reads, as in the
+#     twin; has_more and cursor say there is more.
+#   - GET .../files/search searches, with query, directory_id, depth of
+#     child or unlimited, and limit as above. What an empty query lists
+#     is not said, so q is required.
+#   - GET .../files/{id} reads one file or folder: id, name, type of
+#     file or dir, status, parent_id, size, mime_type and the rest.
+#   - GET /2/.../files/{id}/comments lists a file's comments: id,
+#     parent_id, body, is_resolved, created_at and counts, with the
+#     user and the responses where with asks for them.
+#   - POST .../comments writes a top-level comment from {body};
+#     POST .../comments/{id} answers one. The file declares the first
+#     alone: one comment-writing call. The twin's resolve has no
+#     counterpart (is_resolved is a flag no call here sets).
+#   - POST /2/.../files/{id}/link makes a share link from {right,
+#     password, ...}: right is public or password, the password is
+#     required with password and refused with public, and what is left
+#     out keeps the service's defaults (download allowed, edit not).
+#   - POST /3/drive/{drive}/upload carries a file of at most 1 GB as
+#     application/octet-stream, with directory_id, file_name and the
+#     required total_size in the query, and conflict of error, rename
+#     or version. A declared call cannot send it: the yard sends a
+#     built body as JSON and an upload as multipart, and the service
+#     reads neither. So upload names a build command, drive-file
+#     beside this file, which sends the upload itself with
+#     conflict=error, and the declared request is the GET that reads
+#     the file back by its name, which answers the new file's id. The
+#     GET carries the build's small body, which the service ignores.
+#   - GET /2/.../files/{id}/download answers the file's bytes, or a
+#     directory as a zip, and may answer a 302 first. A declared call
+#     cannot read it: an answer must be JSON and no redirect is
+#     followed. So download is answered by drive-file, which reads the
+#     file's info first, refuses a directory and a file over what the
+#     call carries, follows a redirect to the service's own host
+#     alone, and prints the content as text or base64.
+#
+# Left out, because the bead's lists end: the twin's folder (a folder
+# made), doc, slides and copy; a reply to a comment; recents and
+# shared_with_me; the drives list (above); rename, move, versions,
+# conversion, the activity feed and WebDAV. There is no twin of
+# google-docs: no call edits an office document's content. There is no
+# mint: the token is long-lived.
+#
+# Not tried: no request was made to api.infomaniak.com, because there
+# was no account to make one with. Every call was run through the real
+# yardr against a stand-in that answers fixtures shaped after the pages
+# above (README.md, "What was checked"). Where this file and the
+# service differ, the service is right.
+#
+# The service takes 60 requests a minute. A token made in the manager
+# with the scope drive opens the drives of its user, and one token
+# does both the reads and the writes: Infomaniak scopes it by product,
+# not by read and write.
+#
+# Infomaniak takes no idempotency key, so the file names none: an
+# upload tried again after a lost answer is written twice, unless a
+# file of its name is already there, which the upload refuses.
+#
+# The file names no check: every call takes the drive, so no read call
+# takes no parameter (the profile would, but it is outside the scope
+# drive). yardr source check then looks at the credential and says
+# whether drive-file can be run, and sends nothing; the first files
+# call is the live check. SETUP.md says so.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: infomaniak-drive
+about: Infomaniak kDrive files listed, read, searched and downloaded; files uploaded, comments written, share links made.
+
+# The name of the variable, never the value. A token made in the manager with
+# the scope drive, sent as a Bearer token and typed unseen at setup.
+credential:
+  env: INFOMANIAK_DRIVE_TOKEN
+  header: "Authorization: Bearer {credential}"
+
+# base is api.infomaniak.com, and each call names its version: the reads
+# are v3 but for comments and the download, which are v2, as are the
+# comment and the share link. The drive is a path of each call, not a
+# part of base, because no call lists the drives.
+base: https://api.infomaniak.com
+calls:
+  files:
+    kind: read
+    about: List a folder's files, one page
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }   # the drive's id, read off the webapp's URL at setup
+      folder: { type: string, pattern: "^[0-9]{1,12}$", max: 12, default: "1", log: true }   # the folder's id; 1 is the root
+      type: { type: enum, values: [file, dir], optional: true }   # files alone, or folders alone
+      maxResults: { type: string, pattern: "^([5-9]|[1-9][0-9]|100)$", optional: true }   # 5 to 100; left out, the service's 10
+    request:
+      method: GET
+      path: /3/drive/{drive}/files/{folder}/files
+      query: { limit: "{maxResults}", "type[]": "{type}" }
+    # cursor and has_more say there is more; paging is left out, as in the twin.
+    answer: { select: [result, data, error, cursor, has_more], max: 262144 }
+  file:
+    kind: read
+    about: Read one file's metadata
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      id: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+    request:
+      method: GET
+      path: /3/drive/{drive}/files/{id}
+    answer: { select: [result, data, error] }
+  search:
+    kind: read
+    about: Search files, one page
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      q: { type: string, max: 1000 }   # free text, as the twin's; required, since what an empty query lists is not said
+      folder: { type: string, pattern: "^[0-9]{1,12}$", max: 12, optional: true, log: true }   # search this folder's subtree alone
+      depth: { type: enum, values: [child, unlimited], optional: true }   # with folder: its children alone, or the subtree whole
+      maxResults: { type: string, pattern: "^([5-9]|[1-9][0-9]|100)$", optional: true }   # 5 to 100; left out, the service's 10
+    request:
+      method: GET
+      path: /3/drive/{drive}/files/search
+      query: { query: "{q}", directory_id: "{folder}", depth: "{depth}", limit: "{maxResults}" }
+    answer: { select: [result, data, error, cursor, has_more], max: 262144 }
+  comments:
+    kind: read
+    about: List a file's comments, each with its author and its replies
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      fileId: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+    request:
+      method: GET
+      path: /2/drive/{drive}/files/{fileId}/comments
+      query: { with: "user,responses,responses.user" }
+    answer: { select: [result, data, error] }
+  download:
+    kind: read
+    about: Download one file's content, at most 32 KiB, as text or base64
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      fileId: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+    # Answered by drive-file, which reads the file's info first and then
+    # its bytes: the service answers bytes, and may answer a 302 first,
+    # neither of which a declared request reads.
+    run: [drive-file, download]
+    answer: { select: [name, mime_type, size, encoding, content] }
+  upload:
+    kind: update
+    about: Upload a file of at most 10 MiB, and read it back by its name
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      folder: { type: string, pattern: "^[0-9]{1,12}$", max: 12, default: "1", log: true }   # the destination folder's id; 1 is the root
+      name: { type: string, pattern: "^[^/]{1,255}$", max: 255 }   # the file's name in the drive; free text, no slash
+      file: { type: file, max: 10485760 }   # the local file, read when the call is made
+    request:
+      method: GET
+      path: /3/drive/{drive}/files/{folder}/name
+      query: { name: "{name}" }
+    # drive-file sends the upload itself: the service takes it as
+    # octet-stream, which the yard sends no body as. The GET above then
+    # reads the file back, and its answer is the call's: the new file's
+    # id is in data. A file of the name already there is refused by the
+    # upload, which overwrites nothing.
+    build: [drive-file, upload]
+    answer: { select: [result, data, error] }
+  comment:
+    kind: update
+    about: Write a comment on a file
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      fileId: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      content: { type: string, max: 10000 }   # free text, as the twin's; its value is in no event
+    request:
+      method: POST
+      path: /2/drive/{drive}/files/{fileId}/comments
+      body: { body: "{content}" }
+    answer: { select: [result, data, error] }
+  share:
+    kind: update
+    about: Make a share link for a file, public or with a password
+    params:
+      drive: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      fileId: { type: string, pattern: "^[0-9]{1,12}$", max: 12, log: true }
+      right: { type: enum, values: [public, password] }   # no restriction, or public with a password
+      password: { type: string, max: 256, optional: true }   # required with password, refused with public, by the service
+    request:
+      method: POST
+      path: /2/drive/{drive}/files/{fileId}/link
+      body: { right: "{right}", password: "{password}" }
+    answer: { select: [result, data, error] }   # data holds the link's url

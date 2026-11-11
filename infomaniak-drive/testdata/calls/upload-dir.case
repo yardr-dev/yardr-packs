@@ -1,0 +1,8 @@
+=== args
+upload
+drive=12
+folder=7
+name=notes.txt
+file=__CORE__/files/hello.txt
+=== answer
+@uploaded

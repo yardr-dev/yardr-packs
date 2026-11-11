@@ -1,0 +1,9 @@
+=== args
+upload
+drive=12
+name=hello.txt
+file=__CORE__/files/hello.txt
+=== answer
+@conflict
+=== status
+409

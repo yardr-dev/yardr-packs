@@ -1,0 +1,14 @@
+--- requests
+GET /api/3/drive/12/files/45
+  auth: ok
+  user-agent: yardr
+GET /api/2/drive/12/files/45/download
+  auth: ok
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call download: drive-file: the download points to an invalid address, and is not followed"
+}
+--- stderr

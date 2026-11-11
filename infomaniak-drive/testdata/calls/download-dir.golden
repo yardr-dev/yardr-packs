@@ -1,0 +1,11 @@
+--- requests
+GET /api/3/drive/12/files/7
+  auth: ok
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call download: drive-file: file 7 is a dir, not a file: only a file's content downloads"
+}
+--- stderr

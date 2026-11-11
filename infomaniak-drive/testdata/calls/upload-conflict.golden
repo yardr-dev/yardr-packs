@@ -1,0 +1,13 @@
+--- requests
+POST /api/3/drive/12/upload?directory_id=1&file_name=hello.txt&total_size=15&conflict=error
+  auth: ok
+  content-type: application/octet-stream
+  user-agent: yardr
+  body: NOT JSON
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call upload: drive-file: a file named hello.txt is already in folder 1"
+}
+--- stderr

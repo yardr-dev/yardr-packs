@@ -1,0 +1,12 @@
+--- requests
+GET /api/2/drive/12/files/44/comments?with=user%2Cresponses%2Cresponses.user
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call comments: the service answered 403"
+}
+--- stderr

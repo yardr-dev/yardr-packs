@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call upload: parameter file is missing"
+}
+--- stderr

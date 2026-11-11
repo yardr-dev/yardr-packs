@@ -1,0 +1,5 @@
+=== args
+upload
+drive=12
+name=a/b
+file=__CORE__/files/hello.txt

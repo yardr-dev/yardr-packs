@@ -1,0 +1,47 @@
+--- requests
+GET /api/2/drive/12/files/44/comments?with=user%2Cresponses%2Cresponses.user
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "data": [
+    {
+      "body": "Is this the final version?",
+      "created_at": 1793901200,
+      "id": 9,
+      "is_resolved": false,
+      "liked": false,
+      "likes_count": 0,
+      "parent_id": null,
+      "responses": [
+        {
+          "body": "Yes, signed this morning.",
+          "created_at": 1793904800,
+          "id": 10,
+          "is_resolved": false,
+          "liked": false,
+          "likes_count": 0,
+          "parent_id": 9,
+          "responses": [],
+          "responses_count": 0,
+          "updated_at": 1793904800,
+          "user": {
+            "display_name": "Jane",
+            "id": 502
+          }
+        }
+      ],
+      "responses_count": 1,
+      "updated_at": 1793901200,
+      "user": {
+        "display_name": "mckean",
+        "id": 501
+      }
+    }
+  ],
+  "result": "success"
+}
+--- stderr

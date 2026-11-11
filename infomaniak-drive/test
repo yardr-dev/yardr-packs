@@ -1,0 +1,173 @@
+#!/bin/sh
+# The infomaniak-drive pack's tests: what the gate runs beside yardr pack
+# check. Needs no network and no secret, done in seconds. Needs jq, python3
+# and yardr, and fails without any of them: a part that was skipped would
+# leave the pack unpinned.
+#
+#   build  drive-file as a process, run as the yard runs it, over
+#          testdata/build/*.in: what it refuses in words (it refuses
+#          before it sends anything), and that a valid call reaches the
+#          network only with a credential and a base. Its refusals are
+#          one line each.
+#   core   testdata/core.sh: the real yardr in a scratch yard. The
+#          declaration as the yard reads it, the presets and the grants
+#          SETUP.md teaches, the check, and each testdata/calls/*.case, one
+#          `yardr call` against a stand-in for Infomaniak's drive API on a
+#          loopback port (testdata/standin.py) that answers the fixtures of
+#          testdata/answers/ and testdata/downloads/. A case's golden holds
+#          the requests the stand-in saw (method, path and query as they
+#          arrived, headers, body), the exit status, what the call kept of
+#          the answer and what it said on stderr; a call the declaration
+#          should turn away shows as no request at all. The upload's POST
+#          and the download's two GETs are the program's own requests, and
+#          show in the golden beside the yard's. All the requests together
+#          are held to the calls that read, the one POST that writes a
+#          comment, the one that makes a share link, and the one upload.
+#          The token the yard was given is a made-up string: it must
+#          reach the stand-in as a bearer token and be in no file of the
+#          yard but the env file, and in no output.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the programs
+# print; read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+
+for tool in jq python3; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
+
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn comes,
+# and the yard's server, which its first command starts, would outlive the
+# directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# ---- drive-file ------------------------------------------------------------
+mkdir "$tmp/work" "$tmp/home"
+# The payload an upload case reads: a small text, beside a sparse file a
+# byte past the call's bound, which reads instantly and holds no bytes.
+printf 'Hello, kDrive.\n' >"$tmp/work/payload.txt"
+python3 -c "open('$tmp/work/big.bin','wb').truncate(10*1024*1024+1)"
+# build_run <argv...> <stdin file>: the last word is the stdin file, the
+# rest the argv after the program. Runs the program as the yard does, in a
+# bare environment, from a directory of its own: stdout is in $tmp/b.out,
+# stderr in $tmp/b.err, the status in $rc. PYTHONDONTWRITEBYTECODE is the
+# test's and not the yard's: Apple's python3 3.9, the one a Mac has without
+# another, caches the bytecode of the standard library it imports under
+# $HOME/Library/Caches, and the check that the program writes no file below
+# is of the program's own.
+build_run() {
+  stdin=$1; shift
+  (cd "$tmp/work" && env -i PATH="$PATH" HOME="$tmp/home" PYTHONDONTWRITEBYTECODE=1 "$here/drive-file" "$@") <"$stdin" >"$tmp/b.out" 2>"$tmp/b.err"
+  rc=$?
+}
+# build_net <stdin file> <argv...>: as build_run, but with a made-up
+# credential and a base nothing listens on: a call past its validation
+# tries the network and says so, deterministically.
+build_net() {
+  stdin=$1; shift
+  (cd "$tmp/work" && env -i PATH="$PATH" HOME="$tmp/home" PYTHONDONTWRITEBYTECODE=1 INFOMANIAK_DRIVE_TOKEN=fake YARDR_SOURCE_BASE=http://127.0.0.1:1 "$here/drive-file" "$@") <"$stdin" >"$tmp/b.out" 2>"$tmp/b.err"
+  rc=$?
+}
+
+for c in testdata/build/*.in; do
+  n=$(basename "$c" .in)
+  case $n in
+    usage-none) build_run "$c" ;;
+    usage-extra) build_run "$c" upload bogus ;;
+    usage-bogus) build_run "$c" frobnicate ;;
+    upload-net-*) build_net "$c" upload ;;
+    download-net-*) build_net "$c" download ;;
+    upload-*) build_run "$c" upload ;;
+    download-*) build_run "$c" download ;;
+  esac
+  {
+    echo "--- status"
+    echo "$rc"
+    echo "--- stdout"
+    if [ -s "$tmp/b.out" ]; then jq . "$tmp/b.out" 2>/dev/null || cat "$tmp/b.out"; fi
+    echo "--- stderr"
+    cat "$tmp/b.err"
+  } >"$tmp/b.golden"
+  check "build $n" "$tmp/b.golden" "testdata/build/$n.golden"
+  # Every build case is a refusal: exit 1, no message, one line that
+  # says nothing of the token, the base or the file's path.
+  [ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && [ "$(wc -l <"$tmp/b.err" | tr -d ' ')" = 1 ] && grep -q '^drive-file: ' "$tmp/b.err"
+  ok "build $n is one refusal line with no message" $? "exit $rc, stdout $(wc -c <"$tmp/b.out") bytes, stderr: $(cat "$tmp/b.err")"
+done
+
+# Past its validation, with a credential and a base, the program tries the
+# network: nothing listens there, so each says the same words.
+build_net testdata/build/upload-valid.in upload
+[ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && grep -qx 'drive-file: no answer from the service' "$tmp/b.err"
+ok "build reaches the network for a valid upload (and says so when nothing answers)" $?
+build_net testdata/build/download-valid.in download
+[ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && grep -qx 'drive-file: no answer from the service' "$tmp/b.err"
+ok "build reaches the network for a valid download (and says so when nothing answers)" $?
+
+# The program makes no request and writes nothing: no file in its directory or
+# its home, and it holds no address of the service: where its requests go is
+# the base the yard hands it.
+[ -z "$(find "$tmp/work" "$tmp/home" -type f ! -name 'payload.txt' ! -name 'big.bin' 2>/dev/null)" ]
+ok "build writes no file" $?
+! grep -n 'api\.infomaniak\.com\|https\?://' drive-file | grep -v '^[0-9]*:#' | grep -q .
+ok "drive-file holds no address of the service" $?
+grep -n '^import \|^from ' drive-file | sed 's/^[0-9]*://' | sort >"$tmp/imports"
+python3 - "$tmp/imports" <<'EOF'
+import sys
+allowed = {"base64", "json", "os", "re", "sys", "urllib.error", "urllib.parse", "urllib.request"}
+seen = set()
+for line in open(sys.argv[1]):
+    line = line.strip()
+    if line.startswith("import "):
+        seen.update(w.strip().split(" ")[0] for w in line[len("import "):].split(","))
+    elif line.startswith("from "):
+        seen.add(line.split(" ")[1])
+sys.exit(0 if seen <= allowed else 1)
+EOF
+ok "drive-file imports only its standard library (json, os, re, sys, base64, urllib)" $?
+! grep -n 'INFOMANIAK_DRIVE_TOKEN' drive-file | grep -v '^[0-9]*:#' | grep -v -e 'TOKEN_ENV = ' -e 'os.environ.get(TOKEN_ENV' | grep -q .
+ok "drive-file reads the token from its environment alone" $?
+
+# ---- core ------------------------------------------------------------------
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: infomaniak-drive: all ok"; else echo "test: infomaniak-drive: FAILED"; fi
+exit $fail

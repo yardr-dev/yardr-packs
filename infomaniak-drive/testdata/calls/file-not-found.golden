@@ -1,0 +1,12 @@
+--- requests
+GET /api/3/drive/12/files/999
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call file: the service answered 404"
+}
+--- stderr

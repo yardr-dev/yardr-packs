@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+# drive-file: the two calls of the infomaniak-drive source that no
+# declaration says. The yard runs it for each upload (the call's build)
+# and each download (the call's run): the first argument is upload or
+# download, the call's parameters are on stdin as {"params": {...}}, and
+# one JSON object goes to stdout. A refusal is one line on stderr and a
+# non-zero exit, and for an upload nothing more is sent.
+#
+# Why a program and not two requests: the upload goes as
+# application/octet-stream, which the yard sends no body as (a built
+# body goes as JSON, a file parameter as one multipart upload, and the
+# service reads neither), and the download answers bytes, and may
+# answer a 302 first, where a declared request reads JSON and follows
+# no redirect. So the program makes the requests itself, with the
+# credential the yard hands it. Where they go is YARDR_SOURCE_BASE, the
+# declaration's base: no address is written here.
+#
+# upload reads the local file the call names and POSTs its bytes to the
+# service's upload address, with directory_id, file_name, total_size and
+# conflict=error in the query, as the service's pages say. It carries
+# 10 MiB, the call's bound, and refuses more. It overwrites nothing: a
+# file of the name already there is refused by the service, and the
+# refusal says so. What it prints, {"ok": true}, is the body of the
+# call's declared GET, which reads the file back by its name; the
+# service ignores the body of a GET.
+#
+# download reads the file's info first, refuses a directory (which the
+# service would answer as a zip) and a file over what the call carries,
+# then downloads the bytes, following a redirect to the service's own
+# host alone. It carries 32768 bytes: what a run command prints is held
+# to 64 KiB, and base64 takes four bytes for three. It prints the
+# content as text where it decodes as UTF-8 and the JSON answer fits; if
+# escaping would make that answer too large, it uses base64 instead. Bytes
+# that do not decode as UTF-8 are base64 too.
+#
+# Needs Python 3.9 or newer, and nothing beyond its standard library.
+import base64
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+TOKEN_ENV = "INFOMANIAK_DRIVE_TOKEN"
+BASE_ENV = "YARDR_SOURCE_BASE"
+
+# What each half carries. The upload's is the call's bound, held again
+# here for a file that changed between the yard's read and this one;
+# the download's is what fits the command's 64 KiB as base64.
+UPLOAD_MAX = 10 * 1024 * 1024
+DOWNLOAD_MAX = 32 * 1024
+COMMAND_OUTPUT_MAX = 64 * 1024
+
+# One request ends before the yard ends the call.
+TIMEOUT = 25
+
+ID = re.compile(r"^[0-9]{1,12}$")
+
+PARAMS = {
+    "upload": {"drive", "folder", "name", "file"},
+    "download": {"drive", "fileId"},
+}
+REQUIRED = {
+    "upload": ("drive", "folder", "name", "file"),
+    "download": ("drive", "fileId"),
+}
+
+
+def refuse(words):
+    sys.stderr.write("drive-file: %s\n" % words)
+    sys.exit(1)
+
+
+def read_params(what):
+    try:
+        request = json.loads(sys.stdin.buffer.read())
+    except ValueError:
+        refuse("stdin is no JSON")
+    params = request.get("params") if isinstance(request, dict) else None
+    if not isinstance(params, dict):
+        refuse('stdin is no {"params": {...}}')
+    for key in sorted(params):
+        if key not in PARAMS[what]:
+            refuse("%s is not a parameter of %s" % (key, what))
+        if not isinstance(params[key], str):
+            refuse("%s is no text" % key)
+    missing = [key for key in REQUIRED[what] if key not in params]
+    if missing:
+        refuse("%s needs %s" % (what, ", ".join(missing)))
+    return params
+
+
+def setup():
+    token = os.environ.get(TOKEN_ENV, "")
+    if not token:
+        refuse("no credential: the yard hands it under %s" % TOKEN_ENV)
+    base = os.environ.get(BASE_ENV, "").rstrip("/")
+    if not base:
+        refuse("no base: the yard hands it under %s" % BASE_ENV)
+    try:
+        at = urllib.parse.urlsplit(base)
+    except ValueError:
+        refuse("the base is no address")
+    if at.scheme not in ("http", "https") or not at.hostname:
+        refuse("the base is no address")
+    return token, base
+
+
+def check_id(kind, value):
+    if not ID.match(value):
+        refuse("%s is no id: digits, at most 12" % kind)
+
+
+def opener(redirect):
+    if redirect:
+        return urllib.request.build_opener()
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    return urllib.request.build_opener(NoRedirect)
+
+
+def send(token, request, data=None, limit=None):
+    # One request, answered in full, or to limit bytes where one is
+    # given (the download reads one byte past what it carries, to tell
+    # a file over it without reading the whole file). The words name
+    # the service, never its address: in a test the address holds a
+    # port that changes with each run, and in no golden.
+    request.add_header("Authorization", "Bearer %s" % token)
+    request.add_header("User-Agent", "yardr")
+    try:
+        with opener(redirect=False).open(request, data=data, timeout=TIMEOUT) as response:
+            if limit is None:
+                return response.status, response.headers, response.read()
+            return response.status, response.headers, response.read(limit)
+    except urllib.error.HTTPError as err:
+        try:
+            body = err.read()
+        except Exception:
+            body = b""
+        return err.code, err.headers, body
+    except Exception:
+        refuse("no answer from the service")
+
+
+def service_error(body):
+    # The service's {result: "error", error: {code, description}} cut to
+    # its code, or nothing where the body is none of that.
+    try:
+        answer = json.loads(body)
+    except ValueError:
+        return None
+    if isinstance(answer, dict) and isinstance(answer.get("error"), dict):
+        code = answer["error"].get("code")
+        if isinstance(code, str) and code:
+            return code
+    return None
+
+
+def upload(params, token, base):
+    drive, folder, name, path = (params["drive"], params["folder"], params["name"], params["file"])
+    check_id("drive", drive)
+    check_id("folder", folder)
+    if not name or "/" in name or len(name) > 255:
+        refuse("name is no file name: text without a slash, at most 255 characters")
+    if not os.path.isfile(path):
+        refuse("the file cannot be read")
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        refuse("the file cannot be read")
+    if size > UPLOAD_MAX:
+        refuse("the file is %d bytes, and at most %d" % (size, UPLOAD_MAX))
+    try:
+        with open(path, "rb") as f:
+            content = f.read(UPLOAD_MAX + 1)
+    except OSError:
+        refuse("the file cannot be read")
+    if len(content) > UPLOAD_MAX:
+        refuse("the file is over %d bytes, the most an upload carries" % UPLOAD_MAX)
+    query = urllib.parse.urlencode(
+        {"directory_id": folder, "file_name": name, "total_size": len(content), "conflict": "error"}
+    )
+    request = urllib.request.Request(
+        "%s/3/drive/%s/upload?%s" % (base, drive, query),
+        method="POST",
+        headers={"Content-Type": "application/octet-stream"},
+    )
+    status, _, body = send(token, request, data=content)
+    if status == 409 and service_error(body) == "file_already_exists_error":
+        refuse("a file named %s is already in folder %s" % (name, folder))
+    if status < 200 or status >= 300:
+        code = service_error(body)
+        if code:
+            refuse("the service refused the upload (%s)" % code)
+        refuse("the service refused the upload (status %d)" % status)
+    try:
+        answer = json.loads(body)
+    except ValueError:
+        refuse("the service answered the upload with no JSON")
+    if not isinstance(answer, dict) or answer.get("result") != "success":
+        code = service_error(body)
+        if code:
+            refuse("the service refused the upload (%s)" % code)
+        refuse("the service did not confirm the upload")
+    # The body of the call's declared GET, which reads the file back by
+    # its name; the service ignores a GET's body.
+    sys.stdout.write('{"ok":true}\n')
+
+
+def download(params, token, base):
+    drive, file_id = params["drive"], params["fileId"]
+    check_id("drive", drive)
+    check_id("fileId", file_id)
+    status, _, body = send(token, urllib.request.Request("%s/3/drive/%s/files/%s" % (base, drive, file_id)))
+    if status < 200 or status >= 300:
+        if status == 404:
+            refuse("the service has no file %s in drive %s" % (file_id, drive))
+        code = service_error(body)
+        if code:
+            refuse("the service refused the file's info (%s)" % code)
+        refuse("the service refused the file's info (status %d)" % status)
+    try:
+        info = json.loads(body)
+    except ValueError:
+        refuse("the service answered the file's info with no JSON")
+    data = info.get("data") if isinstance(info, dict) else None
+    if not isinstance(data, dict):
+        refuse("the service answered the file's info with no file")
+    if data.get("type") != "file":
+        refuse("file %s is a %s, not a file: only a file's content downloads" % (file_id, data.get("type")))
+    size = data.get("size")
+    if isinstance(size, int) and size > DOWNLOAD_MAX:
+        refuse("the file is %d bytes, and at most %d" % (size, DOWNLOAD_MAX))
+    url = "%s/2/drive/%s/files/%s/download" % (base, drive, file_id)
+    first = urllib.parse.urlsplit(base)
+    content = None
+    for _ in range(5):
+        request = urllib.request.Request(url)
+        status, headers, body = send(token, request, limit=DOWNLOAD_MAX + 1)
+        if status in (301, 302, 303, 307, 308):
+            try:
+                to = urllib.parse.urljoin(url, headers.get("Location") or "")
+                at = urllib.parse.urlsplit(to)
+                destination = (at.scheme, at.hostname, at.port)
+            except ValueError:
+                refuse("the download points to an invalid address, and is not followed")
+            if not to or destination != (first.scheme, first.hostname, first.port):
+                refuse("the download points elsewhere, and is not followed")
+            url = to
+            continue
+        if status < 200 or status >= 300:
+            code = service_error(body)
+            if code:
+                refuse("the service refused the download (%s)" % code)
+            refuse("the service refused the download (status %d)" % status)
+        content = body
+        break
+    if content is None:
+        refuse("the download redirects past 5 answers, and is not followed")
+    if len(content) > DOWNLOAD_MAX:
+        # The info named no size, so the bytes were read to tell: the
+        # service was asked for the whole file, whatever it holds.
+        refuse("the file is over %d bytes, the most a download carries" % DOWNLOAD_MAX)
+    try:
+        text, encoding = content.decode("utf-8"), "text"
+    except UnicodeDecodeError:
+        text, encoding = base64.b64encode(content).decode("ascii"), "base64"
+    answer = {
+        "name": data.get("name"),
+        "mime_type": data.get("mime_type"),
+        "size": len(content),
+        "encoding": encoding,
+        "content": text,
+    }
+    rendered = json.dumps(answer, separators=(",", ":"))
+    if len(rendered) + 1 > COMMAND_OUTPUT_MAX:
+        answer["encoding"] = "base64"
+        answer["content"] = base64.b64encode(content).decode("ascii")
+        rendered = json.dumps(answer, separators=(",", ":"))
+    if len(rendered) + 1 > COMMAND_OUTPUT_MAX:
+        refuse("the download answer is over 64 KiB")
+    sys.stdout.write(rendered + "\n")
+
+
+def main(argv):
+    if len(argv) != 2 or argv[1] not in ("upload", "download"):
+        refuse("usage: drive-file upload|download")
+    what = argv[1]
+    params = read_params(what)
+    token, base = setup()
+    if what == "upload":
+        upload(params, token, base)
+    else:
+        download(params, token, base)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

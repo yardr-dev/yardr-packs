@@ -1,0 +1,18 @@
+--- requests
+GET /api/3/drive/12/files/46
+  auth: ok
+  user-agent: yardr
+GET /api/2/drive/12/files/46/download
+  auth: ok
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "content": "iVBORw0KGgr//gAH",
+  "encoding": "base64",
+  "mime_type": "image/png",
+  "name": "pixels.png",
+  "size": 12
+}
+--- stderr

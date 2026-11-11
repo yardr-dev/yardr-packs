@@ -1,0 +1,39 @@
+--- requests
+POST /api/3/drive/12/upload?directory_id=1&file_name=hello.txt&total_size=15&conflict=error
+  auth: ok
+  content-type: application/octet-stream
+  user-agent: yardr
+  body: NOT JSON
+GET /api/3/drive/12/files/1/name?name=hello.txt
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"ok":true}
+--- status
+0
+--- stdout
+{
+  "data": {
+    "added_at": 1793981000,
+    "created_at": 1793981000,
+    "created_by": 501,
+    "depth": 1,
+    "drive_id": 12,
+    "extension_type": "text",
+    "id": 101,
+    "last_modified_at": 1793981000,
+    "last_modified_by": 501,
+    "mime_type": "text/plain",
+    "name": "hello.txt",
+    "parent_id": 1,
+    "revised_at": 1793981000,
+    "size": 15,
+    "status": "ok",
+    "type": "file",
+    "updated_at": 1793981000,
+    "visibility": ""
+  },
+  "result": "success"
+}
+--- stderr

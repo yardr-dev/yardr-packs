@@ -1,0 +1,53 @@
+--- requests
+GET /api/3/drive/12/files/1/files?limit=50
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "cursor": "W1siaXQiLDE3OTM4Mjc0MDBdXQ",
+  "data": [
+    {
+      "added_at": 1793798400,
+      "created_at": 1793798400,
+      "created_by": 501,
+      "depth": 1,
+      "drive_id": 12,
+      "id": 7,
+      "last_modified_at": 1793827200,
+      "last_modified_by": 501,
+      "name": "Invoices",
+      "parent_id": 1,
+      "revised_at": 1793827200,
+      "status": "ok",
+      "type": "dir",
+      "updated_at": 1793827200,
+      "visibility": ""
+    },
+    {
+      "added_at": 1793813400,
+      "created_at": 1793813400,
+      "created_by": 501,
+      "depth": 1,
+      "drive_id": 12,
+      "extension_type": "pdf",
+      "id": 44,
+      "last_modified_at": 1793813400,
+      "last_modified_by": 501,
+      "mime_type": "application/pdf",
+      "name": "invoice-june.pdf",
+      "parent_id": 1,
+      "revised_at": 1793813400,
+      "size": 184320,
+      "status": "ok",
+      "type": "file",
+      "updated_at": 1793813400,
+      "visibility": ""
+    }
+  ],
+  "has_more": true,
+  "result": "success"
+}
+--- stderr

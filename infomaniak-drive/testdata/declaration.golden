@@ -1,0 +1,406 @@
+{
+  "about": "Infomaniak kDrive files listed, read, searched and downloaded; files uploaded, comments written, share links made.",
+  "base": "https://api.infomaniak.com",
+  "calls": [
+    {
+      "about": "List a folder's files, one page",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "result",
+          "data",
+          "error",
+          "cursor",
+          "has_more"
+        ]
+      },
+      "kind": "read",
+      "name": "files",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "default": "1",
+          "log": true,
+          "max": 12,
+          "name": "folder",
+          "optional": true,
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "file",
+            "dir"
+          ]
+        },
+        {
+          "name": "maxResults",
+          "optional": true,
+          "pattern": "^([5-9]|[1-9][0-9]|100)$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/3/drive/{drive}/files/{folder}/files",
+        "query": [
+          {
+            "key": "limit",
+            "value": "{maxResults}"
+          },
+          {
+            "key": "type[]",
+            "value": "{type}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Read one file's metadata",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "read",
+      "name": "file",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "id",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/3/drive/{drive}/files/{id}"
+      }
+    },
+    {
+      "about": "Search files, one page",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "result",
+          "data",
+          "error",
+          "cursor",
+          "has_more"
+        ]
+      },
+      "kind": "read",
+      "name": "search",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "max": 1000,
+          "name": "q",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "folder",
+          "optional": true,
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "name": "depth",
+          "optional": true,
+          "type": "enum",
+          "values": [
+            "child",
+            "unlimited"
+          ]
+        },
+        {
+          "name": "maxResults",
+          "optional": true,
+          "pattern": "^([5-9]|[1-9][0-9]|100)$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/3/drive/{drive}/files/search",
+        "query": [
+          {
+            "key": "query",
+            "value": "{q}"
+          },
+          {
+            "key": "directory_id",
+            "value": "{folder}"
+          },
+          {
+            "key": "depth",
+            "value": "{depth}"
+          },
+          {
+            "key": "limit",
+            "value": "{maxResults}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "List a file's comments, each with its author and its replies",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "read",
+      "name": "comments",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "fileId",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/2/drive/{drive}/files/{fileId}/comments",
+        "query": [
+          {
+            "key": "with",
+            "value": "user,responses,responses.user"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Download one file's content, at most 32 KiB, as text or base64",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "name",
+          "mime_type",
+          "size",
+          "encoding",
+          "content"
+        ]
+      },
+      "kind": "read",
+      "name": "download",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "fileId",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "",
+        "path": ""
+      },
+      "run": [
+        "drive-file",
+        "download"
+      ]
+    },
+    {
+      "about": "Upload a file of at most 10 MiB, and read it back by its name",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "build": [
+        "drive-file",
+        "upload"
+      ],
+      "kind": "update",
+      "name": "upload",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "default": "1",
+          "log": true,
+          "max": 12,
+          "name": "folder",
+          "optional": true,
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "max": 255,
+          "name": "name",
+          "pattern": "^[^/]{1,255}$",
+          "type": "string"
+        },
+        {
+          "max": 10485760,
+          "name": "file",
+          "type": "file"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/3/drive/{drive}/files/{folder}/name",
+        "query": [
+          {
+            "key": "name",
+            "value": "{name}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "Write a comment on a file",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "update",
+      "name": "comment",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "fileId",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "max": 10000,
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "body": "{content}"
+        },
+        "method": "POST",
+        "path": "/2/drive/{drive}/files/{fileId}/comments"
+      }
+    },
+    {
+      "about": "Make a share link for a file, public or with a password",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "result",
+          "data",
+          "error"
+        ]
+      },
+      "kind": "update",
+      "name": "share",
+      "params": [
+        {
+          "log": true,
+          "max": 12,
+          "name": "drive",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 12,
+          "name": "fileId",
+          "pattern": "^[0-9]{1,12}$",
+          "type": "string"
+        },
+        {
+          "name": "right",
+          "type": "enum",
+          "values": [
+            "public",
+            "password"
+          ]
+        },
+        {
+          "max": 256,
+          "name": "password",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "password": "{password}",
+          "right": "{right}"
+        },
+        "method": "POST",
+        "path": "/2/drive/{drive}/files/{fileId}/link"
+      }
+    }
+  ],
+  "credential": {
+    "env": "INFOMANIAK_DRIVE_TOKEN",
+    "header": "Authorization: Bearer {credential}"
+  },
+  "name": "infomaniak-drive"
+}

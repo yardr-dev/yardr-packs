@@ -1,0 +1,11 @@
+--- requests
+GET /api/3/drive/12/files/47
+  auth: ok
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-drive, call download: drive-file: the file is 40000 bytes, and at most 32768"
+}
+--- stderr

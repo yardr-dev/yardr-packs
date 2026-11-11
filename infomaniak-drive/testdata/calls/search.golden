@@ -1,0 +1,36 @@
+--- requests
+GET /api/3/drive/12/files/search?query=invoice
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "cursor": "",
+  "data": [
+    {
+      "added_at": 1793813400,
+      "created_at": 1793813400,
+      "created_by": 501,
+      "depth": 2,
+      "drive_id": 12,
+      "extension_type": "pdf",
+      "id": 44,
+      "last_modified_at": 1793813400,
+      "last_modified_by": 501,
+      "mime_type": "application/pdf",
+      "name": "invoice-june.pdf",
+      "parent_id": 7,
+      "revised_at": 1793813400,
+      "size": 184320,
+      "status": "ok",
+      "type": "file",
+      "updated_at": 1793813400,
+      "visibility": ""
+    }
+  ],
+  "has_more": false,
+  "result": "success"
+}
+--- stderr
