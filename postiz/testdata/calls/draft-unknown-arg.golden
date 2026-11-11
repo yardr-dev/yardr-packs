@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call draft: \"type\" is no parameter of the call (it takes: channels, text, image_id, image_path, replies)"
+}
+--- stderr

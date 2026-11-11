@@ -1,0 +1,38 @@
+--- requests
+GET /public/v1/integrations
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+[
+  {
+    "customer": null,
+    "disabled": false,
+    "id": "cm4ean69r0003w8w1cdomox9n",
+    "identifier": "x",
+    "name": "yardr",
+    "picture": "https://uploads.postiz.com/avatar-x.jpg",
+    "profile": "yardrdev"
+  },
+  {
+    "customer": null,
+    "disabled": false,
+    "id": "cm4ean70s0004w8w1efghij2kl",
+    "identifier": "linkedin-page",
+    "name": "yardr",
+    "picture": "https://uploads.postiz.com/avatar-li.jpg",
+    "profile": "yardr"
+  },
+  {
+    "customer": null,
+    "disabled": true,
+    "id": "cm4ean71t0005w8w1mnopqr3st",
+    "identifier": "mastodon",
+    "name": "old relay",
+    "picture": "https://uploads.postiz.com/avatar-md.jpg",
+    "profile": "relay"
+  }
+]
+--- stderr

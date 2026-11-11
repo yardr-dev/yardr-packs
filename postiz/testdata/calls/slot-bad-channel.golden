@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call slot: parameter channel does not match its pattern ^[A-Za-z0-9_-]{1,64}$"
+}
+--- stderr

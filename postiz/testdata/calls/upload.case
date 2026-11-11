@@ -1,0 +1,5 @@
+=== args
+upload
+file=@testfile:pic.png
+=== answer
+@uploaded

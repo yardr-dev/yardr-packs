@@ -1,0 +1,17 @@
+--- requests
+POST /public/v1/posts
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"type":"draft","date":"NOW","shortLink":false,"tags":[],"posts":[{"integration":{"id":"cm4ean70s0004w8w1efghij2kl"},"value":[{"content":"Notes for next week.","image":[]}],"settings":{"__type":"linkedin-page"}}]}
+--- status
+0
+--- stdout
+[
+  {
+    "integration": "cm4ean69r0003w8w1cdomox9n",
+    "postId": "post-new-1"
+  }
+]
+--- stderr

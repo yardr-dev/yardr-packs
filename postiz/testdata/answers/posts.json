@@ -1,0 +1,64 @@
+{
+  "posts": [
+    {
+      "id": "post-queued-1",
+      "content": "Shipping Friday: the yard schedules its own posts now.",
+      "publishDate": "2026-11-20T09:00:00.000Z",
+      "releaseURL": null,
+      "releaseId": null,
+      "state": "QUEUE",
+      "error": null,
+      "intervalInDays": null,
+      "group": "group-1",
+      "creationMethod": "API",
+      "settings": "{\"__type\":\"x\",\"who_can_reply_post\":\"everyone\"}",
+      "tags": [],
+      "integration": {
+        "id": "cm4ean69r0003w8w1cdomox9n",
+        "providerIdentifier": "x",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-x.jpg"
+      }
+    },
+    {
+      "id": "post-draft-1",
+      "content": "Notes for next week's post, still rough.",
+      "publishDate": "2026-11-11T12:00:00.000Z",
+      "releaseURL": null,
+      "releaseId": null,
+      "state": "DRAFT",
+      "error": null,
+      "intervalInDays": null,
+      "group": "group-2",
+      "creationMethod": "API",
+      "settings": "{\"__type\":\"linkedin-page\"}",
+      "tags": [],
+      "integration": {
+        "id": "cm4ean70s0004w8w1efghij2kl",
+        "providerIdentifier": "linkedin-page",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-li.jpg"
+      }
+    },
+    {
+      "id": "post-error-1",
+      "content": "A post the platform would not take.",
+      "publishDate": "2026-11-10T09:00:00.000Z",
+      "releaseURL": null,
+      "releaseId": null,
+      "state": "ERROR",
+      "error": "Account banned from posting, please check account status",
+      "intervalInDays": null,
+      "group": "group-3",
+      "creationMethod": "API",
+      "settings": "{\"__type\":\"x\",\"who_can_reply_post\":\"everyone\"}",
+      "tags": [],
+      "integration": {
+        "id": "cm4ean69r0003w8w1cdomox9n",
+        "providerIdentifier": "x",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-x.jpg"
+      }
+    }
+  ]
+}

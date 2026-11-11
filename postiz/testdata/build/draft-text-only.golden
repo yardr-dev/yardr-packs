@@ -1,0 +1,26 @@
+--- status
+0
+--- stdout
+{
+  "type": "draft",
+  "date": "NOW",
+  "shortLink": false,
+  "tags": [],
+  "posts": [
+    {
+      "integration": {
+        "id": "cm4ean70s0004w8w1efghij2kl"
+      },
+      "value": [
+        {
+          "content": "Notes for next week.",
+          "image": []
+        }
+      ],
+      "settings": {
+        "__type": "linkedin-page"
+      }
+    }
+  ]
+}
+--- stderr

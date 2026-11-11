@@ -1,0 +1,12 @@
+--- requests
+GET /public/v1/posts?endDate=2026-11-30T23%3A59%3A59.000Z&startDate=2026-11-01T00%3A00%3A00.000Z
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "posts": []
+}
+--- stderr

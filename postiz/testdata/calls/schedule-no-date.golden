@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call schedule: parameter date is missing"
+}
+--- stderr

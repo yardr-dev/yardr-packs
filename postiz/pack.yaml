@@ -1,0 +1,41 @@
+# Postiz as a pack of kind source: the integration, imported into the yard
+# and into no depot. What Postiz is here: the declared source postiz, which
+# lists the workspace's channels, reads the scheduled posts, finds a
+# channel's next free slot, uploads one picture, and writes drafts and
+# scheduled posts. It publishes nothing at once, and it deletes, edits,
+# threads, comments and analyses nothing.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/postiz
+#
+# The source is named postiz: a pack is named after the service it talks to.
+# A pack of kind source asks no grants at import, so what a crew member may
+# call is granted afterwards, by the setup notes. Every agent granted a call
+# acts as the one API key's workspace: it reaches every channel of the
+# workspace, whatever it asks for.
+name: postiz
+kind: source
+setup: SETUP.md
+
+sources:
+  postiz:
+    declaration: postiz.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. A preset names read, every read call, or
+# a call by its name: no word stands for every update, so drafts names draft
+# and upload, and schedule names schedule and upload. schedule stands apart
+# from draft: a crew member that schedules is granted both presets.
+presets:
+  read:
+    about: List channels, read scheduled posts, ask for free slots; write nothing
+    grants:
+      postiz: [read]
+  drafts:
+    about: Read, upload pictures, and write drafts the person schedules
+    grants:
+      postiz: [read, draft, upload]
+  schedule:
+    about: Read, upload pictures, and schedule posts that go out on their own
+    grants:
+      postiz: [read, schedule, upload]

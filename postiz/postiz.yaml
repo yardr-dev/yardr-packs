@@ -1,0 +1,156 @@
+# Postiz as a declared source: the workspace's channels, what is scheduled,
+# and drafts and scheduled posts written from the yard. A crew member lists
+# the channels, reads the scheduled posts, asks a channel for its next free
+# slot, uploads one picture, and writes a post as a draft or schedules it.
+# What it never does is publish now: there is no call with type "now", and a
+# schedule whose time has passed or is missing is refused before anything is
+# sent. Until this pack, a wrong scheduled post is removed in Postiz itself:
+# nothing here deletes or edits one.
+#
+# What was read, and on which day: docs.postiz.com (the public API pages for
+# integrations, posts, find-slot, upload and the x and linkedin providers,
+# and the uploads troubleshooting page) and the service's own source,
+# github.com/gitroomhq/postiz-app at b31d29f (11 November 2026), both read on
+# 12 November 2026: apps/backend/src/public-api/routes/v1/public.integrations.controller.ts
+# (every address, field and answer shape here), apps/backend/src/services/auth/public.auth.middleware.ts
+# (the credential), libraries/nestjs-libraries/src/dtos/posts/create.post.dto.ts
+# (what a post requires), libraries/nestjs-libraries/src/database/prisma/posts/posts.service.ts
+# and posts.repository.ts (drafts, schedules, slots, the posts list),
+# libraries/nestjs-libraries/src/throttler/throttler.provider.ts with
+# apps/backend/src/app.module.ts (the rate limit), and
+# apps/orchestrator/src/workflows/post-workflows/post.workflow.v1.1.2.ts (what
+# a schedule waits for).
+#
+# Where the service differs from the remembered list the bead carried:
+#   - The self-hosted base is https://<domain>/api/public/v1, with /api, not
+#     <backend>/public/v1. The cloud base is https://api.postiz.com/public/v1.
+#   - The rate limit is 90 POST /posts an hour per organization by default
+#     (100 on the cloud, API_LIMIT changes it), and reads and uploads are not
+#     limited at all. The remembered "about 30 requests/hour" is stale, as is
+#     the "30 requests per hour" line still in the OpenAPI info block.
+#   - A draft needs posts[] and a date like any other post; the OpenAPI note
+#     "Required if type is not 'draft'" is wrong against the source, which
+#     requires at least one post always. The draft's date is stored and unused
+#     until the post is scheduled, which sets a new date.
+#   - A schedule whose time has passed publishes at once: the workflow sleeps
+#     0 for a past publishDate. A schedule a minute ahead waits the minute; it
+#     is not treated as now. So build-post, beside this file, refuses a past
+#     or missing time, and only that.
+# What held: the API key bare in Authorization (no "Bearer"); GET
+# /integrations, GET /posts with a required window, POST /posts with type
+# draft/schedule/now, one entry per channel; POST /upload as multipart plus
+# upload from a URL; the next-free-slot call, GET /find-slot/{id}.
+#
+# Not tried: no request was made to api.postiz.com, because there is no
+# Postiz account in the yard yet. Every call was run through the real yardr
+# against a stand-in that answers fixtures shaped after the docs and the
+# source (README.md, "What was checked"). Where this file and the service
+# differ, the service is right.
+#
+# The service takes no idempotency key, so the file names none: an update
+# tried again after a lost answer is written twice. A schedule tried twice is
+# queued twice.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies into
+# the yard.
+name: postiz
+about: Postiz channels, scheduled posts and drafts. Lists channels, reads scheduled posts, finds a channel's next free slot, uploads one picture, and writes drafts and scheduled posts; publishes nothing at once.
+
+# The name of the variable, never the value. An API key made in Postiz's
+# settings, on the Developers tab, sent bare and typed unseen at setup.
+credential:
+  env: POSTIZ_API_KEY
+  header: "Authorization: {credential}"
+
+# base is the cloud's API. A yard on a self-hosted Postiz runs an operator's
+# copy of this file with the base replaced (SETUP.md, step 2): the credential
+# is then given again, for the new host.
+base: https://api.postiz.com/public/v1
+# channels needs no argument and shows at once that the key is taken.
+check: channels
+calls:
+  channels:
+    kind: read
+    about: List the workspace's channels, each with its id, name, network, picture, whether it is disabled, and its profile
+    request:
+      method: GET
+      path: /integrations
+    # The answer is a list; the select keeps these keys of each entry. The
+    # service names the network "identifier" and the channel's id "id": the
+    # id is the channel of slot and the id in each entry of draft and schedule.
+    answer: { select: [id, name, identifier, picture, disabled, profile, customer] }
+  posts:
+    kind: read
+    about: Read the posts in a window, scheduled, drafted, published and failed
+    params:
+      start: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?Z?$", max: 30 }   # the window's start, UTC; the service wants the window
+      end: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?Z?$", max: 30 }   # the window's end, UTC
+    request:
+      method: GET
+      path: /posts
+      query: { startDate: "{start}", endDate: "{end}" }
+    # Each post carries its id, content, publishDate, state (QUEUE, DRAFT,
+    # PUBLISHED, ERROR), releaseURL, error, settings and integration. An
+    # answer over the bound is refused, not cut: narrow the window.
+    answer: { select: [posts], max: 262144 }
+  slot:
+    kind: read
+    about: Ask a channel for its next free posting slot, from its time slots
+    params:
+      channel: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }   # a channel's id as channels gives it
+    request:
+      method: GET
+      path: /find-slot/{channel}
+    # The date is UTC as YYYY-MM-DDTHH:mm:ss, with no zone letter; schedule
+    # takes it as it stands.
+    answer: { select: [date] }
+  draft:
+    kind: update
+    about: Write a draft for one or more channels, saved and never published
+    params:
+      channels: { type: string, pattern: "^[a-z0-9-]+:[A-Za-z0-9_-]+(,[a-z0-9-]+:[A-Za-z0-9_-]+)*$", max: 2000, log: true }   # one channel per entry, network:id as channels shows them, comma-separated
+      text: { type: string, max: 10000 }   # the post's text, the same for every channel; blank only with a picture
+      image_id: { type: string, pattern: "^[A-Za-z0-9_-]{1,200}$", max: 200, optional: true }   # the picture's id as upload answered it; with its path, or neither
+      image_path: { type: string, pattern: "^https://[^[:space:]]+$", max: 2000, optional: true }   # the picture's path as upload answered it
+      replies: { type: enum, values: [everyone, following, mentionedUsers, subscribers, verified], default: "everyone" }   # who may reply on X; other networks ignore it
+    request:
+      method: POST
+      path: /posts
+    # build-post assembles the request: one entry per channel, X and LinkedIn
+    # carried, the rest given the text. A draft's date is the service's
+    # required field and is stored unused; scheduling sets a new one.
+    build: [build-post, draft]
+    answer: { select: [postId, integration] }   # one entry per channel written
+  schedule:
+    kind: update
+    about: Schedule a post for one or more channels at a given time
+    params:
+      channels: { type: string, pattern: "^[a-z0-9-]+:[A-Za-z0-9_-]+(,[a-z0-9-]+:[A-Za-z0-9_-]+)*$", max: 2000, log: true }   # one channel per entry, network:id as channels shows them, comma-separated
+      text: { type: string, max: 10000 }   # the post's text, the same for every channel; blank only with a picture
+      date: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?Z?$" }   # when it goes out, UTC; in the future, or nothing is sent
+      image_id: { type: string, pattern: "^[A-Za-z0-9_-]{1,200}$", max: 200, optional: true }   # the picture's id as upload answered it; with its path, or neither
+      image_path: { type: string, pattern: "^https://[^[:space:]]+$", max: 2000, optional: true }   # the picture's path as upload answered it
+      replies: { type: enum, values: [everyone, following, mentionedUsers, subscribers, verified], default: "everyone" }   # who may reply on X; other networks ignore it
+    request:
+      method: POST
+      path: /posts
+    # build-post assembles the request and refuses a time that is not in the
+    # future: the service publishes a past schedule at once.
+    build: [build-post, schedule]
+    answer: { select: [postId, integration] }   # one entry per channel written
+  upload:
+    kind: update
+    about: Upload one picture for a post to carry, and read back its id and path
+    params:
+      file: { type: file, max: 10485760 }   # the local picture, read when the call is made, at most 10 MiB
+    request:
+      method: POST
+      path: /upload
+      # A body that names a file parameter goes as a multipart upload: the
+      # file part is what the service reads, as its own example sends it.
+      body: { file: "{file}" }
+    # The service answers the media's id and path (and its status, ready),
+    # which go into a draft or a schedule as image_id and image_path. It
+    # inspects the file's content and refuses what is no picture or video.
+    answer: { select: [id, name, path, organizationId, createdAt, updatedAt, status] }

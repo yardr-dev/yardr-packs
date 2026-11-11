@@ -1,0 +1,5 @@
+--- status
+1
+--- stdout
+--- stderr
+build-post: channel cm4ean69r0003w8w1cdomox9n is named twice: one entry per channel

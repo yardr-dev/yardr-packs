@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz has no call \"delete\" (it has: channels, posts, slot, draft, schedule, upload)"
+}
+--- stderr

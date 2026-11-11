@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call draft: build-post: a picture is image_id with image_path, or neither"
+}
+--- stderr

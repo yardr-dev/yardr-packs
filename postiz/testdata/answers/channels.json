@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cm4ean69r0003w8w1cdomox9n",
+    "name": "yardr",
+    "identifier": "x",
+    "picture": "https://uploads.postiz.com/avatar-x.jpg",
+    "disabled": false,
+    "profile": "yardrdev",
+    "customer": null
+  },
+  {
+    "id": "cm4ean70s0004w8w1efghij2kl",
+    "name": "yardr",
+    "identifier": "linkedin-page",
+    "picture": "https://uploads.postiz.com/avatar-li.jpg",
+    "disabled": false,
+    "profile": "yardr",
+    "customer": null
+  },
+  {
+    "id": "cm4ean71t0005w8w1mnopqr3st",
+    "name": "old relay",
+    "identifier": "mastodon",
+    "picture": "https://uploads.postiz.com/avatar-md.jpg",
+    "disabled": true,
+    "profile": "relay",
+    "customer": null
+  }
+]

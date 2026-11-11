@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+# build-post: the request body of the draft and schedule calls of the postiz
+# source. The yard runs it for each draft and each schedule (the call's build
+# in postiz.yaml): the first argument is draft or schedule, the call's
+# parameters are on stdin as {"params": {...}}, and one JSON object, the
+# request the service wants, goes to stdout. A refusal is one line on stderr
+# and a non-zero exit, and nothing is sent. It makes no request and reads no
+# credential.
+#
+# Why a program and not a body template: one call writes one entry per
+# channel, a template writes one body. The channels parameter names each
+# channel as network:id, and the program builds an entry for each, with the
+# settings its network takes. The service fills __type from the channel
+# itself and validates against the true network, so a wrong network fails
+# there with the service's readable error; what the program refuses itself
+# is what must never be sent.
+#
+# The one thing that must hold: a schedule goes out on its own, and the
+# service publishes a schedule whose time has passed at once (its workflow
+# sleeps 0 for a past publishDate). So a schedule whose date is missing, is
+# no date, or is not in the future is refused here, and the pack's test holds
+# every schedule to a future date. A minute-ahead schedule waits the minute;
+# the service does not treat it as now, so it is sent. There is no type now:
+# the type comes from the argument alone, draft or schedule, and from no
+# parameter. A draft's date is the service's required field and is stored
+# unused; scheduling the draft later sets a new one, so the program sends the
+# current time.
+#
+# Needs Python 3.9 or newer, and nothing beyond its standard library.
+import json
+import re
+import sys
+from datetime import datetime, timezone
+
+# The parameters of the calls. date is schedule's alone: draft takes none.
+PARAMS = {
+    "draft": {"channels", "text", "image_id", "image_path", "replies"},
+    "schedule": {"channels", "text", "date", "image_id", "image_path", "replies"},
+}
+REQUIRED = {
+    "draft": ("channels", "text"),
+    "schedule": ("channels", "text", "date"),
+}
+
+# Who may reply on X, the service's five values; the call defaults to the first.
+REPLIES = ("everyone", "following", "mentionedUsers", "subscribers", "verified")
+
+# A date as the calls take it: UTC, seconds, optional millis, the zone letter
+# optional so that a slot's answer goes in as it stands. Always UTC: a date
+# with an offset is refused.
+DATE = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,3}))?Z?$")
+
+# One channel: the network and the id as channels shows them.
+ENTRY = re.compile(r"^([a-z0-9-]+):([A-Za-z0-9_-]+)$")
+
+
+def refuse(words):
+    sys.stderr.write("build-post: %s\n" % words)
+    sys.exit(1)
+
+
+def parse_date(value):
+    m = DATE.match(value)
+    if not m:
+        return None
+    year, month, day, hour, minute, second = (int(g) for g in m.groups()[:6])
+    millis = int((m.group(7) or "0").ljust(3, "0"))
+    try:
+        return datetime(year, month, day, hour, minute, second, millis * 1000, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def stamp(when):
+    return "%s.%03dZ" % (when.strftime("%Y-%m-%dT%H:%M:%S"), when.microsecond // 1000)
+
+
+def settings(network, replies):
+    # X and LinkedIn carried; any other network gets the text with generic
+    # settings, and the service validates against the channel's true network.
+    if network == "x":
+        return {"__type": "x", "who_can_reply_post": replies}
+    return {"__type": network}
+
+
+def build(which, params, now):
+    for key in sorted(params):
+        if key not in PARAMS[which]:
+            refuse("%s is not a parameter of %s" % (key, which))
+        if not isinstance(params[key], str):
+            refuse("%s is no text" % key)
+    missing = [key for key in REQUIRED[which] if key not in params]
+    if missing:
+        refuse("%s needs %s" % (which, ", ".join(missing)))
+    replies = params.get("replies", "everyone")
+    if replies not in REPLIES:
+        refuse("replies is none of %s" % ", ".join(REPLIES))
+    entries = []
+    seen = set()
+    for raw in params["channels"].split(","):
+        m = ENTRY.match(raw.strip())
+        if not m:
+            refuse("%s is no channel: network:id as channels shows them" % (raw.strip() or params["channels"]))
+        network, cid = m.group(1), m.group(2)
+        if cid in seen:
+            refuse("channel %s is named twice: one entry per channel" % cid)
+        seen.add(cid)
+        entries.append((network, cid))
+    if not entries:
+        refuse("channels names no channel")
+    image_id = params.get("image_id")
+    image_path = params.get("image_path")
+    if (image_id is None) != (image_path is None):
+        refuse("a picture is image_id with image_path, or neither")
+    image = [] if image_id is None else [{"id": image_id, "path": image_path}]
+    if not params["text"].strip() and not image:
+        refuse("a post has at least one character or one picture")
+    if which == "schedule":
+        when = parse_date(params["date"])
+        if when is None:
+            refuse("date is no UTC date and time: YYYY-MM-DDTHH:mm:ss")
+        if when <= now:
+            refuse("date is not in the future: the service would publish at once")
+    else:
+        when = now
+    return {
+        "type": which,
+        "date": stamp(when),
+        "shortLink": False,
+        "tags": [],
+        "posts": [
+            {
+                "integration": {"id": cid},
+                "value": [{"content": params["text"], "image": image}],
+                "settings": settings(network, replies),
+            }
+            for network, cid in entries
+        ],
+    }
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in ("draft", "schedule"):
+        refuse("the one argument is draft or schedule")
+    try:
+        request = json.loads(sys.stdin.buffer.read())
+    except ValueError:
+        refuse("stdin is no JSON")
+    params = request.get("params") if isinstance(request, dict) else None
+    if not isinstance(params, dict):
+        refuse('stdin is no {"params": {...}}')
+    now = datetime.now(timezone.utc)
+    sys.stdout.write(json.dumps(build(sys.argv[1], params, now), separators=(",", ":")) + "\n")
+
+
+if __name__ == "__main__":
+    main()

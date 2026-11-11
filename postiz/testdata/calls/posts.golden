@@ -1,0 +1,73 @@
+--- requests
+GET /public/v1/posts?endDate=2026-11-30T23%3A59%3A59.000Z&startDate=2026-11-01T00%3A00%3A00.000Z
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "posts": [
+    {
+      "content": "Shipping Friday: the yard schedules its own posts now.",
+      "creationMethod": "API",
+      "error": null,
+      "group": "group-1",
+      "id": "post-queued-1",
+      "integration": {
+        "id": "cm4ean69r0003w8w1cdomox9n",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-x.jpg",
+        "providerIdentifier": "x"
+      },
+      "intervalInDays": null,
+      "publishDate": "2026-11-20T09:00:00.000Z",
+      "releaseId": null,
+      "releaseURL": null,
+      "settings": "{\"__type\":\"x\",\"who_can_reply_post\":\"everyone\"}",
+      "state": "QUEUE",
+      "tags": []
+    },
+    {
+      "content": "Notes for next week's post, still rough.",
+      "creationMethod": "API",
+      "error": null,
+      "group": "group-2",
+      "id": "post-draft-1",
+      "integration": {
+        "id": "cm4ean70s0004w8w1efghij2kl",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-li.jpg",
+        "providerIdentifier": "linkedin-page"
+      },
+      "intervalInDays": null,
+      "publishDate": "2026-11-11T12:00:00.000Z",
+      "releaseId": null,
+      "releaseURL": null,
+      "settings": "{\"__type\":\"linkedin-page\"}",
+      "state": "DRAFT",
+      "tags": []
+    },
+    {
+      "content": "A post the platform would not take.",
+      "creationMethod": "API",
+      "error": "Account banned from posting, please check account status",
+      "group": "group-3",
+      "id": "post-error-1",
+      "integration": {
+        "id": "cm4ean69r0003w8w1cdomox9n",
+        "name": "yardr",
+        "picture": "https://uploads.postiz.com/avatar-x.jpg",
+        "providerIdentifier": "x"
+      },
+      "intervalInDays": null,
+      "publishDate": "2026-11-10T09:00:00.000Z",
+      "releaseId": null,
+      "releaseURL": null,
+      "settings": "{\"__type\":\"x\",\"who_can_reply_post\":\"everyone\"}",
+      "state": "ERROR",
+      "tags": []
+    }
+  ]
+}
+--- stderr

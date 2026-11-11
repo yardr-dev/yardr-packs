@@ -1,0 +1,12 @@
+--- requests
+GET /public/v1/integrations
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call channels: the service answered 401"
+}
+--- stderr

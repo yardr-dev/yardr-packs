@@ -1,0 +1,4 @@
+GET /public/v1/integrations
+  auth: ok
+  accept: application/json
+  user-agent: yardr

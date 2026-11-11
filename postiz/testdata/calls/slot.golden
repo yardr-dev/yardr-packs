@@ -1,0 +1,12 @@
+--- requests
+GET /public/v1/find-slot/cm4ean69r0003w8w1cdomox9n
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "date": "2026-11-20T09:00:00"
+}
+--- stderr

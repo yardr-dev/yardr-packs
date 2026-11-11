@@ -1,0 +1,20 @@
+--- requests
+POST /public/v1/upload
+  auth: ok
+  accept: application/json
+  content-type: multipart/form-data
+  user-agent: yardr
+  part: file filename=pic.png type=image/png size=69 sha256=b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640
+--- status
+0
+--- stdout
+{
+  "createdAt": "2026-11-12T08:18:54.274Z",
+  "id": "e639003b-f727-4a1e-87bd-74a2c48ae41e",
+  "name": "6fba0ef5febb4400ae8778a5b854224d.png",
+  "organizationId": "85460a39-6329-4cf4-a252-187ce89a3480",
+  "path": "https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png",
+  "status": "ready",
+  "updatedAt": "2026-11-12T08:18:54.274Z"
+}
+--- stderr

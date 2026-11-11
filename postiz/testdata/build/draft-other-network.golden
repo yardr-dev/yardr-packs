@@ -1,0 +1,26 @@
+--- status
+0
+--- stdout
+{
+  "type": "draft",
+  "date": "NOW",
+  "shortLink": false,
+  "tags": [],
+  "posts": [
+    {
+      "integration": {
+        "id": "cm4ean71t0005w8w1mnopqr3st"
+      },
+      "value": [
+        {
+          "content": "Hello from the yard.",
+          "image": []
+        }
+      ],
+      "settings": {
+        "__type": "mastodon"
+      }
+    }
+  ]
+}
+--- stderr

@@ -1,0 +1,9 @@
+=== args
+schedule
+channels=x:cm4ean69r0003w8w1cdomox9n
+text=Far too long for X.
+date=2030-11-20T09:00:00.000Z
+=== answer
+@too-long
+=== status
+400

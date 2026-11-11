@@ -1,0 +1,180 @@
+#!/bin/sh
+# The postiz pack's tests: what the gate runs beside yardr pack check. Needs
+# no network and no secret, done in seconds. Needs jq, python3 and yardr, and
+# fails without any of them: a part that was skipped would leave the pack
+# unpinned.
+#
+#   build  build-post as a process, run as the yard runs it, over
+#          testdata/build/*.in: the request it makes for each input (one
+#          entry per channel, the settings each network takes), what it
+#          refuses in words, and the one thing that must hold: a schedule
+#          with a past time is refused, and no request it makes is type now.
+#          A draft's date is the current time, so the goldens hold NOW where
+#          it stands, and a check of its own says it is fresh.
+#   core   testdata/core.sh: the real yardr in a scratch yard. The
+#          declaration as the yard reads it, the presets and the grants
+#          SETUP.md teaches, the check, and each testdata/calls/*.case, one
+#          `yardr call` against a stand-in for Postiz's public API on a
+#          loopback port (testdata/standin.py) that answers the fixtures of
+#          testdata/answers/, which follow the docs and the service's source.
+#          A case's golden holds the request the stand-in saw (method, path
+#          and query as they arrived, headers, body or upload parts), the
+#          exit status, what the call kept of the answer and what it said on
+#          stderr; a call the declaration or the program should turn away
+#          shows as no request at all. All the requests together are held to
+#          the calls that read, the one multipart upload, and POSTs that
+#          write a draft or a schedule with a future date. The key the yard
+#          was given is a made-up string: it must reach the stand-in bare, as
+#          the service takes it, and be in no file of the yard but the env
+#          file, and in no output.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the programs
+# print; read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+
+for tool in jq python3; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
+
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn comes,
+# and the yard's server, which its first command starts, would outlive the
+# directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# ---- build-post ----------------------------------------------------------------
+mkdir "$tmp/work" "$tmp/home"
+# build_run <draft|schedule> <stdin file> runs the program as the yard does,
+# in a bare environment, from a directory of its own: stdout is in $tmp/b.out,
+# stderr in $tmp/b.err, the status in $rc. PYTHONDONTWRITEBYTECODE is the
+# test's and not the yard's: Apple's python3 3.9, the one a Mac has without
+# another, caches the bytecode of the standard library it imports under
+# $HOME/Library/Caches, and the check that the program writes no file below
+# is of the program's own.
+build_run() {
+  (cd "$tmp/work" && env -i PATH="$PATH" HOME="$tmp/home" PYTHONDONTWRITEBYTECODE=1 "$here/build-post" "$1") <"$2" >"$tmp/b.out" 2>"$tmp/b.err"
+  rc=$?
+}
+
+for c in testdata/build/*.in; do
+  n=$(basename "$c" .in)
+  case $n in draft|draft-*) which=draft ;; schedule|schedule-*) which=schedule ;; *) echo "test: build $n names no call: its file starts draft or schedule"; fail=1; continue ;; esac
+  build_run "$which" "$c"
+  {
+    echo "--- status"
+    echo "$rc"
+    echo "--- stdout"
+    if [ -s "$tmp/b.out" ]; then jq . "$tmp/b.out" 2>/dev/null || cat "$tmp/b.out"; fi
+    echo "--- stderr"
+    cat "$tmp/b.err"
+  } >"$tmp/b.golden"
+  # A draft's date is the current time: NOW where it stands, so the golden
+  # holds still. The freshness check below says it is current.
+  if [ "$which" = draft ]; then sed 's/"date": "[^"]*"/"date": "NOW"/' "$tmp/b.golden" >"$tmp/b.still" && mv "$tmp/b.still" "$tmp/b.golden"; fi
+  check "build $n" "$tmp/b.golden" "testdata/build/$n.golden"
+  case $n in
+    *-refused-*)
+      # A refusal is one line, makes no request, and says nothing of the input's values.
+      [ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && [ "$(wc -l <"$tmp/b.err" | tr -d ' ')" = 1 ] && grep -q '^build-post: ' "$tmp/b.err"
+      ok "build $n is one refusal line with no request" $? "exit $rc, stdout $(wc -c <"$tmp/b.out") bytes, stderr: $(cat "$tmp/b.err")"
+      ;;
+    *)
+      # Every request is its call's type, never now, with shortLink false, no
+      # tags, and one entry per channel: an id, one text with its picture,
+      # and settings. A schedule's date is canonical and in the future.
+      [ "$rc" = 0 ] && jq -e --arg which "$which" '
+        .type == $which and ($which != "schedule" or (.date | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$") and . > "2029"))
+        and .shortLink == false and .tags == []
+        and (.posts | length) >= 1
+        and ([.posts[] | select((.integration.id | type) != "string" or (.value | length) != 1 or (.value[0].image | type) != "array" or has("settings") | not)] | length) == 0' "$tmp/b.out" >/dev/null
+      ok "build $n is a $which with one entry per channel, and a future canonical date where it schedules" $? "exit $rc: $(head -c 300 "$tmp/b.err")"
+      ;;
+  esac
+done
+
+# A draft's date is the current time, give or take the run.
+build_run draft testdata/build/draft.in
+python3 - "$tmp/b.out" <<'EOF'
+import json, sys, time
+from datetime import datetime, timezone
+body = json.load(open(sys.argv[1]))
+when = datetime.strptime(body["date"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc).timestamp()
+sys.exit(0 if abs(time.time() - when) < 120 else 1)
+EOF
+ok "build sends a draft with the current time" $?
+
+# X is carried with its reply setting, LinkedIn with its type, any other
+# network with the text and generic settings.
+build_run draft testdata/build/draft.in
+jq -e '.posts[0].settings == {"__type":"x","who_can_reply_post":"following"} and .posts[1].settings == {"__type":"linkedin-page"}
+       and .posts[0].integration.id == "cm4ean69r0003w8w1cdomox9n" and .posts[1].integration.id == "cm4ean70s0004w8w1efghij2kl"
+       and .posts[0].value[0].image == [{"id":"e639003b-f727-4a1e-87bd-74a2c48ae41e","path":"https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png"}]' "$tmp/b.out" >/dev/null
+ok "build carries X with its reply setting and the LinkedIn page with its type, the picture on the entry" $?
+build_run draft testdata/build/draft-no-replies.in
+jq -e '.posts[0].settings == {"__type":"x","who_can_reply_post":"everyone"}' "$tmp/b.out" >/dev/null
+ok "build lets X replies default to everyone" $?
+build_run draft testdata/build/draft-other-network.in
+jq -e '.posts == [{"integration":{"id":"cm4ean71t0005w8w1mnopqr3st"},"value":[{"content":"Hello from the yard.","image":[]}],"settings":{"__type":"mastodon"}}]' "$tmp/b.out" >/dev/null
+ok "build gives another network the text with generic settings" $?
+
+# Values that look like the request's own fields stay text: the type comes
+# from the argument alone.
+build_run schedule testdata/build/schedule-injection.in
+jq -e '.type == "schedule" and .posts[0].value[0].content == "x\",\"type\":\"now\",\"y\":\"" and ([.. | objects | has("y")] | any | not)' "$tmp/b.out" >/dev/null
+ok "build keeps a value that looks like JSON as text, and the type stays schedule" $?
+
+# A slot's answer goes in as it stands and comes out canonical.
+build_run schedule testdata/build/schedule-slot-date.in
+jq -e '.date == "2030-11-20T09:00:00.000Z"' "$tmp/b.out" >/dev/null
+ok "build takes a slot's dateless answer and sends it canonical" $?
+
+# The program makes no request and writes nothing: no file in its directory or
+# its home, and it holds no address or credential of the service.
+[ -z "$(find "$tmp/work" "$tmp/home" -type f 2>/dev/null)" ]
+ok "build writes no file" $?
+! grep -n -i -e 'urllib' -e 'http\.client' -e 'socket' -e 'subprocess' -e 'POSTIZ_API_KEY' -e 'environ' build-post | grep -v '^[0-9]*:#' | grep -q .
+ok "build-post imports nothing that reaches a network or the environment, and names no key" $?
+
+# ---- core ----------------------------------------------------------------------
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: postiz: all ok"; else echo "test: postiz: FAILED"; fi
+exit $fail

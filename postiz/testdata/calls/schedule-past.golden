@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call schedule: build-post: date is not in the future: the service would publish at once"
+}
+--- stderr

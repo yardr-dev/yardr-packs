@@ -1,0 +1,51 @@
+--- status
+0
+--- stdout
+{
+  "type": "draft",
+  "date": "NOW",
+  "shortLink": false,
+  "tags": [],
+  "posts": [
+    {
+      "integration": {
+        "id": "cm4ean69r0003w8w1cdomox9n"
+      },
+      "value": [
+        {
+          "content": "Shipping Friday: the yard schedules its own posts now.",
+          "image": [
+            {
+              "id": "e639003b-f727-4a1e-87bd-74a2c48ae41e",
+              "path": "https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png"
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "__type": "x",
+        "who_can_reply_post": "following"
+      }
+    },
+    {
+      "integration": {
+        "id": "cm4ean70s0004w8w1efghij2kl"
+      },
+      "value": [
+        {
+          "content": "Shipping Friday: the yard schedules its own posts now.",
+          "image": [
+            {
+              "id": "e639003b-f727-4a1e-87bd-74a2c48ae41e",
+              "path": "https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png"
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "__type": "linkedin-page"
+      }
+    }
+  ]
+}
+--- stderr
