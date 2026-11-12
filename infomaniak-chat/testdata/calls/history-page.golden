@@ -1,0 +1,51 @@
+--- requests
+GET /api/v4/channels/chan0000000000000000000001/posts?page=2&per_page=5
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "order": [
+    "post0000000000000000000002",
+    "post0000000000000000000001"
+  ],
+  "posts": {
+    "post0000000000000000000001": {
+      "channel_id": "chan0000000000000000000001",
+      "create_at": 1793952000000,
+      "delete_at": 0,
+      "file_ids": [],
+      "has_reactions": false,
+      "hashtags": "",
+      "id": "post0000000000000000000001",
+      "message": "yardr can this land on Monday? @yardrbot",
+      "original_id": "",
+      "props": {},
+      "reply_count": 0,
+      "root_id": "",
+      "type": "",
+      "update_at": 1793952000000,
+      "user_id": "user0000000000000000000001"
+    },
+    "post0000000000000000000002": {
+      "channel_id": "chan0000000000000000000001",
+      "create_at": 1793952060000,
+      "delete_at": 0,
+      "file_ids": [],
+      "has_reactions": false,
+      "hashtags": "",
+      "id": "post0000000000000000000002",
+      "message": "Monday works for me.",
+      "original_id": "",
+      "props": {},
+      "reply_count": 0,
+      "root_id": "post0000000000000000000001",
+      "type": "",
+      "update_at": 1793952060000,
+      "user_id": "user0000000000000000000002"
+    }
+  }
+}
+--- stderr

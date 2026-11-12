@@ -1,0 +1,4 @@
+=== args
+whoami
+=== routes
+GET /api/v4/users/me 200 @whoami

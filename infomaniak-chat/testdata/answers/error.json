@@ -1,0 +1,5 @@
+{
+  "id": "api.context.404",
+  "message": "no such channel",
+  "status_code": 404
+}

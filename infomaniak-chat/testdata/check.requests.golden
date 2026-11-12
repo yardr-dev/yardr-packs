@@ -1,0 +1,4 @@
+GET /api/v4/users/me
+  auth: ok
+  accept: application/json
+  user-agent: yardr

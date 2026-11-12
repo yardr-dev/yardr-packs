@@ -1,0 +1,12 @@
+--- requests
+GET /api/v4/posts/post0000000000000000000001/thread
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+1
+--- stdout
+{
+  "error": "source infomaniak-chat, call thread: the service answered 404"
+}
+--- stderr

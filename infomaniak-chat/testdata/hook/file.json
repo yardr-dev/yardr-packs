@@ -1,0 +1,16 @@
+{
+  "headers": {},
+  "body": {
+    "team_id": "team0000000000000000000001",
+    "team_domain": "example-team",
+    "channel_id": "chan0000000000000000000001",
+    "channel_name": "general",
+    "timestamp": 1793952000000,
+    "user_id": "user0000000000000000000001",
+    "user_name": "ada",
+    "post_id": "post0000000000000000000001",
+    "text": "",
+    "trigger_word": "yardr",
+    "file_ids": "file00000000000000000001"
+  }
+}

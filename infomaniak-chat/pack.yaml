@@ -1,0 +1,37 @@
+# Infomaniak kChat as a pack of kind source: the integration, imported
+# into the yard and into no depot. What kChat is here: the declared source
+# infomaniak-chat, the twin of slack. It hears a channel through kChat's
+# outgoing webhook and answers in the thread with yardr reply, through a
+# bot account's token at https://<team>.kchat.infomaniak.com.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-chat
+#
+# The source is named infomaniak-chat: a pack is named after the service
+# it talks to. The pack is written for pack API 7, because the webhook's
+# token arrives in the body and API 7 added signature.body; a yardr that
+# reads less is told to upgrade. A pack of kind source asks no grants at
+# import, so what a crew member may call is granted afterwards, by the
+# setup notes. Answering in a thread (yardr reply) needs no grant: it
+# speaks with the answering crew member's own copy of the bot token.
+name: infomaniak-chat
+api: 7
+kind: source
+setup: SETUP.md
+
+sources:
+  infomaniak-chat:
+    declaration: infomaniak-chat.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and a
+# terminal pack apply ignores them. read names every read call and no
+# update; post is granted by its name, as every update is.
+presets:
+  read:
+    about: Read who the bot is, a channel's recent posts and one thread; change nothing
+    grants:
+      infomaniak-chat: [read]
+  post:
+    about: Read, and post one message to a channel, in a thread where one is named
+    grants:
+      infomaniak-chat: [read, post]

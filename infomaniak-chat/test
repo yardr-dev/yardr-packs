@@ -1,0 +1,154 @@
+#!/bin/sh
+# The infomaniak-chat pack's tests: what the gate runs beside yardr pack
+# check. Needs no network and no secret, done in seconds. Needs jq,
+# bash, curl, python3 and yardr, and fails without any of them: a part
+# that was skipped would leave the pack unpinned.
+#
+#   hook  infomaniak-chat/normalize as a process, over testdata/hook/:
+#         the envelope of each verified body (the token field already
+#         removed, as the core hands it over), byte for byte, and what
+#         it refuses.
+#   core  testdata/core.sh: the real yardr in a scratch yard. The
+#         declaration as the yard reads it, the presets and the grants
+#         SETUP.md teaches, the check and each testdata/calls/*.case
+#         against a stand-in for kChat on a loopback port
+#         (testdata/standin.py), and deliveries to the yard's own hook
+#         listener: one with the webhook's token heard and recorded,
+#         one with a wrong token and one with none refused with no
+#         event, the token in no stored body, and yardr reply and
+#         thread show in the heard thread against the same stand-in.
+#
+# UPDATE_GOLDEN=1 ./test writes the goldens again from what the
+# programs print; read the diff before keeping it.
+set -u
+cd "$(dirname "$0")" || exit 1
+here=$(pwd)
+fail=0
+
+for tool in jq bash curl python3; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
+done
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+[ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
+
+tmp=$(mktemp -d)
+# The core part's scratch yard and stand-in are made when its turn
+# comes, and the yard's server, which its first command starts, would
+# outlive the directory it owns: stop it first. core is empty until then.
+core=
+standin_pid=
+cleanup() {
+  [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
+  if [ -n "${core:-}" ]; then
+    env -i HOME="$core/h" PATH="$PATH" "$YARDR" --home "$core/y" --actor tester server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# check <name> <actual file> <golden file>: ok when they are the same.
+check() {
+  if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
+    if ! cmp -s "$2" "$3"; then cp "$2" "$3"; echo "test: $1 golden written"; fi
+    return
+  fi
+  if [ ! -e "$3" ]; then
+    echo "test: $1 has no golden $3 (UPDATE_GOLDEN=1 ./test writes it)"
+    fail=1
+  elif cmp -s "$2" "$3"; then
+    echo "test: $1 ok"
+  else
+    echo "test: $1 differs from $3:"
+    diff "$3" "$2" | sed 's/^/    /' | head -30
+    fail=1
+  fi
+}
+# ok <name> <condition's exit status> [detail]
+ok() {
+  if [ "$2" = 0 ]; then echo "test: $1 ok"; else echo "test: $1 FAILED${3:+: $3}"; fail=1; fi
+}
+
+# ---- the tokens, made here and thrown away -------------------------------------
+# A random bot token and webhook token for each run: the stand-in and
+# the hook know them, the yard is given them as SETUP.md gives them,
+# and none of the pack's files can hold them.
+token=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
+wtoken=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
+[ "${#token}" = 48 ] && [ "${#wtoken}" = 48 ] || { echo "test: no random tokens could be made"; exit 1; }
+(umask 077 && printf '%s\n' "$token" >"$tmp/token")
+
+# ---- the stand-in ----------------------------------------------------------------
+: >"$tmp/requests"
+: >"$tmp/routes"
+python3 -I testdata/standin.py "$tmp/port" "$tmp/requests" "$tmp/routes" "$tmp/token" 2>"$tmp/standin.err" &
+standin_pid=$!
+i=0
+while [ ! -s "$tmp/port" ] && [ "$i" -lt 200 ]; do sleep 0.05; i=$((i + 1)); done
+if [ ! -s "$tmp/port" ]; then
+  echo "test: the stand-in did not listen: $(cat "$tmp/standin.err")"
+  exit 1
+fi
+site=http://127.0.0.1:$(cat "$tmp/port")
+
+# split_case <case file> <dir>: each section of the case becomes a file
+# of its own in the dir, named for it.
+split_case() {
+  awk -v dir="$2" '/^=== /{ name = substr($0, 5); f = dir "/" name; printf "" > f; next } name != "" { print >> f }' "$1"
+}
+# set_routes <routes file>: what the stand-in answers from now on. An
+# answer @name is testdata/answers/name.json; a line that starts with
+# # is a comment, and no file at all is no route.
+set_routes() {
+  : >"$tmp/routes"
+  [ -e "$1" ] || return 0
+  while read -r method path status answer; do
+    case $method in '' | '#'*) continue ;; esac
+    case $answer in @*) answer=$here/testdata/answers/${answer#@}.json ;; esac
+    printf '%s %s %s %s\n' "$method" "$path" "$status" "$answer" >>"$tmp/routes"
+  done <"$1"
+}
+
+# ---- hook: normalize ---------------------------------------------------------------
+for f in testdata/hook/message.json testdata/hook/file.json testdata/hook/event.json; do
+  n=$(basename "$f" .json)
+  env -i PATH="$PATH" ./infomaniak-chat/normalize <"$f" >"$tmp/$n.out" 2>"$tmp/$n.err"
+  rc=$?
+  [ "$rc" = 0 ]
+  ok "normalize $n runs" $? "exit $rc: $(head -c 200 "$tmp/$n.err")"
+  check "normalize $n" "$tmp/$n.out" "testdata/hook/$n.golden"
+  [ ! -s "$tmp/$n.err" ]
+  ok "normalize $n prints nothing to stderr" $?
+done
+
+# A body that is no JSON object is refused with nothing on stdout: the
+# core answers such a delivery 400, and a form body (SETUP.md pins
+# JSON at creation) is refused here as that.
+env -i PATH="$PATH" ./infomaniak-chat/normalize <testdata/hook/not-an-object.json >"$tmp/r.out" 2>"$tmp/r.err"
+rc=$?
+[ "$rc" != 0 ] && [ ! -s "$tmp/r.out" ] && ! grep -q 'payload=' "$tmp/r.err"
+ok "normalize refuses a body that is no object, quoting none of it" $? "exit $rc"
+
+# A long text is truncated as the envelope's is: 500 runes, the last
+# an ellipsis.
+jq -c '.body.text = ([range(600) | "a"] | join(""))' testdata/hook/message.json | env -i PATH="$PATH" ./infomaniak-chat/normalize >"$tmp/long.out" 2>/dev/null
+jq -e '(.text | length) == 500 and (.text | endswith("…"))' "$tmp/long.out" >/dev/null
+ok "normalize truncates a long text to 500 runes" $?
+
+# The fields the envelopes carry are the declaration's hook.keys and
+# no others (the declaration itself is held to them in core below).
+keys=$(jq -s '[.[].fields // {} | keys[]] | unique' testdata/hook/message.golden testdata/hook/file.golden 2>/dev/null)
+[ "$keys" = '[
+  "channel",
+  "sender",
+  "team",
+  "trigger"
+]' ]
+ok "normalize's fields are hook.keys and no others" $? "got $keys"
+
+# ---- core --------------------------------------------------------------------------
+. ./testdata/core.sh
+
+if [ "$fail" = 0 ]; then echo "test: infomaniak-chat: all ok"; else echo "test: infomaniak-chat: FAILED"; fi
+exit $fail

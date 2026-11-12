@@ -1,0 +1,19 @@
+--- requests
+POST /api/v4/posts
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  user-agent: yardr
+  body: {"channel_id":"chan0000000000000000000001","message":"On it.","root_id":"post0000000000000000000001"}
+--- status
+0
+--- stdout
+{
+  "channel_id": "chan0000000000000000000001",
+  "create_at": 1793952120000,
+  "id": "post0000000000000000000003",
+  "message": "Noted; Monday it is.",
+  "root_id": "post0000000000000000000001",
+  "user_id": "user0000000000000000000099"
+}
+--- stderr

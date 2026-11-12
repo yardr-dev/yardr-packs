@@ -1,0 +1,5 @@
+=== args
+thread
+id=post0000000000000000000001
+=== routes
+GET /api/v4/posts/post0000000000000000000001/thread 200 @thread

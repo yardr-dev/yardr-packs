@@ -1,0 +1,182 @@
+# Infomaniak kChat as a declared source: a channel heard through its
+# outgoing webhook and answered in the thread, with a bot account's
+# token. The twin is slack (packs/slack in the yardr repository): same
+# shape (whoami, post, thread reply/posted/read, hearing by who speaks),
+# with kChat's service where slack has its own. What the yard does in
+# its threads and what a hook is are in yardr docs integrations.
+#
+# Checked on 12 November 2026 against: Infomaniak's Developer Portal
+# kChat API docs (POST /api/v4/posts with required channel_id and
+# message, optional root_id; GET /api/v4/channels/{channel_id}/posts
+# and GET /api/v4/posts/{post_id}/thread with PostList order/posts;
+# it documents these routes at the team's kchat.infomaniak.com host);
+# Infomaniak's FAQ 2001 (webhook directions and plan counts, plus the
+# incoming webhook walk and post shape; it does not show the outgoing
+# webhook creation screen, so the Content-Type choice below remains
+# unverified); github.com/Infomaniak/mcp-server-kchat (README.md and
+# src/kchat-client.ts at main: the bot account walk, Bearer header,
+# team host, and the calls it makes to those routes); and Mattermost's
+# own v4 sources (the OutgoingWebhookPayload and Post models, plus the
+# outgoing sender, which puts the webhook token in the body and sets no
+# Authorization header). No request was made to kChat: there is no
+# account to make one with (README.md, "What was checked").
+#
+# Where kChat differs from Mattermost, and this file follows kChat:
+#   - The host is per team, https://{team}.kchat.infomaniak.com, not
+#     one host for everyone: the shipped base below is a placeholder
+#     (example) that SETUP.md has the operator replace with their
+#     team name in the yard's copy, as confluence replaces its site.
+#   - Its live socket is Pusher, not Mattermost's websocket. Nothing
+#     here needs a socket: hearing is the outgoing webhook alone.
+# Where Mattermost is all the evidence there is, this file says so:
+#   - The outgoing payload carries no root_id, so a reply posted in a
+#     thread is heard as a new post whose thread is itself; the real
+#     thread is read back through the API (thread call, thread.read).
+#   - Mattermost lets a webhook's creator choose application/json or
+#     form encoding per webhook. This pack hears JSON alone (hook
+#     below): SETUP.md pins JSON at creation, and a form or payload=
+#     body is refused as no JSON. Whether kChat's creation screen
+#     offers the choice was not seen; if it offers form only, hearing
+#     needs form support in the core, a bead of its own.
+#
+# Left out, on purpose: the live socket, direct messages (an outgoing
+# webhook fires in public channels only, on its trigger words),
+# files and reactions (a heard post with files is heard as "[file]",
+# and nothing is fetched), slash commands, and an incoming webhook
+# as a second way to post (post below is the API with the bot token).
+# There is no notify (nobody is told through kChat), no link and no
+# thread.state or thread.open, as in slack: a kChat thread has no
+# status, a channel post is no bead's link, and a thread starts with
+# a person's post, not with the yard opening one.
+#
+# The service's ids are taken as they come (the MCP client writes a
+# channel's id straight into its paths; its tool schemas call them
+# uuids), so the patterns below allow letters, digits, - and _ to 64.
+# A post's text is held to slack's 4000. No idempotency key is named:
+# POST /api/v4/posts takes none the client shows, so a reply tried
+# again after a lost answer is posted twice, as in slack.
+#
+# A command is a list, run without a shell. A path that does not start
+# with / is a file beside this one, which `yardr source add` copies
+# into the yard.
+name: infomaniak-chat
+about: A kChat channel heard through its outgoing webhook, answered in the thread with a bot token.
+
+# The name of the variable, never the value. The token of the bot
+# account made in kChat itself (New, Integrations, Bot accounts),
+# typed unseen at setup: it speaks as the bot in every call and reply
+# below. It is not the outgoing webhook's token (that one only
+# verifies, hook below, and is handed to no program) and not a token
+# made in Infomaniak's manager: a manager token with the scope kchat
+# acts as the user it was made for, which is the user-token
+# alternative the MCP server documents, and no call here asks for it.
+credential:
+  env: INFOMANIAK_CHAT_TOKEN
+  header: "Authorization: Bearer {credential}"
+
+# base is the team's address, shipped as a placeholder: example is no
+# one's team, and the credential is given only after SETUP.md replaces
+# it, so it is paired with the host the calls really go to.
+base: https://example.kchat.infomaniak.com
+# whoami needs no argument and shows at once whose token this is.
+check: whoami
+calls:
+  whoami:
+    kind: read
+    about: Who the bot token acts as (GET /api/v4/users/me); its id and username set the bot's identity at setup
+    request: { method: GET, path: /api/v4/users/me }
+    answer: { select: [id, username] }
+  post:
+    kind: update
+    about: One message to a channel (POST /api/v4/posts), in the thread of root where one is named; threaded answers a person asked for go by yardr reply
+    params:
+      channel: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }   # a channel's id, as history or a heard delivery gives it
+      text: { type: string, max: 4000 }   # the message, as slack's post holds it
+      root: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, optional: true, log: true }   # the root post's id; left out, a top-level post
+    request:
+      method: POST
+      path: /api/v4/posts
+      body: { channel_id: "{channel}", message: "{text}", root_id: "{root}" }   # root left out leaves root_id out with it
+    answer: { select: [id, channel_id, root_id, user_id, message, create_at] }
+  history:
+    kind: read
+    about: A channel's recent posts, newest first (GET /api/v4/channels/{channel}/posts); order names the posts, posts holds each by its id
+    params:
+      channel: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }
+      limit: { type: int, default: 30 }   # posts in the page, per_page to the service
+      page: { type: int, default: 0 }   # how many pages of limit to skip
+    request:
+      method: GET
+      path: /api/v4/channels/{channel}/posts
+      query: { per_page: "{limit}", page: "{page}" }
+    answer: { select: [order, posts], max: 262144 }
+  thread:
+    kind: read
+    about: One thread by its root post's id (GET /api/v4/posts/{id}/thread); the root and its replies, order names them, posts holds each
+    params:
+      id: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$", max: 64, log: true }   # the root post's id, as a heard delivery or history gives it
+    request:
+      method: GET
+      path: /api/v4/posts/{id}/thread
+    answer: { select: [order, posts], max: 262144 }
+
+# ---- what it sends us ----------------------------------------------------
+
+hook:
+  # Adapter.Verify stays data, checked by the core: the webhook's token
+  # is handed to no command, and an unverified body reaches none. kChat
+  # signs nothing: its outgoing webhook posts the token it was made
+  # with in the body's token field, and the core compares it there
+  # before anything is read from the body, then removes the field
+  # before normalize, before the body is stored and before it is
+  # hashed for dedupe (yardr docs integrations, "What the service
+  # sends in"). A body that is no JSON carries no token and is
+  # refused the same way. The delivery is the post itself: a retry
+  # repeats its post_id, re-serialized or not.
+  verify:
+    scheme: secret
+    signature: { body: token }
+    delivery: { body: post_id }
+  bodies: unique
+  # kChat's deliveries follow chat activity, not a rhythm, so silence is never quiet.
+  untimed: true
+
+  # Adapter.Normalize. stdin {"headers":{…},"body":{…}} with the token
+  # field already removed, stdout the envelope. The core sets source
+  # and delivery itself.
+  normalize: [infomaniak-chat/normalize]
+
+  # The keys its events' fields may carry: a subscription's --where may
+  # name them beside type, action, team, project, repo and label.
+  # trigger is the word that fired the webhook, as kChat sent it.
+  keys: [channel, team, sender, trigger]
+
+# ---- who is heard ---------------------------------------------------------
+# A delivery is kept when its sender is a user of the yard, matched by
+# identity: fields.sender holds the member's user_id, which normalize
+# also sets as actor.id. The core adds fields.speaker for a kept
+# delivery (the yard user's name, or outside where the hook's
+# --unknown word allows an unmapped sender); speaker is the derived
+# filter key for this hear, and stands in no hook.keys above, which
+# names only what normalize may set. As in slack, a channel post is
+# heard by who speaks it, and what an unmapped speaker writes reaches
+# the yard as information, not instructions.
+
+hear:
+  field: sender
+  by: identity
+
+# ---- what the yard does in its threads ------------------------------------
+# One command per thing, each handed its object on stdin and the
+# credential under INFOMANIAK_CHAT_TOKEN, with YARDR_SOURCE_BASE from
+# base above. The thread a delivery carries is <channel_id>:<root post
+# id>, and every command reads the two back from it. A reply is a post
+# whose root_id is the thread's root (Mattermost threads are one level:
+# answering a reply still answers the root). POST /api/v4/posts takes
+# no idempotency key the client shows, so posted answers what there is
+# to find: nothing, as in slack.
+
+thread:
+  reply:  [infomaniak-chat/thread, reply]      # in  {thread, parent, body, key}      out {id}
+  posted: [infomaniak-chat/thread, posted]     # in  {thread, key}                    out {} always
+  read:   [infomaniak-chat/thread, read]       # in  {thread}                         out {messages: [...]}

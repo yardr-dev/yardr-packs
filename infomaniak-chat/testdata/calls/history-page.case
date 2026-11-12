@@ -1,0 +1,7 @@
+=== args
+history
+channel=chan0000000000000000000001
+limit=5
+page=2
+=== routes
+GET /api/v4/channels/chan0000000000000000000001/posts 200 @history

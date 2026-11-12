@@ -1,0 +1,42 @@
+{
+  "order": [
+    "post0000000000000000000001",
+    "post0000000000000000000002"
+  ],
+  "posts": {
+    "post0000000000000000000001": {
+      "id": "post0000000000000000000001",
+      "create_at": 1793952000000,
+      "update_at": 1793952000000,
+      "delete_at": 0,
+      "user_id": "user0000000000000000000001",
+      "channel_id": "chan0000000000000000000001",
+      "root_id": "",
+      "original_id": "",
+      "message": "yardr can this land on Monday? @yardrbot",
+      "type": "",
+      "props": {},
+      "hashtags": "",
+      "file_ids": [],
+      "has_reactions": false,
+      "reply_count": 0
+    },
+    "post0000000000000000000002": {
+      "id": "post0000000000000000000002",
+      "create_at": 1793952060000,
+      "update_at": 1793952060000,
+      "delete_at": 0,
+      "user_id": "user0000000000000000000002",
+      "channel_id": "chan0000000000000000000001",
+      "root_id": "post0000000000000000000001",
+      "original_id": "",
+      "message": "Monday works for me.",
+      "type": "",
+      "props": {},
+      "hashtags": "",
+      "file_ids": [],
+      "has_reactions": false,
+      "reply_count": 0
+    }
+  }
+}

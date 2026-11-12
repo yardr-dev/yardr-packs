@@ -1,0 +1,85 @@
+#!/bin/bash
+# thread: what the yard does in a kChat thread: reply, posted, read. One
+# JSON object on stdin, one on stdout, as the thread key of the
+# declaration says. INFOMANIAK_CHAT_TOKEN and YARDR_SOURCE_BASE, the
+# declaration's base (https://<team>.kchat.infomaniak.com), are in the
+# environment. Needs curl and jq.
+#
+# The thread a delivery carries is <channel_id>:<root post id>, and
+# every command reads the two back from it. A reply is POST
+# /api/v4/posts in that channel with root_id the thread's root:
+# Mattermost threads are one level, so answering a reply (the parent
+# the core names) still answers the root. The service takes no
+# idempotency key the MCP client shows, so posted answers what there
+# is to find, nothing, and a reply retried after a lost answer posts
+# twice.
+set -euo pipefail
+in=$(cat)
+arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
+
+: "${INFOMANIAK_CHAT_TOKEN:?INFOMANIAK_CHAT_TOKEN is not set}"
+: "${YARDR_SOURCE_BASE:?YARDR_SOURCE_BASE is not set}"
+
+# api <path> [curl argument]...: the whole answer. The token goes to
+# curl in a config read from a process-substitution descriptor, not an
+# argument. Reply text is sent on stdin as the request body, not exposed
+# in the argument list of jq or curl.
+api() {
+  local path=$1
+  shift
+  curl -sS --fail-with-body \
+    -K <(printf 'header = "Authorization: Bearer %s"\n' "$INFOMANIAK_CHAT_TOKEN") \
+    "$YARDR_SOURCE_BASE$path" "$@"
+}
+
+# fail <words> <answer>: the service's own reason, where it gave one,
+# on stderr. kChat answers a refusal with {message: ...}; the token is
+# in none of it, and none of the answer is printed beyond that field.
+fail() {
+  local msg
+  msg=$(jq -r '.message // empty' <<<"$2" 2>/dev/null) || msg=""
+  echo "kChat $1${msg:+: $msg}" >&2
+  exit 1
+}
+
+# split <thread>: the channel and the root of a thread, in $channel
+# and $root; a thread of neither shape is refused before any request.
+channel="" root=""
+split() {
+  channel=${1%%:*}; root=${1#*:}
+  [ -n "$channel" ] && [ -n "$root" ] && [ "$channel" != "$1" ] \
+    || { echo "thread was handed no channel and root: $1" >&2; exit 1; }
+  case $channel$root in *[!A-Za-z0-9_-]*) echo "thread was handed no channel and root: $1" >&2; exit 1 ;; esac
+}
+
+case "$1" in
+reply) # POST /api/v4/posts with the thread's channel and root
+  thread=$(arg thread)
+  body=$(arg body)
+  [ -n "$thread" ] || { echo "thread.reply was handed no thread" >&2; exit 1; }
+  [ -n "$body" ] || { echo "thread.reply was handed no body" >&2; exit 1; }
+  split "$thread"
+  payload=$(printf '%s' "$body" | jq -Rs -c --arg c "$channel" --arg r "$root" \
+    '{channel_id: $c, root_id: $r, message: .}')
+  out=$(printf '%s' "$payload" | api /api/v4/posts -H 'Content-Type: application/json' \
+    --data-binary @-) || fail "POST /api/v4/posts to channel $channel" "$out"
+  jq -e -c '{id: (.id // "")} | if .id == "" then error("no id") else . end' <<<"$out" 2>/dev/null \
+    || fail "POST /api/v4/posts answered no post id" "$out" ;;
+posted) # {} always: without an idempotency key there is nothing to find
+  printf '%s' '{}' ;;
+read) # GET /api/v4/posts/<root>/thread: the root and its replies,
+  # oldest first. The answer is a PostList: order names the posts and
+  # posts holds each by id; the messages are sorted by create_at, so
+  # the order the service lists them in cannot shuffle a thread.
+  thread=$(arg thread)
+  [ -n "$thread" ] || { echo "thread.read was handed no thread" >&2; exit 1; }
+  split "$thread"
+  out=$(api "/api/v4/posts/$root/thread") || fail "GET /api/v4/posts/$root/thread" "$out"
+  jq -e -c '(.posts // {}) as $p | {messages: [([$p[]] | sort_by(.create_at // 0))[] |
+    {id: (.id // ""), parent: (if (.root_id // "") != "" then .root_id else (.id // "") end),
+     author: {id: (.user_id // "")},
+     at: (((.create_at // 0) / 1000 | floor) | gmtime | strftime("%Y-%m-%dT%H:%M:%SZ")),
+     body: (.message // "")}]} | if .messages == [] then error("no posts") else . end' <<<"$out" 2>/dev/null \
+    || fail "GET /api/v4/posts/$root/thread answered no posts" "$out" ;;
+*) echo "unknown: $1" >&2; exit 2 ;;
+esac

@@ -1,0 +1,7 @@
+=== args
+post
+channel=chan0000000000000000000001
+text=On it.
+root=post0000000000000000000001
+=== routes
+POST /api/v4/posts 201 @posted

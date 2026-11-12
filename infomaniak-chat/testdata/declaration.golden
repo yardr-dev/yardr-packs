@@ -1,0 +1,193 @@
+{
+  "about": "A kChat channel heard through its outgoing webhook, answered in the thread with a bot token.",
+  "base": "https://example.kchat.infomaniak.com",
+  "calls": [
+    {
+      "about": "Who the bot token acts as (GET /api/v4/users/me); its id and username set the bot's identity at setup",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "id",
+          "username"
+        ]
+      },
+      "kind": "read",
+      "name": "whoami",
+      "request": {
+        "method": "GET",
+        "path": "/api/v4/users/me"
+      }
+    },
+    {
+      "about": "One message to a channel (POST /api/v4/posts), in the thread of root where one is named; threaded answers a person asked for go by yardr reply",
+      "answer": {
+        "max": 65536,
+        "select": [
+          "id",
+          "channel_id",
+          "root_id",
+          "user_id",
+          "message",
+          "create_at"
+        ]
+      },
+      "kind": "update",
+      "name": "post",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "channel",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "max": 4000,
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 64,
+          "name": "root",
+          "optional": true,
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "channel_id": "{channel}",
+          "message": "{text}",
+          "root_id": "{root}"
+        },
+        "method": "POST",
+        "path": "/api/v4/posts"
+      }
+    },
+    {
+      "about": "A channel's recent posts, newest first (GET /api/v4/channels/{channel}/posts); order names the posts, posts holds each by its id",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "order",
+          "posts"
+        ]
+      },
+      "kind": "read",
+      "name": "history",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "channel",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        },
+        {
+          "default": 30,
+          "name": "limit",
+          "optional": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "name": "page",
+          "optional": true,
+          "type": "int"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v4/channels/{channel}/posts",
+        "query": [
+          {
+            "key": "per_page",
+            "value": "{limit}"
+          },
+          {
+            "key": "page",
+            "value": "{page}"
+          }
+        ]
+      }
+    },
+    {
+      "about": "One thread by its root post's id (GET /api/v4/posts/{id}/thread); the root and its replies, order names them, posts holds each",
+      "answer": {
+        "max": 262144,
+        "select": [
+          "order",
+          "posts"
+        ]
+      },
+      "kind": "read",
+      "name": "thread",
+      "params": [
+        {
+          "log": true,
+          "max": 64,
+          "name": "id",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v4/posts/{id}/thread"
+      }
+    }
+  ],
+  "check": "whoami",
+  "credential": {
+    "env": "INFOMANIAK_CHAT_TOKEN",
+    "header": "Authorization: Bearer {credential}"
+  },
+  "hear": {
+    "address": {
+      "env": ""
+    },
+    "by": "identity",
+    "field": "sender"
+  },
+  "hook": {
+    "bodies": "unique",
+    "keys": [
+      "channel",
+      "team",
+      "sender",
+      "trigger"
+    ],
+    "normalize": [
+      "infomaniak-chat/normalize"
+    ],
+    "untimed": true,
+    "verify": {
+      "delivery": {
+        "body": "post_id"
+      },
+      "scheme": "secret",
+      "signature": {
+        "body": "token",
+        "encoding": "",
+        "header": ""
+      },
+      "signed": ""
+    }
+  },
+  "name": "infomaniak-chat",
+  "thread": {
+    "posted": [
+      "infomaniak-chat/thread",
+      "posted"
+    ],
+    "read": [
+      "infomaniak-chat/thread",
+      "read"
+    ],
+    "reply": [
+      "infomaniak-chat/thread",
+      "reply"
+    ]
+  }
+}

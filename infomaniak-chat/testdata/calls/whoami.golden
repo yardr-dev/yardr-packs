@@ -1,0 +1,13 @@
+--- requests
+GET /api/v4/users/me
+  auth: ok
+  accept: application/json
+  user-agent: yardr
+--- status
+0
+--- stdout
+{
+  "id": "user0000000000000000000099",
+  "username": "yardrbot"
+}
+--- stderr

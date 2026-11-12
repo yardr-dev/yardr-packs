@@ -1,0 +1,54 @@
+#!/bin/sh
+# A verified kChat outgoing-webhook body to the yard's envelope: stdin
+# {"headers":{…},"body":{…}}, stdout the envelope. Needs jq. The core
+# has already compared the body's token field with the hook's secret
+# and removed that field, so no token reaches this program.
+#
+# The body is Mattermost's OutgoingWebhookPayload (kChat's fork sends
+# the same shape): token (removed), team_id, team_domain, channel_id,
+# channel_name, timestamp, user_id, user_name, post_id, text,
+# trigger_word, file_ids. It carries no root_id, so a post heard here
+# is the root of its thread; the thread's replies are read back with
+# the thread call, not heard.
+#
+# Every body gets an envelope, an unknown one too: anything that is
+# no channel post is answered as type event and matches no
+# subscription the setup makes, and a non-zero exit would be answered
+# 400, which the service retries. Nothing of the body is ever printed
+# to stderr.
+exec jq -c '
+def obj: if type == "object" then . else {} end;
+def str($v): if ($v | type) == "string" then $v elif $v == null then "" else "\($v)" end;
+# trunc is hooks.truncate: whitespace collapsed, at most 500 runes. The jq
+# POSIX space class includes the Unicode spaces split by Go strings.Fields.
+def trunc: (gsub("^[[:space:]]+|[[:space:]]+$"; "") | gsub("[[:space:]]+"; " ")) | if length > 500 then .[0:499] + "…" else . end;
+def ordered: reduce .[] as $x ([]; if index($x) then . else . + [$x] end);
+# mentions are the envelope shape for this source: the usernames a text
+# mentions as @name, lowercase, once each, in order (Mattermost writes
+# a mention as the username, not a member id as Slack does, so an
+# identity is matched by its key). An @name in code is text, not a
+# mention. A kChat username is letters, digits and . _ -.
+def mentions($md):
+  ((($md // "") | gsub("(?s)```.*?(```|$)|`[^`\n]*`"; " "))
+   | [scan("(?:^|[^A-Za-z0-9_@./-])@([A-Za-z0-9_.-]+)") | .[0] | ascii_downcase]
+   | ordered);
+
+(.body | if type == "object" then . else error("kChat delivery is not an object") end) as $b
+| if (($b.post_id | type) == "string" and $b.post_id != "" and ($b.user_id | type) == "string" and $b.user_id != "") then
+    ($b.channel_id // "") as $channel
+    | (($b.text // "") | if type == "string" then . else "" end) as $raw
+    | (if $raw != "" then $raw
+       elif (($b.file_ids // "") | type) == "string" and $b.file_ids != "" then "[file]"
+       else "[message]" end) as $text
+    | {source: "infomaniak-chat", type: "message", action: "create",
+       actor: {id: str($b.user_id), name: str($b.user_name)},
+       thread: {id: "\($channel):\($b.post_id)"},
+       text: ($text | trunc), mentions: mentions($raw),
+       message: str($b.post_id), parent: str($b.post_id),
+       fields: {channel: [str($channel)], team: [str($b.team_id)],
+                sender: [str($b.user_id)], trigger: [str($b.trigger_word)]}}
+  else
+    {source: "infomaniak-chat", type: "event", actor: {}, thread: {}, mentions: []}
+    | if (($b.user_id | type) == "string") then . + {fields: {sender: [$b.user_id]}} else . end
+  end
+'
