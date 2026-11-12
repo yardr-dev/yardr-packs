@@ -23,7 +23,9 @@
 #              output held it.
 #   exit       this file run again, as a process that dies after its temp dir is
 #              made (an openssl that fails ends it at the certificate), to hold
-#              that the dir is gone: cleanup runs at every exit, not only after
+#              that the dir is gone, and as two copies ended by SIGTERM and
+#              SIGHUP once their server is up, to hold that no dir and no
+#              server is left: cleanup runs at every exit, not only after
 #              the last line.
 #   yardr      the real yardr in a scratch yard (its own home, an environment
 #              of nothing but HOME and PATH, a short path for its socket): the
@@ -44,11 +46,13 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import socket
 import ssl
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -98,6 +102,10 @@ if not os.access(YARDR, os.X_OK):
     sys.exit(1)
 
 tmp = tempfile.mkdtemp(prefix="protont.", dir="/tmp")
+signal_dirs_file = os.environ.get("PROTON_TEST_SIGNAL_DIRS")
+if signal_dirs_file:
+    with open(signal_dirs_file, "w") as f:
+        f.write(tmp + "\n")
 stubs = []
 core = None
 
@@ -118,6 +126,12 @@ def cleanup():
 # At exit, not as the last statement: an exception or a sys.exit anywhere below ends the run too, and
 # would leave the dirs, and from the yardr part on the scratch yard's server, behind.
 atexit.register(cleanup)
+
+# SIGTERM and SIGHUP end the process without running exit handlers, so turn them into sys.exit and
+# let the one exit path above run. The code keeps the shell's signal-death convention, 128 plus the
+# signal. SIGINT needs none of this: it arrives as an exception, which already runs the handlers.
+for _sig in (signal.SIGTERM, signal.SIGHUP):
+    signal.signal(_sig, lambda signum, frame: sys.exit(128 + signum))
 
 # ---- the program, loaded to call its functions ---------------------------------
 loader = importlib.machinery.SourceFileLoader("proton_imap", PROGRAM)
@@ -758,10 +772,80 @@ if "PROTON_TEST_COPY" not in os.environ:
         # what a run that did not clean up would have left: this run does not add to it
         shutil.rmtree(keyout.group(1), ignore_errors=True)
 
+    # A run ended by SIGTERM or SIGHUP must leave nothing either: no temp dir, and no server. Only
+    # a process shows that too, so a copy is run for real, and once its server is up — server.pid
+    # under its scratch yard names it — the copy itself is ended with the signal.
+    for sig, name in ((signal.SIGTERM, "SIGTERM"), (signal.SIGHUP, "SIGHUP")):
+        logpath = tmp + "/signal-" + name.lower() + ".out"
+        dirsfile = tmp + "/signal-" + name.lower() + ".dirs"
+        log = open(logpath, "w")
+        copy = subprocess.Popen([sys.executable, os.path.join(HERE, "test")], stdout=log, stderr=subprocess.STDOUT,
+                                env=dict(os.environ, PROTON_TEST_COPY="1", PROTON_TEST_SIGNAL_DIRS=dirsfile))
+        try:
+            # Wait for its own server pid, with a bound in case setup never reaches one.
+            pidfile, server = None, None
+            signal_tmp, signal_core = None, None
+            waiting_since = time.monotonic()
+            while server is None and copy.poll() is None and time.monotonic() - waiting_since < 60:
+                try:
+                    with open(dirsfile) as f:
+                        child_dirs = f.read().splitlines()
+                except OSError:
+                    child_dirs = []
+                if child_dirs:
+                    signal_tmp = child_dirs[0]
+                if len(child_dirs) > 1:
+                    signal_core = child_dirs[1]
+                    pidfile = signal_core + "/y/server.pid"
+                    if os.path.exists(pidfile):
+                        try:
+                            server = int(open(pidfile).read().strip())
+                        except (OSError, ValueError):
+                            server = None
+                if server is None:
+                    time.sleep(0.2)
+            if copy.poll() is None:
+                copy.send_signal(sig)
+            try:
+                rc = copy.wait(timeout=120)
+            except subprocess.TimeoutExpired:
+                copy.kill()
+                rc = copy.wait()
+        finally:
+            if copy.poll() is None:
+                copy.kill()
+                copy.wait()
+            log.close()
+        tail = open(logpath).read()[-500:]
+        ok("the %s copy's server is up before it is signalled" % name, server is not None, (pidfile, copy.poll(), tail))
+        ok("the copy ended by %s exits %d" % (name, 128 + sig), rc == 128 + sig, (rc, tail))
+        left = [d for d in (signal_tmp, signal_core) if d and os.path.exists(d)]
+        ok("the copy ended by %s leaves no temp dir" % name, left == [], (left, tail))
+        running = server
+        if running is not None:
+            gone_by = time.monotonic() + 10
+            while time.monotonic() < gone_by:
+                try:
+                    os.kill(running, 0)
+                except ProcessLookupError:
+                    running = None
+                    break
+                time.sleep(0.2)
+        ok("the copy ended by %s leaves its server stopped" % name, server is not None and running is None, (server, running, tail))
+        for d in left:
+            # If cleanup failed, stop and remove only this copy's scratch yard.
+            if d == signal_core:
+                subprocess.run([YARDR, "--home", d + "/y", "--actor", "tester", "server", "stop"], capture_output=True,
+                               env={"HOME": d + "/h", "PATH": os.environ["PATH"]})
+            shutil.rmtree(d, ignore_errors=True)
+
 # =====================================================================================
 # yardr
 # =====================================================================================
 core = tempfile.mkdtemp(prefix="protonc.", dir="/tmp")
+if signal_dirs_file:
+    with open(signal_dirs_file, "a") as f:
+        f.write(core + "\n")
 os.mkdir(core + "/h")
 
 
