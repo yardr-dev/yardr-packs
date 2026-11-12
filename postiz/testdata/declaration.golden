@@ -1,6 +1,7 @@
 {
   "about": "Postiz channels, scheduled posts and drafts. Lists channels, reads scheduled posts, finds a channel's next free slot, uploads one picture, and writes drafts and scheduled posts; publishes nothing at once.",
   "base": "https://api.postiz.com/public/v1",
+  "base_template": "https://{host}/api/public/v1",
   "calls": [
     {
       "about": "List the workspace's channels, each with its id, name, network, picture, whether it is disabled, and its profile",

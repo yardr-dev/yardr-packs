@@ -27,18 +27,15 @@ Commands below call the pack's directory (the `postiz` directory of the yardr-pa
 
    **There is no setup card for this pack.** A crew member sets up a pack that yardr embeds with one card (`yardr bead ask <bead> ... --setup <pack>`), and this pack is not embedded: tried for the pack's twin on 10 November 2026, yardr refuses `--setup` for a pack of a directory with "yardr embeds no pack of that name ... the operator's to apply in a terminal". So the apply above is the operator's. The key (step 3) and each grant (step 4) can still be asked for on a card by a crew member, one card each.
 
-   A yard on a self-hosted Postiz does not call the cloud: the address is `https://<the Postiz domain>/api/public/v1`, with `/api`. Write it into a copy of the declaration, beside the original so that the program it names is found, and add the copy to the yard. The copy is ignored by git:
+   A yard on a self-hosted Postiz does not call the cloud: give the host, and the calls go to `https://<the Postiz domain>/api/public/v1`, with `/api`:
    ```sh
-   sed 's|^base: .*|base: https://postiz.example.com/api/public/v1|' <pack dir>/postiz.yaml > <pack dir>/postiz.local.yaml
-   ```
-   ```sh
-   yardr source add <pack dir>/postiz.local.yaml
+   yardr source set postiz host=postiz.example.com
    ```
    Give the key again afterwards with step 3: a credential is sent only to the host it was given for, so a key given for the cloud is held back from the new host until then. The first line of `yardr source show postiz` is the address in use:
    ```sh
    yardr source show postiz
    ```
-   Applying the pack again puts the cloud address back and the shows line says so; add the copy again after it.
+   Applying the pack again keeps the host, and the shows line says so; `yardr source set postiz host=` puts the cloud address back.
 
 3. **The key, in the yard.** `yardr source key` asks for it and shows nothing as you type. The yard's server writes it into the source's env file, `~/.yardr/sources/postiz.env`, with mode 0600. The value is never an argument or a command's variable, where every process of your user could read it:
    ```sh
@@ -77,7 +74,7 @@ Commands below call the pack's directory (the `postiz` directory of the yardr-pa
    ```sh
    yardr source check postiz
    ```
-   If the check fails, the status it prints is the service's refusal. The usual causes are a key that was mistyped or rotated, or a self-hosted address that is not the copy's (step 2). Give it again with step 3, or check the shows line. Which status Postiz answers to a wrong key was read from its source (a 401) and not seen: the pack has never been run against it.
+   If the check fails, the status it prints is the service's refusal. The usual causes are a key that was mistyped or rotated, or a self-hosted host that is not the one the yard was told (step 2). Give it again with step 3, or check the shows line. Which status Postiz answers to a wrong key was read from its source (a 401) and not seen: the pack has never been run against it.
 
 6. **Try it.** As the operator, who may make any call, or in a session that was granted the calls. The channels are found, not typed at setup: `channels` lists them, and every other call takes them as `channel` or `channels`.
    ```sh

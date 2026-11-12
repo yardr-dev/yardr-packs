@@ -34,7 +34,7 @@ else
   # keeps publishing at once, deleting and editing out: three reads that all
   # GET, and three updates that POST a draft, a schedule or an upload, the
   # first two built by build-post.
-  jq -e '.base == "https://api.postiz.com/public/v1" and .check == "channels" and (has("idempotency") | not)
+  jq -e '.base == "https://api.postiz.com/public/v1" and .base_template == "https://{host}/api/public/v1" and .check == "channels" and (has("idempotency") | not)
          and ([.calls[] | select(.kind == "read") | .name] == ["channels", "posts", "slot"])
          and ([.calls[] | select(.kind == "read") | .request.method] | all(. == "GET"))
          and ([.calls[] | select(.kind == "update") | .name] == ["draft", "schedule", "upload"])
@@ -47,7 +47,20 @@ else
          and ([.calls[] | .request.path] | all(test("/(now|delete|status|settings|trigger|analytics|video|clipping|webhook|group)") | not))
          and .credential.env == "POSTIZ_API_KEY" and .credential.header == "Authorization: {credential}"
          and (.credential | has("mint") | not) and (.credential | has("update_env") | not)' "$core/declaration.json" >/dev/null
-  ok "the shipped base is Postiz's cloud, three calls read (all GET) and draft, schedule and upload are the updates (two POSTs built by build-post, one multipart upload), no call's path deletes or edits, and the key goes bare" $?
+  ok "the shipped base is Postiz's cloud, the template fills a set host under /api, three calls read (all GET) and draft, schedule and upload are the updates (two POSTs built by build-post, one multipart upload), no call's path deletes or edits, and the key goes bare" $?
+  # -- the self-hosted host: set it, and source show names the filled
+  # address of the documented shape; clear it, and the cloud base is back.
+  # .invalid resolves nowhere, and show makes no call, so this needs no
+  # network. The host is cleared before the grants and the calls below, which
+  # run against the shipped base and the stand-in.
+  yrun source set postiz host=postiz.example.invalid >"$core/host.out" 2>&1 \
+    && yrun source show postiz >"$core/host.show" 2>&1
+  ok "source set takes a host for the template" $? "$(tail -c 300 "$core/host.out")"
+  head -n 1 "$core/host.show" | grep -qF 'postiz  https://postiz.example.invalid/api/public/v1 (host postiz.example.invalid)'
+  ok "source show names the template filled with the host" $?
+  yrun source set postiz host= >"$core/host.out" 2>&1 && yrun source show postiz >"$core/host.show" 2>&1
+  head -n 1 "$core/host.show" | grep -qF 'postiz  https://api.postiz.com/public/v1'
+  ok "clearing the host sends the calls to the cloud base again" $?
   yrun pack show postiz >"$core/packshow.out" 2>&1
   grep -q '1\. read: ' "$core/packshow.out" && grep -q '2\. drafts: ' "$core/packshow.out" && grep -q '3\. schedule: ' "$core/packshow.out" &&
     awk '/1\. read: /{ r = 1; next } /2\. drafts: /{ r = 2; next } /3\. schedule: /{ r = 3; next } r == 1 && /postiz:/ { read = $0 } r == 2 && /postiz:/ { drafts = $0 } r == 3 && /postiz:/ { sched = $0 }
@@ -55,8 +68,9 @@ else
   ok "pack show prints the three presets, read granting read, drafts granting read, draft and upload, schedule granting read, schedule and upload" $?
 
   # -- SETUP.md says what the key is, where it is made and where calls go
-  grep -q 'POSTIZ_API_KEY' SETUP.md && grep -q 'Developers' SETUP.md && grep -q 'api.postiz.com/public/v1' SETUP.md && grep -q '/api/public/v1' SETUP.md
-  ok "SETUP.md names the variable, the Developers tab, the cloud base and the self-hosted base" $?
+  grep -q 'POSTIZ_API_KEY' SETUP.md && grep -q 'Developers' SETUP.md && grep -q 'api.postiz.com/public/v1' SETUP.md && grep -q '/api/public/v1' SETUP.md \
+    && grep -q 'source set postiz host=' SETUP.md && ! grep -q 'postiz.local.yaml' SETUP.md
+  ok "SETUP.md names the variable, the Developers tab, the cloud base and the self-hosted shape, teaches the host setting, and keeps no sed-edited copy" $?
 
   # -- the grants SETUP.md teaches, run as written. They are read out of
   # SETUP.md and not copied here: a copy would pass whatever SETUP teaches,

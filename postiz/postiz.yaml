@@ -22,7 +22,8 @@
 # a schedule waits for).
 #
 # Where the service differs from the remembered list the bead carried:
-#   - The self-hosted base is https://<domain>/api/public/v1, with /api, not
+#   - The self-hosted address is the base_template below, filled with the
+#     operator's host: https://<domain>/api/public/v1, with /api, not
 #     <backend>/public/v1. The cloud base is https://api.postiz.com/public/v1.
 #   - The rate limit is 90 POST /posts an hour per organization by default
 #     (100 on the cloud, API_LIMIT changes it), and reads and uploads are not
@@ -63,10 +64,11 @@ credential:
   env: POSTIZ_API_KEY
   header: "Authorization: {credential}"
 
-# base is the cloud's API. A yard on a self-hosted Postiz runs an operator's
-# copy of this file with the base replaced (SETUP.md, step 2): the credential
-# is then given again, for the new host.
+# base is the cloud's API. A yard on a self-hosted Postiz sets the host
+# instead (SETUP.md, step 2), and the calls go to the base_template with it
+# filled in: the credential is then given again, for the new host.
 base: https://api.postiz.com/public/v1
+base_template: https://{host}/api/public/v1
 # channels needs no argument and shows at once that the key is taken.
 check: channels
 calls:
