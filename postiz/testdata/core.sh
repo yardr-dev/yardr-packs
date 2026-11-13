@@ -201,6 +201,15 @@ else
     done
     rm -f "$core/answer.json.status"
 
+    # The stand-in holds a post on an Instagram channel to the service's rule
+    # (post_type is required, for a draft as for a schedule). That gives the
+    # Instagram cases above their meaning: they pass only because build-post
+    # sends the setting. Since build-post never leaves it out now, this step
+    # posts without it straight at the stand-in.
+    cp testdata/answers/created-one.json "$core/answer.json"
+    python3 -I testdata/instagram-settings.py "$site" "$(jq -r '.[] | select(.identifier == "instagram-standalone") | .id' testdata/answers/channels.json)" >"$core/rule.out" 2>&1
+    ok "the stand-in answers 400 to a draft and to a schedule on an Instagram channel without post_type, and takes both with it, as the service does" $? "$(tail -c 300 "$core/rule.out")"
+
     # Of all the requests the cases made: each is a read of the channels, the
     # posts or a slot, the one multipart upload, or the one POST that writes
     # a draft or a schedule. No other method, no other address: nothing

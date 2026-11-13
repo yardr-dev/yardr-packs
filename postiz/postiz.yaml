@@ -21,6 +21,29 @@
 # apps/orchestrator/src/workflows/post-workflows/post.workflow.v1.1.2.ts (what
 # a schedule waits for).
 #
+# Read again for Instagram on 13 November 2026, in the same repository at
+# 23f29c4 (main that day). Instagram's settings DTO and its two providers are
+# the same at b31d29f. The public controller and the posts service changed
+# between the two, and not on the path below.
+#   - libraries/nestjs-libraries/src/dtos/posts/providers-settings/instagram.dto.ts:
+#     post_type, post or story, is the one setting Instagram requires.
+#     collaborators, is_trial_reel, graduation_strategy and audio are optional.
+#     instagram and instagram-standalone share this DTO (see
+#     all.providers.settings.ts). Nothing else has been required since 11
+#     December 2024.
+#   - posts.service.ts, mapTypeToPost: the service fills each entry's __type
+#     from its channel and validates the entry against that network's DTO. The
+#     public controller always has it treat a draft as a schedule, so a draft
+#     without post_type is refused as a schedule is.
+#   - instagram.provider.ts and instagram.standalone.provider.ts: both return
+#     'Should have at least one media' for a post with no picture. The public
+#     controller acts on that for a schedule only, and takes a draft without
+#     one. Both providers allow 2200 characters.
+# So build-post carries an Instagram channel as a feed post: post_type post and
+# no other setting, with one picture. It refuses a schedule with no picture and
+# leaves a draft with none alone. It carries no stories, reels, carousels,
+# collaborators or audio.
+#
 # Where the service differs from the remembered list the bead carried:
 #   - The self-hosted address is the base_template below, filled with the
 #     operator's host: https://<domain>/api/public/v1, with /api, not
@@ -46,7 +69,10 @@
 # Postiz account in the yard yet. Every call was run through the real yardr
 # against a stand-in that answers fixtures shaped after the docs and the
 # source (README.md, "What was checked"). Where this file and the service
-# differ, the service is right.
+# differ, the service is right. Instagram is read from the source alone. On 13
+# November 2026 a self-hosted Postiz answered 400 to a draft and to a schedule
+# on an instagram-standalone channel. The missing post_type explains that, and
+# no live Postiz has yet taken a post with it.
 #
 # The service takes no idempotency key, so the file names none: an update
 # tried again after a lost answer is written twice. A schedule tried twice is
@@ -119,9 +145,9 @@ calls:
     request:
       method: POST
       path: /posts
-    # build-post assembles the request: one entry per channel, X and LinkedIn
-    # carried, the rest given the text. A draft's date is the service's
-    # required field and is stored unused; scheduling sets a new one.
+    # build-post assembles the request: one entry per channel, X, LinkedIn and
+    # Instagram carried, the rest given the text. A draft's date is the
+    # service's required field and is stored unused; scheduling sets a new one.
     build: [build-post, draft]
     answer: { select: [postId, integration] }   # one entry per channel written
   schedule:
@@ -138,7 +164,8 @@ calls:
       method: POST
       path: /posts
     # build-post assembles the request and refuses a time that is not in the
-    # future: the service publishes a past schedule at once.
+    # future: the service publishes a past schedule at once. It also refuses an
+    # Instagram channel with no picture, as the service does for a schedule.
     build: [build-post, schedule]
     answer: { select: [postId, integration] }   # one entry per channel written
   upload:

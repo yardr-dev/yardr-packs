@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source postiz, call schedule: build-post: Instagram needs a picture: give image_id with image_path, or leave instagram-standalone:cm4ean73v0007w8w1cdefgh5ij out of channels"
+}
+--- stderr

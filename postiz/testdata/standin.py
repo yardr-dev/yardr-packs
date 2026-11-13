@@ -14,6 +14,15 @@
 # its value, a file as its name, type, size and sha256, never its bytes. The
 # yard's boundary is random per request and is left out, so the log is stable.
 #
+# One thing it answers on its own: a post the service itself would turn away for
+# its settings. The service finds each entry's channel by its id, fills __type
+# from the channel's network and validates the settings against that network's
+# DTO, for a draft as for a schedule. The stand-in knows the channels of
+# answers/channels.json and one network's rule, Instagram's: post_type is
+# required, post or story. A request that breaks it is logged like any other
+# and answered 400, with a body shaped after Nest's validation pipe (a message
+# for each setting, naming its path); no live service has been asked for one.
+#
 # The key is not in the log: it is read from the token file, where the test
 # wrote it, and compared there. It writes the port it bound, on 127.0.0.1, to
 # the file it is given once it listens.
@@ -33,6 +42,32 @@ import sys
 port_file, log_file, answer_file, token_file = sys.argv[1:5]
 with open(token_file) as f:
     token = f.readline().strip()
+
+# The network of each channel the service knows, by its id.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "answers", "channels.json")) as f:
+    networks = {channel["id"]: channel["identifier"] for channel in json.load(f)}
+
+# Instagram's settings, which instagram and instagram-standalone share.
+INSTAGRAM = ("instagram", "instagram-standalone")
+POST_TYPES = ("post", "story")
+
+
+def settings_refusal(command, path, raw):
+    """The service's 400 body for a post whose settings its DTO refuses, or None."""
+    if command != "POST" or path.split("?")[0] != "/public/v1/posts":
+        return None
+    try:
+        problems = [
+            "posts.%d.settings.post_type must be one of the following values: %s" % (i, ", ".join(POST_TYPES))
+            for i, entry in enumerate(json.loads(raw)["posts"])
+            if networks.get(entry["integration"]["id"]) in INSTAGRAM and (entry.get("settings") or {}).get("post_type") not in POST_TYPES
+        ]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        # Not a post the stand-in can read: it answers as it does any request.
+        return None
+    if not problems:
+        return None
+    return json.dumps({"message": problems, "error": "Bad Request", "statusCode": 400}).encode()
 
 
 def auth(header):
@@ -102,6 +137,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 status = int(f.readline())
         with open(answer_file, "rb") as f:
             body = f.read()
+        refusal = settings_refusal(self.command, self.path, raw)
+        if refusal is not None:
+            status, body = 400, refusal
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))

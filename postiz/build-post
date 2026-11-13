@@ -15,6 +15,14 @@
 # there with the service's readable error; what the program refuses itself
 # is what must never be sent.
 #
+# Instagram is carried as a feed post. Its settings are one set for instagram
+# and instagram-standalone, and they require post_type, post or story. The
+# program sends post and no other setting. The service checks a draft against
+# those settings as it checks a schedule, so an entry without post_type is
+# refused with a 400 either way. Instagram also needs a picture, but the
+# service enforces that for a schedule alone and takes a draft without one. So
+# a schedule with no picture is refused here, and a draft is left alone.
+#
 # The one thing that must hold: a schedule goes out on its own, and the
 # service publishes a schedule whose time has passed at once (its workflow
 # sleeps 0 for a past publishDate). So a schedule whose date is missing, is
@@ -53,6 +61,9 @@ DATE = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-
 # One channel: the network and the id as channels shows them.
 ENTRY = re.compile(r"^([a-z0-9-]+):([A-Za-z0-9_-]+)$")
 
+# The networks that take Instagram's settings.
+INSTAGRAM = ("instagram", "instagram-standalone")
+
 
 def refuse(words):
     sys.stderr.write("build-post: %s\n" % words)
@@ -76,10 +87,16 @@ def stamp(when):
 
 
 def settings(network, replies):
-    # X and LinkedIn carried; any other network gets the text with generic
-    # settings, and the service validates against the channel's true network.
+    # X, LinkedIn and Instagram carried; any other network gets the text with
+    # generic settings, and the service validates against the channel's true
+    # network.
     if network == "x":
         return {"__type": "x", "who_can_reply_post": replies}
+    if network in INSTAGRAM:
+        # post_type is the one setting the service requires. The others
+        # (collaborators, trial reel, audio) are optional and left out: a plain
+        # post, nobody else named.
+        return {"__type": network, "post_type": "post"}
     return {"__type": network}
 
 
@@ -115,6 +132,12 @@ def build(which, params, now):
     image = [] if image_id is None else [{"id": image_id, "path": image_path}]
     if not params["text"].strip() and not image:
         refuse("a post has at least one character or one picture")
+    if which == "schedule" and not image:
+        # The service refuses a scheduled Instagram post with no picture and
+        # takes a draft with none, so only a schedule is held to it here.
+        for network, cid in entries:
+            if network in INSTAGRAM:
+                refuse("Instagram needs a picture: give image_id with image_path, or leave %s:%s out of channels" % (network, cid))
     if which == "schedule":
         when = parse_date(params["date"])
         if when is None:

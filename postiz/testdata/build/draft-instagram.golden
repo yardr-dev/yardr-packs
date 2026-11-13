@@ -1,0 +1,52 @@
+--- status
+0
+--- stdout
+{
+  "type": "draft",
+  "date": "NOW",
+  "shortLink": false,
+  "tags": [],
+  "posts": [
+    {
+      "integration": {
+        "id": "cm4ean72u0006w8w1uvwxyz4ab"
+      },
+      "value": [
+        {
+          "content": "Shipping Friday: the yard schedules its own posts now.",
+          "image": [
+            {
+              "id": "e639003b-f727-4a1e-87bd-74a2c48ae41e",
+              "path": "https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png"
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "__type": "instagram",
+        "post_type": "post"
+      }
+    },
+    {
+      "integration": {
+        "id": "cm4ean73v0007w8w1cdefgh5ij"
+      },
+      "value": [
+        {
+          "content": "Shipping Friday: the yard schedules its own posts now.",
+          "image": [
+            {
+              "id": "e639003b-f727-4a1e-87bd-74a2c48ae41e",
+              "path": "https://uploads.postiz.com/6fba0ef5febb4400ae8778a5b854224d.png"
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "__type": "instagram-standalone",
+        "post_type": "post"
+      }
+    }
+  ]
+}
+--- stderr

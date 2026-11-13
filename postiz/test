@@ -23,10 +23,13 @@
 #          stderr; a call the declaration or the program should turn away
 #          shows as no request at all. All the requests together are held to
 #          the calls that read, the one multipart upload, and POSTs that
-#          write a draft or a schedule with a future date. The key the yard
-#          was given is a made-up string: it must reach the stand-in bare, as
-#          the service takes it, and be in no file of the yard but the env
-#          file, and in no output.
+#          write a draft or a schedule with a future date. The stand-in turns
+#          away what the service turns away for Instagram's settings (a post
+#          without post_type, draft or schedule), and one step hands it such
+#          a post, with and without the setting, to show it does. The key the
+#          yard was given is a made-up string: it must reach the stand-in
+#          bare, as the service takes it, and be in no file of the yard but
+#          the env file, and in no output.
 #
 # UPDATE_GOLDEN=1 ./test writes the goldens again from what the programs
 # print; read the diff before keeping it.
@@ -154,6 +157,26 @@ ok "build lets X replies default to everyone" $?
 build_run draft testdata/build/draft-other-network.in
 jq -e '.posts == [{"integration":{"id":"cm4ean71t0005w8w1mnopqr3st"},"value":[{"content":"Hello from the yard.","image":[]}],"settings":{"__type":"mastodon"}}]' "$tmp/b.out" >/dev/null
 ok "build gives another network the text with generic settings" $?
+
+# Instagram, on either of its two networks, is carried as a feed post: post_type
+# post, the one setting the service requires, and no other, whatever replies
+# says. The service refuses a draft without it as it refuses a schedule. Only a
+# schedule is asked for a picture, because the service takes a draft with none.
+# So a text-only draft goes through, and a schedule with no picture is refused
+# before anything is sent, however many other channels the call names.
+build_run draft testdata/build/draft-instagram.in
+jq -e '.posts[0].settings == {"__type":"instagram","post_type":"post"} and .posts[1].settings == {"__type":"instagram-standalone","post_type":"post"}
+       and .posts[0].integration.id == "cm4ean72u0006w8w1uvwxyz4ab" and .posts[1].integration.id == "cm4ean73v0007w8w1cdefgh5ij"' "$tmp/b.out" >/dev/null
+ok "build carries Instagram, standalone or not, as a feed post: post_type post and nothing else, whatever replies says" $?
+build_run schedule testdata/build/schedule-instagram.in
+jq -e '.type == "schedule" and .posts[0].settings == {"__type":"instagram-standalone","post_type":"post"} and (.posts[0].value[0].image | length) == 1' "$tmp/b.out" >/dev/null
+ok "build gives a scheduled Instagram post its post_type and its picture" $?
+build_run draft testdata/build/draft-instagram-text-only.in
+jq -e '.posts[0].value[0].image == [] and .posts[0].settings == {"__type":"instagram-standalone","post_type":"post"}' "$tmp/b.out" >/dev/null
+ok "build takes an Instagram draft with no picture, as the service does" $?
+build_run schedule testdata/build/schedule-refused-instagram-no-picture.in
+[ "$rc" = 1 ] && [ ! -s "$tmp/b.out" ] && grep -q '^build-post: Instagram needs a picture: .*instagram-standalone:cm4ean73v0007w8w1cdefgh5ij' "$tmp/b.err"
+ok "build refuses an Instagram schedule with no picture, naming the channel, though X is named beside it" $? "exit $rc: $(head -c 300 "$tmp/b.err")"
 
 # Values that look like the request's own fields stay text: the type comes
 # from the argument alone.

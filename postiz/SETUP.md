@@ -100,7 +100,7 @@ Commands below call the pack's directory (the `postiz` directory of the yardr-pa
    ```sh
    yardr call postiz schedule channels=x:<x id>,linkedin-page:<page id> text="Hello from the yard." date=2026-11-20T09:00:00.000Z
    ```
-   Who may reply on X is `replies` (`everyone` unless given: `following`, `mentionedUsers`, `subscribers`, `verified`); other networks ignore it. One channel twice, a past time, or a picture by its id without its path, is refused before anything is sent. A scheduled text past a network's count (280 on X, 3000 on LinkedIn) is refused by the service. Postiz skips that length check for drafts, so an overlong draft can be saved and may need editing before it can be scheduled.
+   Who may reply on X is `replies` (`everyone` unless given: `following`, `mentionedUsers`, `subscribers`, `verified`); other networks ignore it. Instagram, on `instagram` or `instagram-standalone`, is carried as a feed post with one picture. Upload the picture first and give its `image_id` and `image_path`. A schedule on an Instagram channel with no picture is refused before anything is sent. A draft without one is not, because the service takes it (README.md says what that rests on). One channel twice, a past time, or a picture by its id without its path, is refused before anything is sent too. A scheduled text past a network's count (280 on X, 3000 on LinkedIn) is refused by the service. Postiz skips that length check for drafts, so an overlong draft can be saved and may need editing before it can be scheduled.
 
 7. **When it does not work.**
    - *the service refuses the key*: a 401 with `{"msg": ...}`, whatever Postiz answers. See step 5.

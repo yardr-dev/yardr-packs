@@ -25,5 +25,23 @@
     "disabled": true,
     "profile": "relay",
     "customer": null
+  },
+  {
+    "id": "cm4ean72u0006w8w1uvwxyz4ab",
+    "name": "yardr",
+    "identifier": "instagram",
+    "picture": "https://uploads.postiz.com/avatar-ig.jpg",
+    "disabled": false,
+    "profile": "yardrdev",
+    "customer": null
+  },
+  {
+    "id": "cm4ean73v0007w8w1cdefgh5ij",
+    "name": "yardr",
+    "identifier": "instagram-standalone",
+    "picture": "https://uploads.postiz.com/avatar-igs.jpg",
+    "disabled": false,
+    "profile": "yardr.dev",
+    "customer": null
   }
 ]

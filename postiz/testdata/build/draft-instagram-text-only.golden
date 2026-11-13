@@ -1,0 +1,27 @@
+--- status
+0
+--- stdout
+{
+  "type": "draft",
+  "date": "NOW",
+  "shortLink": false,
+  "tags": [],
+  "posts": [
+    {
+      "integration": {
+        "id": "cm4ean73v0007w8w1cdefgh5ij"
+      },
+      "value": [
+        {
+          "content": "Notes for next week.",
+          "image": []
+        }
+      ],
+      "settings": {
+        "__type": "instagram-standalone",
+        "post_type": "post"
+      }
+    }
+  ]
+}
+--- stderr

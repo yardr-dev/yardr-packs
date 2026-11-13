@@ -33,6 +33,24 @@ GET /public/v1/integrations
     "name": "old relay",
     "picture": "https://uploads.postiz.com/avatar-md.jpg",
     "profile": "relay"
+  },
+  {
+    "customer": null,
+    "disabled": false,
+    "id": "cm4ean72u0006w8w1uvwxyz4ab",
+    "identifier": "instagram",
+    "name": "yardr",
+    "picture": "https://uploads.postiz.com/avatar-ig.jpg",
+    "profile": "yardrdev"
+  },
+  {
+    "customer": null,
+    "disabled": false,
+    "id": "cm4ean73v0007w8w1cdefgh5ij",
+    "identifier": "instagram-standalone",
+    "name": "yardr",
+    "picture": "https://uploads.postiz.com/avatar-igs.jpg",
+    "profile": "yardr.dev"
   }
 ]
 --- stderr
