@@ -249,9 +249,6 @@ instance changes.
     ```
     Events the hook accepted are kept.
 
-Two limits matter before the yard writes in a project, and README.md has
-both in full. A line of a reply that starts with a slash is posted with one
-space in front, because GitLab would run it as a quick action. And GitLab
-numbers issues and merge requests apart while the core takes issue 7 and
-merge request 7 for one thread, which matters once a hook has `says` or
-`makes` lines.
+One limit matters before the yard writes in a project, and README.md has
+it in full. A line of a reply that starts with a slash is posted with one
+space in front, because GitLab would run it as a quick action.

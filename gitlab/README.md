@@ -250,28 +250,15 @@ presets of packs inside its binary.
   repeats the token has it cut out of the message. Request bodies go to curl
   as files, not arguments, so a long reply fits.
 
-## A known gap: issue 7 and merge request 7
+## Issue 7 and merge request 7
 
 GitLab numbers its issues and its merge requests apart. Issue #7 and merge
-request !7 are two things in one project. The core reads the two link shapes
-as one numbered thread. For an event on a thread no bead tracks, it also
-looks for a bead that tracks the same number in the other shape. So a bead
-that tracks issue #7 is found by an event on merge request !7 when nothing
-tracks !7, and the other way round. A `says` line can then move the wrong
-bead, a `makes` line for the merge request finds a tracker and makes
-nothing, and the same goes for a bead that closed.
-
-The `events` key meets the same gap. The thread of a pipeline is the merge
-request's, so a run on merge request !7 is found by the bead that tracks issue
-#7 when nothing tracks !7, and a `says` line can move that bead. Where the
-bead has no head from an event, `pr` is asked for the issue's address, which
-names no merge request, and the read fails and is logged.
-
-The pack declares both shapes all the same. `yardr reply` and `yardr thread
-state` check an event's thread URL against them, so without the merge
-request shape both are refused for a merge request. A hook with no `says` or
-`makes` lines is not touched by this. The fix is an option in the core, filed
-as yardr-dmfh, and this section goes when it lands.
+request !7 are two things in one project, and the declaration says so
+(`apart: true` under `link.pull`): an event finds only the bead that tracks
+its own thread, in either shape, and a bead closed on one holds back nothing
+a `makes` line would make of the other. A merge request's own URL still names
+its thread, so `yardr reply` and `yardr thread state` answer for a merge
+request as for an issue.
 
 ## The secret token and the signing token
 

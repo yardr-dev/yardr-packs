@@ -453,6 +453,7 @@
     "host": "gitlab.com",
     "issue": "^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?issues/([1-9][0-9]*)(?:/.*)?$",
     "pull": {
+      "apart": true,
       "fixed": "https://gitlab.com/{1}/-/merge_requests/{2}",
       "issue": "^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?merge_requests/([1-9][0-9]*)(?:/.*)?$",
       "thread": "{1}!{2}"

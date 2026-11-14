@@ -82,8 +82,7 @@ hook:
 # its commands. The shapes are in docs/integrations.md.
 #
 # A pipeline is GitLab's run of CI, and the merge request's own events tell
-# its head (last_commit). The known gap below holds here as for `says` lines:
-# an event for merge request !7 may find the bead that tracks issue #7.
+# its head (last_commit).
 events:
   runs: [pipeline]            # the types that are CI runs, whatever became of them
   head_from: [merge_request]  # the types that tell the merge request's head
@@ -146,9 +145,11 @@ identity:
 # cannot list (SETUP.md says what to change).
 #
 # GitLab numbers its issues and its merge requests apart: issue #7 and
-# merge request !7 are two things. The core reads the two shapes as one
-# numbered thread, so it takes either for the other (README.md, "A known
-# gap").
+# merge request !7 are two things. apart says so: the core names neither
+# shape's form of a thread from the other, so an event finds only the bead
+# that tracks its own thread, and a bead closed on one holds back nothing a
+# `makes` line would make of the other. A merge request's own URL still
+# names its thread for reply and state.
 
 link:
   host: gitlab.com
@@ -160,6 +161,7 @@ link:
     issue: '^/((?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*)/(?:-/)?merge_requests/([1-9][0-9]*)(?:/.*)?$'
     fixed: "https://gitlab.com/{1}/-/merge_requests/{2}"
     thread: "{1}!{2}"
+    apart: true
   repos: '(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*/)+[A-Za-z0-9_.][A-Za-z0-9_.-]*'
 
 # ---- what an agent may ask of it, through `yardr call` -------------------
