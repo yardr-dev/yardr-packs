@@ -159,7 +159,9 @@ else
         if [ -s "$d/stdout" ]; then jq -S . "$d/stdout" 2>/dev/null || cat "$d/stdout"; fi
         echo "--- stderr"
         cat "$d/stderr"
-      } >"$d/golden"
+      } | sed "s|$core|SANDBOX|g" >"$d/golden"
+      # (A refused credential names the source's env file under this run's
+      # scratch yard, so the golden holds SANDBOX where that stands.)
       check "call $n" "$d/golden" "testdata/calls/$n.golden"
     done
     rm -f "$core/answer.json.status"

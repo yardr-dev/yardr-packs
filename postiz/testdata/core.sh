@@ -193,7 +193,9 @@ else
         if [ -s "$d/stdout" ]; then jq -S . "$d/stdout" 2>/dev/null || cat "$d/stdout"; fi
         echo "--- stderr"
         cat "$d/stderr"
-      } >"$d/golden"
+      } | sed "s|$core|SANDBOX|g" >"$d/golden"
+      # (A refused credential names the source's env file under this run's
+      # scratch yard, so the golden holds SANDBOX where that stands.)
       # A draft's date is the current time: NOW where it stands, as in the
       # build part. The freshness check there says it is current.
       case $n in draft|draft-*) sed 's/"date":"[^"]*"/"date":"NOW"/' "$d/golden" >"$d/still" && mv "$d/still" "$d/golden" ;; esac

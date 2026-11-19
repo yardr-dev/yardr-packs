@@ -196,9 +196,11 @@ for c in testdata/calls/*.case; do
     if [ -s "$d/stdout" ]; then jq -S . "$d/stdout" 2>/dev/null || cat "$d/stdout"; fi
     echo "--- stderr"
     cat "$d/stderr"
-  } | sed 's/the answer is [0-9][0-9]* bytes/the answer is N bytes/' >"$d/golden"
+  } | sed -e 's/the answer is [0-9][0-9]* bytes/the answer is N bytes/' -e "s|$core|SANDBOX|g" >"$d/golden"
   # (yardr counts an over-bound answer's bytes after the keys are kept, so
-  # the golden holds the bound and not the count.)
+  # the golden holds the bound and not the count. A refused credential names
+  # the source's env file under this run's scratch yard, so the golden holds
+  # SANDBOX where that stands.)
   check "call $n" "$d/golden" "testdata/calls/$n.golden"
 done
 rm -f "$core/answer.json.status"

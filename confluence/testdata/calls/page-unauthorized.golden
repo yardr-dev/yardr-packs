@@ -6,6 +6,6 @@ GET /wiki/api/v2/pages/98404?body-format=storage
 1
 --- stdout
 {
-  "error": "source confluence, call page: the service answered 401"
+  "error": "source confluence, call page: confluence refused the credential (401): the token minted from CONFLUENCE_EMAIL and CONFLUENCE_API_TOKEN, as set in the source's env_file SANDBOX/y/sources/confluence.env, sent as Authorization: Basic <credential>; to fix: give its inputs again (yardr source key confluence, or yardr bead ask <bead> - --secret confluence asks the operator for it), or check the application that issued it: the service answered 401"
 }
 --- stderr

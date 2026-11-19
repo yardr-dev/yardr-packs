@@ -7,6 +7,6 @@ GET /public/v1/integrations
 1
 --- stdout
 {
-  "error": "source postiz, call channels: the service answered 401"
+  "error": "source postiz, call channels: postiz refused the credential (401): POSTIZ_API_KEY, as set in the source's env_file SANDBOX/y/sources/postiz.env, sent as Authorization: <credential>; to fix: give it again (yardr source key postiz, or yardr bead ask <bead> - --secret postiz asks the operator for it), or check the application that issued it: the service answered 401"
 }
 --- stderr

@@ -126,7 +126,9 @@ else
     while IFS= read -r word; do set -- "$@" "$word"; done <"$d/args"
     yrun call infomaniak-calendar "$@" --json >"$d/stdout" 2>"$d/stderr"
     status=$?
-    golden_of "$d" "$status" >"$d/golden"
+    golden_of "$d" "$status" | sed "s|$core|SANDBOX|g" >"$d/golden"
+    # (A refused credential names the source's env file under this run's
+    # scratch yard, so the golden holds SANDBOX where that stands.)
     check "call $n" "$d/golden" "testdata/calls/$n.golden"
   done
 

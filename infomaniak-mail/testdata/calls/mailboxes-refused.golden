@@ -7,6 +7,6 @@ GET /api/mailbox?with=aliases%2Cpermissions%2CaccountId%2Ccount_users
 1
 --- stdout
 {
-  "error": "source infomaniak-mail, call mailboxes: the service answered 401"
+  "error": "source infomaniak-mail, call mailboxes: infomaniak-mail refused the credential (401): INFOMANIAK_MAIL_TOKEN, as set in the source's env_file SANDBOX/y/sources/infomaniak-mail.env, sent as Authorization: Bearer <credential>; to fix: give it again (yardr source key infomaniak-mail, or yardr bead ask <bead> - --secret infomaniak-mail asks the operator for it), or check the application that issued it: the service answered 401"
 }
 --- stderr

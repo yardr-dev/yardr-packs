@@ -9,6 +9,6 @@ POST /api/v2/statements
 1
 --- stdout
 {
-  "error": "source snowflake, call query: the service answered 401"
+  "error": "source snowflake, call query: snowflake refused the credential (401): the token minted from SNOWFLAKE_ACCOUNT and SNOWFLAKE_USER and SNOWFLAKE_KEY_FILE, as set in the source's env_file SANDBOX/y/sources/snowflake.env, sent as Authorization: Bearer <credential>; to fix: give its inputs again (yardr source key snowflake, or yardr bead ask <bead> - --secret snowflake asks the operator for it), or check the application that issued it: the service answered 401"
 }
 --- stderr
