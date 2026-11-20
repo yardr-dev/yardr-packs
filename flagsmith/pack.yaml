@@ -2,17 +2,18 @@
 # the yard and into no depot. What Flagsmith is here: the declared
 # source flagsmith, which lists the organisations an organisation API
 # token sees, the projects, a project's environments and a project's
-# flags, and reads an environment's flag states, all through Flagsmith's
-# Management API. Read only; switching a flag changes the live product
-# at once, so updates are a later bead.
+# flags, reads an environment's flag states, switches one flag on or off
+# in one environment and creates a flag in a project, all through
+# Flagsmith's Management API. The two updates change the live product at
+# once, so each is granted by its name alone.
 #
 #   yardr pack apply /Users/mckean/projects/repos/yardr-packs/flagsmith
 #
 # The source is named flagsmith: a pack is named after the service it
 # talks to. A pack of kind source asks no grants at import, so what a
 # crew member may call is granted afterwards, by the setup notes. The
-# token reads whatever it was made with, one identity for the yard, so
-# every agent granted a call reads all of it.
+# token reads and writes whatever it was made with, one identity for the
+# yard, so every agent granted a call reads or writes all of it.
 name: flagsmith
 kind: source
 setup: SETUP.md
@@ -23,9 +24,18 @@ sources:
 
 # Suggested grants: named sets of the source's calls, printed numbered by
 # pack show. Suggesting grants nothing: the operator grants them, and
-# terminal pack apply ignores them.
+# terminal pack apply ignores them. read covers every read call and no
+# update; each update is granted by its name alone.
 presets:
   read:
     about: List organisations, projects, environments and flags, and read each flag's state in an environment; change nothing
     grants:
       flagsmith: [read]
+  switch:
+    about: Switch one flag on or off in one environment; changes the live product at once
+    grants:
+      flagsmith: [switch]
+  create:
+    about: Create a flag in a project; changes the project at once
+    grants:
+      flagsmith: [create]

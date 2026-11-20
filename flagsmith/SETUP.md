@@ -2,18 +2,19 @@
 
 The pack wires Flagsmith into the yard as the declared source
 `flagsmith`. An agent lists the organisations the token sees, the
-projects, a project's environments and a project's flags, and reads an
+projects, a project's environments and a project's flags, reads an
 environment's flag states: whether each flag is on and what value it
-carries. It only reads. Switching a flag changes the live product at
-once, so no call here switches, creates or changes anything.
+carries, switches one flag on or off in one environment, and creates
+a flag in a project. The two updates change the live product at once,
+so each is granted by its name alone.
 
-Read this before the steps. The yard reads as one organisation API
-token, an identity of its own. Whatever that token may read, every
-agent the operator grants this source reads, and the yard does not
-narrow it per person. A token made as a full organisation admin reads
-every project of the organisation. Where different people may see
+Read this before the steps. The yard reads and writes as one organisation API
+token, an identity of its own. Whatever that token may read or write, every
+agent the operator grants this source reads or writes, and the yard does not
+narrow it per person. A token made as a full organisation admin reads and
+writes every project of the organisation. Where different people may see
 different projects, this source does not fit: a token with RBAC roles
-that reads only some projects is the narrower route, and the calls it
+that reads and writes only some projects is the narrower route, and the calls it
 may not make fail at Flagsmith.
 
 The steps follow Flagsmith's Management API documentation as of 20
@@ -73,29 +74,45 @@ the yardr-packs checkout) `<pack dir>`.
    ```
 4. **Who may call what.** A pack of kind source asks no grants at
    import, so what a crew member may call is granted afterwards.
-   `yardr pack show flagsmith` prints the pack's one suggested preset:
+   `yardr pack show flagsmith` prints the pack's three suggested presets:
    1. `read`: every read call, `organisations`, `projects`,
       `environments`, `features` and `featurestates`, and any read call
       the source is later given; it writes nothing.
+   2. `switch`: the `switch` call alone, which switches one flag on
+      or off in one environment; it changes the live product at once.
+   3. `create`: the `create` call alone, which creates a flag in a
+      project; it changes the project at once.
 
    A pack applied from a directory takes a preset by the calls it
-   names, as this line does:
+   names, as these lines do:
    ```sh
    yardr source grant flagsmith read --crew yardmaster
    ```
-   A grantee who comes later gets one card:
+   ```sh
+   yardr source grant flagsmith switch --crew yardmaster
+   ```
+   ```sh
+   yardr source grant flagsmith create --crew yardmaster
+   ```
+   `read` covers every read call and no update; `switch` and `create`
+   each change something in Flagsmith and are granted by their names
+   alone. A grantee who comes later gets one card for each grant:
    ```sh
    yardr bead ask <bead> "Let the reviewers read Flagsmith" --run "source grant flagsmith read --group reviewers" --context "The reviewers read flag states to check a bead's rollout; the card names each call it covers."
    ```
-   One caller may make 60 calls of a source in an hour. Flagsmith
-   itself takes 500 requests a minute of its Management API by
-   default; a self-hoster changes it with `USER_THROTTLE_RATE`. The
-   operator raises the yard's limit where the work needs it:
+   One caller may make 60 calls of a source in an hour, 10 of them
+   updates. Flagsmith itself takes 500 requests a minute of its
+   Management API by default; a self-hoster changes it with
+   `USER_THROTTLE_RATE`. The operator raises the yard's limits where
+   the work needs them:
    ```sh
    yardr source set flagsmith calls_per_hour=300
    ```
+   ```sh
+   yardr source set flagsmith updates_per_hour=30
+   ```
    To take a grant back, run `yardr source revoke flagsmith read
-   --crew yardmaster`.
+   --crew yardmaster`, and the same for `switch` and `create`.
 5. **Check it.** The source's check call is `organisations`, which
    needs no argument. It confirms the token is set, then asks
    Flagsmith for the organisations and reports the answer:
@@ -144,15 +161,30 @@ the yardr-packs checkout) `<pack dir>`.
    ```
    Every list answers its first page alone. An answer that has more
    keeps `next` and follows none; `count` says how many there are.
+   From a featurestate id to the flag switched on in its environment:
+   ```sh
+   yardr call flagsmith switch state=<id> enabled=true
+   ```
+   The id must be the environment's own state, with `identity` and
+   `feature_segment` null in the `featurestates` answer; the switch
+   changes the live product at once. `enabled=false` switches off.
+   From a project's id to a new flag in it:
+   ```sh
+   yardr call flagsmith create project=<id> name=<name>
+   ```
+   With a description and whether it starts on:
+   ```sh
+   yardr call flagsmith create project=<id> name=<name> description=<words> default_enabled=true
+   ```
 7. **When it does not work.**
    - *the service refuses the token*: a 401 or 403, whatever Flagsmith
      answers. See step 5.
    - *a 429*: the caller spent Flagsmith's 500 requests for the
-     minute. Nothing was read by the refused call. Wait for the
+     minute. Nothing was read or written by the refused call. Wait for the
      minute.
    - *the answer is over its bound*: yardr refuses an answer over the
-     call's bound and does not cut it. The lists are held to 64 KB.
-     Narrow with `search`, `is_archived`, `feature` or `feature_name`.
+     call's bound and does not cut it. Each call is held to 64 KB.
+     Narrow a list with `search`, `is_archived`, `feature` or `feature_name`.
    - *an argument is refused with its pattern*: the call was not sent.
      `yardr source show flagsmith` lists each call's arguments and
      their patterns.
@@ -166,6 +198,12 @@ the yardr-packs checkout) `<pack dir>`.
    tab:
    ```sh
    yardr source revoke flagsmith read --crew yardmaster
+   ```
+   ```sh
+   yardr source revoke flagsmith switch --crew yardmaster
+   ```
+   ```sh
+   yardr source revoke flagsmith create --crew yardmaster
    ```
    ```sh
    yardr source rm flagsmith

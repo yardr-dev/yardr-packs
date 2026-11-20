@@ -12,6 +12,8 @@
     "projects": "read",
     "environments": "read",
     "features": "read",
-    "featurestates": "read"
+    "featurestates": "read",
+    "switch": "update",
+    "create": "update"
   }
 }

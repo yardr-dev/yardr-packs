@@ -1,14 +1,17 @@
 # Flagsmith feature flags as a declared source: the organisation's
-# projects, a project's environments, a project's flags, and each flag's
-# state in an environment, all read through Flagsmith's Management API
+# projects, a project's environments, a project's flags, each flag's
+# state in an environment, one flag switched on or off in one environment,
+# and a flag created in a project, all through Flagsmith's Management API
 # with one organisation API token. An agent lists the organisations the
 # token sees, lists the projects, lists a project's environments, lists
-# a project's flags (searched, or narrowed to archived ones), and reads
-# an environment's flag states (for one flag or all). What it never does:
-# no write of any kind (switching a flag changes the live product at
-# once, so updates are a later bead); no paging past the first page; no
-# segments, identities, edge, audit or anything else of the API; no OIDC
-# trust tokens, the organisation token alone.
+# a project's flags (searched, or narrowed to archived ones), reads
+# an environment's flag states (for one flag or all), switches one flag
+# on or off in one environment, and creates a flag in a project. What it
+# never does: no change to a flag's value and no delete (not picked); no
+# segment or identity override (switch targets the environment default
+# state); no paging past the first page; no segments, identities, edge,
+# audit or anything else of the API; no OIDC trust tokens, the organisation
+# token alone.
 #
 # Checked against Flagsmith's docs and the live Management API swagger
 # on 20 November 2026, not against a Flagsmith organisation:
@@ -40,7 +43,16 @@
 #     the environment's api_key, not its integer id, and answers a
 #     paginated list of states; feature (a flag id) and feature_name
 #     filter it.
-#   paging: DRF ?page= (page_size on some lists). Every call reads the
+#   switch: PATCH /features/featurestates/{id}/ with a body of {enabled}
+#     alone. Partial: PatchedWritableNestedFeatureState requires nothing,
+#     so the body carries the one field and nothing else. {id} is the
+#     featurestate id from featurestates; the environment's own state has
+#     identity and feature_segment null there. Answers the updated state.
+#   create: POST /projects/{project_pk}/features/ with a body requiring
+#     name (ListFeature requires name; description and default_enabled
+#     optional). name is at most 2000 characters; description has no max
+#     in the swagger. Answers the new flag.
+#   paging: DRF ?page= (page_size on some lists). Every read call reads the
 #     first page alone and keeps next as the sign of more, following
 #     none; previous is always null on page one and is dropped.
 #   answers: select keeps top-level keys only and cannot reach into
@@ -49,15 +61,19 @@
 #     kept fixtures are a few kilobytes, and the swagger names no page
 #     size to count against. An answer over the bound is refused, not
 #     cut: narrow with search, is_archived, feature or feature_name.
+#     switch and create answer single objects and keep the keys that
+#     confirm the write: the state's id, enabled, feature, environment,
+#     identity and feature_segment; the flag's id, name, description,
+#     default_enabled and project.
 #   limits: the Management API takes 500 requests a minute by default
 #     (USER_THROTTLE_RATE on a self-hosted one), and the yard lets one
-#     caller make 60 calls of the source an hour.
+#     caller make 60 calls of the source an hour, 10 of them updates.
 #
 # Not tried: no request was made to api.flagsmith.com, because there is
 # no Flagsmith organisation in the yard yet. The first call against a
 # live organisation is the real check (README.md, "What was checked").
 name: flagsmith
-about: Flagsmith feature flags through the Management API, read with one organisation API token; organisations, projects, environments, flags and each flag's state in an environment.
+about: Flagsmith feature flags through the Management API with one organisation API token; organisations, projects, environments and flags listed, each flag's state in an environment read, one flag switched in one environment and a flag created in a project.
 
 # The name of the variable, never the value. An organisation API token
 # made in Flagsmith's Organisation Settings, on the API Access tab, sent
@@ -127,3 +143,27 @@ calls:
       path: /environments/{environment}/featurestates/
       query: { feature: "{feature}", feature_name: "{feature_name}" }
     answer: { select: [count, next, results] }
+  switch:
+    kind: update
+    about: Switch one flag on or off in one environment at once; takes the featurestate id featurestates answers, which must be the environment's own state (identity and feature_segment null there).
+    params:
+      state: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # a featurestate id as featurestates gives it; the environment's own state, not an override
+      enabled: { type: bool }   # true switches on, false switches off
+    request:
+      method: PATCH
+      path: /features/featurestates/{state}/
+      body: { enabled: "{enabled}" }
+    answer: { select: [id, enabled, feature, environment, identity, feature_segment] }
+  create:
+    kind: update
+    about: Add a flag to a project; answers the new flag's id.
+    params:
+      project: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # a project's id as projects gives it
+      name: { type: string, max: 2000 }   # the new flag's name; free text, its value is in no event
+      description: { type: string, max: 10000, optional: true }   # free text, left out, no description; its value is in no event
+      default_enabled: { type: bool, optional: true }   # true for a flag that starts on, false for one that starts off; left out, Flagsmith's default
+    request:
+      method: POST
+      path: /projects/{project}/features/
+      body: { name: "{name}", description: "{description}", default_enabled: "{default_enabled}" }   # a description or default_enabled left out leaves its key out with it
+    answer: { select: [id, name, description, default_enabled, project] }

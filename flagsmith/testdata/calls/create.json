@@ -1,0 +1,43 @@
+{
+  "call": "create",
+  "about": "Create flag summer_sale in project 7 with a name alone: description and default_enabled left out leave their keys out of the body. Shaped after ListFeature; the service answers the new flag with its default off and no description.",
+  "params": { "project": "7", "name": "summer_sale" },
+  "answer": {
+    "id": 44,
+    "name": "summer_sale",
+    "type": "STANDARD",
+    "default_enabled": false,
+    "initial_value": null,
+    "created_date": "2026-11-20T15:30:00.000000Z",
+    "description": null,
+    "tags": [],
+    "multivariate_options": [],
+    "is_archived": false,
+    "owners": [],
+    "group_owners": [],
+    "uuid": "d1d2d3d4-0000-4000-8000-000000000044",
+    "project": 7,
+    "num_segment_overrides": 0
+  },
+  "want": {
+    "request": {
+      "method": "POST",
+      "url": "https://api.flagsmith.com/api/v1/projects/7/features/",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "Content-Type": "application/json", "User-Agent": "yardr" },
+      "body": { "name": "summer_sale" }
+    },
+    "kept": {
+      "id": 44,
+      "name": "summer_sale",
+      "description": null,
+      "default_enabled": false,
+      "project": 7
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "project": "7" }, "error": "parameter name is missing" },
+    { "params": { "project": "seven", "name": "summer_sale" }, "error": "parameter project does not match its pattern ^[0-9]+$" },
+    { "params": { "project": "7", "name": "summer_sale", "default_enabled": "yes" }, "error": "parameter default_enabled is true or false" }
+  ]
+}
