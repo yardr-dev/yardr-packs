@@ -1,0 +1,64 @@
+{
+  "call": "features",
+  "about": "Project 7's flags searched and narrowed to live ones: both optional filters sent, the query sorted by key and the search escaped. One hit, the last page.",
+  "params": { "project": "7", "search": "checkout & pay", "is_archived": "false" },
+  "answer": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 42,
+        "name": "new_checkout",
+        "type": "STANDARD",
+        "default_enabled": false,
+        "initial_value": null,
+        "created_date": "2025-01-10T10:00:00.000000Z",
+        "description": "The new checkout flow.",
+        "tags": [],
+        "multivariate_options": [],
+        "is_archived": false,
+        "owners": [],
+        "group_owners": [],
+        "uuid": "d1d2d3d4-0000-4000-8000-000000000042",
+        "project": 7,
+        "num_segment_overrides": 0
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/projects/7/features/?is_archived=false&search=checkout+%26+pay",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "count": 1,
+      "next": null,
+      "results": [
+        {
+          "id": 42,
+          "name": "new_checkout",
+          "type": "STANDARD",
+          "default_enabled": false,
+          "initial_value": null,
+          "created_date": "2025-01-10T10:00:00.000000Z",
+          "description": "The new checkout flow.",
+          "tags": [],
+          "multivariate_options": [],
+          "is_archived": false,
+          "owners": [],
+          "group_owners": [],
+          "uuid": "d1d2d3d4-0000-4000-8000-000000000042",
+          "project": 7,
+          "num_segment_overrides": 0
+        }
+      ]
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "project": "7", "search": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }, "error": "parameter search is 201 characters, and at most 200" },
+    { "params": { "project": "7", "is_archived": "False" }, "error": "parameter is_archived is true or false" }
+  ]
+}

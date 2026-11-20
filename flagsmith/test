@@ -1,0 +1,190 @@
+#!/bin/sh
+# The flagsmith pack's tests: what the gate runs beside yardr pack check.
+# Needs no network and no secret, done in seconds. It wants jq 1.6 or
+# later, and one of ruby, python3 with PyYAML or yq to read flagsmith.yaml
+# as data; with none of them it fails and says so, since a skipped test
+# would leave the requests unpinned.
+#
+# The calls. flagsmith.yaml is read as data and testdata/render.jq builds
+# from it, for each fixture in testdata/calls/, the request yardr sends
+# for the fixture's parameters and what the call keeps of the fixture's
+# recorded Flagsmith answer. Both are compared with what the fixture says
+# they must be, which was written from Flagsmith's documentation and the
+# live swagger and not from the declaration, so a changed path, query,
+# parameter pattern or select fails here. The fixture's refusals are
+# parameters the call must turn away before sending. The declaration's
+# call names and kinds are also compared with what yardr pack check reads
+# of the same file.
+#
+# The grant. The commands SETUP.md teaches for granting the source (step
+# 4's, and the --run of the card for a later grantee) are read out of
+# SETUP.md and run as written against the yardr on PATH, in a scratch
+# yard with the pack applied from its directory, as step 2 says. Each
+# must be accepted: yardr takes --preset only for a pack inside its own
+# binary, so a SETUP that teaches it fails here and yardr says why.
+# Without yardr the grant is not tried, and the test says so.
+set -u
+pack=$(cd "$(dirname "$0")" && pwd)
+cd "$pack" || exit 1
+fail=0
+
+command -v jq >/dev/null 2>&1 || { echo "test: needs jq on PATH"; exit 1; }
+if [ "$(jq -nr '"é &" | @uri')" != "%C3%A9%20%26" ] || [ "$(jq -nr '"ab" | gsub("(?<n>b)"; "[\(.n)]")')" != "a[b]" ]; then
+  echo "test: needs jq 1.6 or later ($(jq --version))"
+  exit 1
+fi
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/flagsmith-test.XXXXXX") || exit 1
+# The grant's scratch yard (below) is made when its turn comes, and has a
+# server that its first command starts and that would outlive the
+# directory it owns: stop it first. core is empty until then, whatever the
+# environment holds.
+core=
+# The trap runs this, which shellcheck does not see in a script that ends
+# in exit.
+# shellcheck disable=SC2329
+cleanup() {
+  if [ -n "${core:-}" ]; then
+    yrun server stop >/dev/null 2>&1
+    rm -rf "${core:?}"
+  fi
+  rm -rf "${tmp:?}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# yaml2json <file> writes the file, read as YAML, as JSON on stdout.
+yaml2json() {
+  if command -v ruby >/dev/null 2>&1; then
+    ruby -ryaml -rjson -e 'puts JSON.generate(YAML.safe_load(File.read(ARGV[0])))' "$1"
+  elif command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; then
+    python3 -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))' "$1"
+  elif command -v yq >/dev/null 2>&1; then
+    yq -o=json '.' "$1" 2>/dev/null || yq '.' "$1"
+  else
+    echo "needs ruby, python3 with PyYAML, or yq to read $1" >&2
+    return 1
+  fi
+}
+
+# same <what> <wanted.json> <got.json> is 0 when both are the same JSON,
+# keys in any order, and says the difference where they are not.
+same() {
+  jq -S . "$2" > "$tmp/want.txt" 2>/dev/null || { echo "test: $1: $2 is no JSON"; return 1; }
+  jq -S . "$3" > "$tmp/got.txt" 2>/dev/null || { echo "test: $1: $3 is no JSON"; return 1; }
+  if cmp -s "$tmp/want.txt" "$tmp/got.txt"; then return 0; fi
+  echo "test: $1 differs (- wanted, + got):"
+  diff -u "$tmp/want.txt" "$tmp/got.txt" | sed 's/^/  /'
+  return 1
+}
+
+# ---- the declaration ----------------------------------------------------
+
+if ! yaml2json flagsmith.yaml > "$tmp/decl.json" 2> "$tmp/yaml.err"; then
+  echo "test: flagsmith.yaml cannot be read as data: $(cat "$tmp/yaml.err")"
+  fail=1
+else
+  jq '{name, base, base_template, check: (.check // null), credential, kinds: (.calls | map_values(.kind))}' "$tmp/decl.json" > "$tmp/got.json"
+  if same "declaration (name, base, base_template, check, credential, kinds)" testdata/declaration.json "$tmp/got.json"; then
+    echo "test: declaration ok"
+  else
+    fail=1
+  fi
+
+  # Every call has a fixture, and every fixture a call.
+  jq -r '.calls | keys[]' "$tmp/decl.json" | LC_ALL=C sort > "$tmp/declared.txt"
+  jq -r '.call' testdata/calls/*.json | LC_ALL=C sort -u > "$tmp/fixtured.txt"
+  if cmp -s "$tmp/declared.txt" "$tmp/fixtured.txt"; then
+    echo "test: every call has a fixture"
+  else
+    echo "test: the calls of flagsmith.yaml and of testdata/calls/ differ (- declared, + fixtured):"
+    diff -u "$tmp/declared.txt" "$tmp/fixtured.txt" | sed 's/^/  /'
+    fail=1
+  fi
+
+  for f in testdata/calls/*.json; do
+    [ -e "$f" ] || continue
+    label=$(basename "$f" .json)
+    call=$(jq -r .call "$f")
+    bad=0
+    jq -n --slurpfile d "$tmp/decl.json" --slurpfile f "$f" --arg call "$call" \
+      '{decl: $d[0], call: $call, given: $f[0].params, answer: $f[0].answer}' |
+      jq -f testdata/render.jq > "$tmp/got.json"
+    jq '.want' "$f" > "$tmp/want.json"
+    same "call $label (request and kept answer)" "$tmp/want.json" "$tmp/got.json" || bad=1
+    nref=$(jq '.refused // [] | length' "$f")
+    r=0
+    while [ "$r" -lt "$nref" ]; do
+      jq -n --slurpfile d "$tmp/decl.json" --slurpfile f "$f" --arg call "$call" --argjson r "$r" \
+        '{decl: $d[0], call: $call, given: $f[0].refused[$r].params, answer: {}}' |
+        jq -f testdata/render.jq > "$tmp/got.json"
+      jq --argjson r "$r" '{error: .refused[$r].error}' "$f" > "$tmp/want.json"
+      same "call $label refusal $r" "$tmp/want.json" "$tmp/got.json" || bad=1
+      r=$((r + 1))
+    done
+    if [ "$bad" = 0 ]; then echo "test: call $label ok ($nref refusals)"; else fail=1; fi
+  done
+fi
+
+# The same file as yardr itself reads it: the source, its base and its
+# calls with their kinds. As .yardr/test finds yardr.
+YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+if [ -x "$YARDR" ] && [ -s "$tmp/decl.json" ]; then
+  "$YARDR" pack check . --json 2>/dev/null | jq -r '.declared[0] | (.source, .base, (.calls[]))' > "$tmp/yardr.txt"
+  jq -r '.name, .base, (.calls | to_entries[] | "\(.key) (\(.value.kind))")' "$tmp/decl.json" > "$tmp/ours.txt"
+  if cmp -s "$tmp/ours.txt" "$tmp/yardr.txt"; then
+    echo "test: yardr pack check reads the same calls"
+  else
+    echo "test: yardr pack check reads flagsmith.yaml otherwise (- read here, + read by yardr):"
+    diff -u "$tmp/ours.txt" "$tmp/yardr.txt" | sed 's/^/  /'
+    fail=1
+  fi
+else
+  echo "test: yardr not found: the calls were not compared with what it reads"
+fi
+
+# ---- the grant ------------------------------------------------------------
+
+# The commands are read out of SETUP.md, not copied here: a copy would pass
+# whatever SETUP teaches, and SETUP once taught --preset, which yardr
+# refuses for a pack applied from a directory. The scratch yard is under a
+# short path (a unix socket's path is held to 100 bytes), and each command
+# of it runs with an environment of its own home and a system PATH, so none
+# of this session's YARDR_* variables lead back to a real yard. It starts
+# no agent, and its server listens on a unix socket alone. The card of
+# SETUP.md grants the group reviewers, which a fresh yard has none of.
+grep -o 'source grant [^`"]*' SETUP.md > "$tmp/grants"
+if [ ! -s "$tmp/grants" ]; then
+  echo "test: grant failed: SETUP.md teaches no source grant command"
+  fail=1
+elif [ ! -x "$YARDR" ]; then
+  echo "test: yardr not found: the grants of SETUP.md were not tried"
+else
+  yrun() { env -i HOME="$core/h" PATH=/usr/bin:/bin "$YARDR" --home "$core/y" --actor tester "$@"; }
+  core=$(mktemp -d /tmp/flagsmitht.XXXXXX) || exit 1
+  mkdir -p "$core/h"
+  if ! yrun init --harness claude --operator tester > "$core/out" 2>&1; then
+    echo "test: grant failed: the scratch yard could not be made: $(tail -c 300 "$core/out")"
+    fail=1
+  elif ! yrun pack apply "$pack" --yes > "$core/out" 2>&1; then
+    echo "test: grant failed: the pack did not apply from its directory: $(tail -c 300 "$core/out")"
+    fail=1
+  elif ! yrun group add reviewers --runner manual > "$core/out" 2>&1; then
+    echo "test: grant failed: the group of the card could not be made: $(tail -c 300 "$core/out")"
+    fail=1
+  else
+    while IFS= read -r cmd; do
+      # A grant is plain words, so $cmd is split on purpose. Its stdin is
+      # /dev/null so that it cannot read the rest of the list.
+      # shellcheck disable=SC2086
+      if yrun $cmd < /dev/null > "$core/out" 2>&1; then
+        echo "test: grant ok (yardr $cmd)"
+      else
+        echo "test: grant failed: yardr refused 'yardr $cmd', which SETUP.md teaches: $(tail -c 300 "$core/out")"
+        fail=1
+      fi
+    done < "$tmp/grants"
+  fi
+fi
+
+exit $fail

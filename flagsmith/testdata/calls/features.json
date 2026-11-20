@@ -1,0 +1,99 @@
+{
+  "call": "features",
+  "about": "Project 7's flags with no filter, first page of three: next names page two. Shaped after PaginatedListFeatureList; each flag carries the id featurestates filters by.",
+  "params": { "project": "7" },
+  "answer": {
+    "count": 3,
+    "next": "https://api.flagsmith.com/api/v1/projects/7/features/?page=2",
+    "previous": null,
+    "results": [
+      {
+        "id": 42,
+        "name": "new_checkout",
+        "type": "STANDARD",
+        "default_enabled": false,
+        "initial_value": null,
+        "created_date": "2025-01-10T10:00:00.000000Z",
+        "description": "The new checkout flow.",
+        "tags": [],
+        "multivariate_options": [],
+        "is_archived": false,
+        "owners": [],
+        "group_owners": [],
+        "uuid": "d1d2d3d4-0000-4000-8000-000000000042",
+        "project": 7,
+        "num_segment_overrides": 0
+      },
+      {
+        "id": 43,
+        "name": "winter_banner",
+        "type": "STANDARD",
+        "default_enabled": true,
+        "initial_value": null,
+        "created_date": "2025-11-01T10:00:00.000000Z",
+        "description": null,
+        "tags": [],
+        "multivariate_options": [],
+        "is_archived": false,
+        "owners": [],
+        "group_owners": [],
+        "uuid": "d1d2d3d4-0000-4000-8000-000000000043",
+        "project": 7,
+        "num_segment_overrides": 0
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/projects/7/features/",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "count": 3,
+      "next": "https://api.flagsmith.com/api/v1/projects/7/features/?page=2",
+      "results": [
+        {
+          "id": 42,
+          "name": "new_checkout",
+          "type": "STANDARD",
+          "default_enabled": false,
+          "initial_value": null,
+          "created_date": "2025-01-10T10:00:00.000000Z",
+          "description": "The new checkout flow.",
+          "tags": [],
+          "multivariate_options": [],
+          "is_archived": false,
+          "owners": [],
+          "group_owners": [],
+          "uuid": "d1d2d3d4-0000-4000-8000-000000000042",
+          "project": 7,
+          "num_segment_overrides": 0
+        },
+        {
+          "id": 43,
+          "name": "winter_banner",
+          "type": "STANDARD",
+          "default_enabled": true,
+          "initial_value": null,
+          "created_date": "2025-11-01T10:00:00.000000Z",
+          "description": null,
+          "tags": [],
+          "multivariate_options": [],
+          "is_archived": false,
+          "owners": [],
+          "group_owners": [],
+          "uuid": "d1d2d3d4-0000-4000-8000-000000000043",
+          "project": 7,
+          "num_segment_overrides": 0
+        }
+      ]
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": {}, "error": "parameter project is missing" },
+    { "params": { "project": "seven" }, "error": "parameter project does not match its pattern ^[0-9]+$" },
+    { "params": { "project": "7", "is_archived": "yes" }, "error": "parameter is_archived is true or false" }
+  ]
+}

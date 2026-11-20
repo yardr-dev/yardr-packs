@@ -1,0 +1,17 @@
+{
+  "name": "flagsmith",
+  "base": "https://api.flagsmith.com/api/v1",
+  "base_template": "https://{host}/api/v1",
+  "check": "organisations",
+  "credential": {
+    "env": "FLAGSMITH_API_KEY",
+    "header": "Authorization: Api-Key {credential}"
+  },
+  "kinds": {
+    "organisations": "read",
+    "projects": "read",
+    "environments": "read",
+    "features": "read",
+    "featurestates": "read"
+  }
+}

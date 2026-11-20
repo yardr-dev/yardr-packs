@@ -1,0 +1,91 @@
+{
+  "call": "environments",
+  "about": "Project 7's two environments, the last page: next is null and kept. Shaped after PaginatedEnvironmentSerializerWithMetadataList; each item carries the api_key featurestates takes.",
+  "params": { "project": "7" },
+  "answer": {
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 3,
+        "uuid": "c1c2c3d4-0000-4000-8000-000000000003",
+        "name": "Production",
+        "api_key": "Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4",
+        "description": "The live site.",
+        "project": 7,
+        "minimum_change_request_approvals": null,
+        "allow_client_traits": true,
+        "banner_text": null,
+        "banner_colour": null,
+        "hide_disabled_flags": null,
+        "use_v2_feature_versioning": false,
+        "metadata": []
+      },
+      {
+        "id": 4,
+        "uuid": "c1c2c3d4-0000-4000-8000-000000000004",
+        "name": "Staging",
+        "api_key": "St4G1nGK3yH8uF0vBn2xM5pL7qW9zR3tY6sE1dC8aV",
+        "description": null,
+        "project": 7,
+        "minimum_change_request_approvals": null,
+        "allow_client_traits": true,
+        "banner_text": null,
+        "banner_colour": null,
+        "hide_disabled_flags": null,
+        "use_v2_feature_versioning": false,
+        "metadata": []
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/environments/?project=7",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "count": 2,
+      "next": null,
+      "results": [
+        {
+          "id": 3,
+          "uuid": "c1c2c3d4-0000-4000-8000-000000000003",
+          "name": "Production",
+          "api_key": "Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4",
+          "description": "The live site.",
+          "project": 7,
+          "minimum_change_request_approvals": null,
+          "allow_client_traits": true,
+          "banner_text": null,
+          "banner_colour": null,
+          "hide_disabled_flags": null,
+          "use_v2_feature_versioning": false,
+          "metadata": []
+        },
+        {
+          "id": 4,
+          "uuid": "c1c2c3d4-0000-4000-8000-000000000004",
+          "name": "Staging",
+          "api_key": "St4G1nGK3yH8uF0vBn2xM5pL7qW9zR3tY6sE1dC8aV",
+          "description": null,
+          "project": 7,
+          "minimum_change_request_approvals": null,
+          "allow_client_traits": true,
+          "banner_text": null,
+          "banner_colour": null,
+          "hide_disabled_flags": null,
+          "use_v2_feature_versioning": false,
+          "metadata": []
+        }
+      ]
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": {}, "error": "parameter project is missing" },
+    { "params": { "project": "7x" }, "error": "parameter project does not match its pattern ^[0-9]+$" },
+    { "params": { "project": "7", "page": "2" }, "error": "\"page\" is no parameter of the call (it takes: project)" }
+  ]
+}

@@ -1,0 +1,31 @@
+# Flagsmith as a pack of kind source: the integration, imported into
+# the yard and into no depot. What Flagsmith is here: the declared
+# source flagsmith, which lists the organisations an organisation API
+# token sees, the projects, a project's environments and a project's
+# flags, and reads an environment's flag states, all through Flagsmith's
+# Management API. Read only; switching a flag changes the live product
+# at once, so updates are a later bead.
+#
+#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/flagsmith
+#
+# The source is named flagsmith: a pack is named after the service it
+# talks to. A pack of kind source asks no grants at import, so what a
+# crew member may call is granted afterwards, by the setup notes. The
+# token reads whatever it was made with, one identity for the yard, so
+# every agent granted a call reads all of it.
+name: flagsmith
+kind: source
+setup: SETUP.md
+
+sources:
+  flagsmith:
+    declaration: flagsmith.yaml
+
+# Suggested grants: named sets of the source's calls, printed numbered by
+# pack show. Suggesting grants nothing: the operator grants them, and
+# terminal pack apply ignores them.
+presets:
+  read:
+    about: List organisations, projects, environments and flags, and read each flag's state in an environment; change nothing
+    grants:
+      flagsmith: [read]

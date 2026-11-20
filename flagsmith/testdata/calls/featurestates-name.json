@@ -1,0 +1,66 @@
+{
+  "call": "featurestates",
+  "about": "Production's states for one flag by name, the name escaped in the query.",
+  "params": { "environment": "Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4", "feature_name": "new checkout" },
+  "answer": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 101,
+        "feature_state_value": null,
+        "multivariate_feature_state_values": [],
+        "identity": null,
+        "deleted_at": null,
+        "uuid": "e1e2e3e4-0000-4000-8000-000000000101",
+        "enabled": false,
+        "created_at": "2025-01-10T10:00:00.000000Z",
+        "updated_at": "2025-02-01T10:00:00.000000Z",
+        "live_from": null,
+        "version": 3,
+        "feature": 42,
+        "environment": 3,
+        "feature_segment": null,
+        "change_request": null,
+        "environment_feature_version": null
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/environments/Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4/featurestates/?feature_name=new+checkout",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "count": 1,
+      "next": null,
+      "results": [
+        {
+          "id": 101,
+          "feature_state_value": null,
+          "multivariate_feature_state_values": [],
+          "identity": null,
+          "deleted_at": null,
+          "uuid": "e1e2e3e4-0000-4000-8000-000000000101",
+          "enabled": false,
+          "created_at": "2025-01-10T10:00:00.000000Z",
+          "updated_at": "2025-02-01T10:00:00.000000Z",
+          "live_from": null,
+          "version": 3,
+          "feature": 42,
+          "environment": 3,
+          "feature_segment": null,
+          "change_request": null,
+          "environment_feature_version": null
+        }
+      ]
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "environment": "Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4", "feature_name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }, "error": "parameter feature_name is 2001 characters, and at most 2000" },
+    { "params": { "environment": "Kp7Q2mZxV9bNwL4tY6sE8rT0uDf3aHcJ5eWvXyZ1aB4", "anyIdentity": "x" }, "error": "\"anyIdentity\" is no parameter of the call (it takes: environment, feature, feature_name)" }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "call": "projects",
+  "about": "Every project as a bare array, shaped after ProjectList. Three projects in two organisations: organisation matches the id organisations gave, since Flagsmith answers no per-organisation list the swagger pins.",
+  "params": {},
+  "answer": [
+    {
+      "id": 7,
+      "uuid": "b1b2c3d4-0000-4000-8000-000000000007",
+      "name": "Website",
+      "organisation": 1,
+      "hide_disabled_flags": false,
+      "enable_dynamo_db": false,
+      "migration_status": "NOT_APPLICABLE",
+      "use_edge_identities": false,
+      "prevent_flag_defaults": false,
+      "enable_realtime_updates": false,
+      "only_allow_lower_case_feature_names": false,
+      "feature_name_regex": null,
+      "show_edge_identity_overrides_for_feature": false,
+      "stale_flags_limit_days": 30
+    },
+    {
+      "id": 9,
+      "uuid": "b1b2c3d4-0000-4000-8000-000000000009",
+      "name": "Mobile app",
+      "organisation": 1,
+      "hide_disabled_flags": true,
+      "enable_dynamo_db": false,
+      "migration_status": "NOT_APPLICABLE",
+      "use_edge_identities": false,
+      "prevent_flag_defaults": false,
+      "enable_realtime_updates": false,
+      "only_allow_lower_case_feature_names": true,
+      "feature_name_regex": null,
+      "show_edge_identity_overrides_for_feature": false,
+      "stale_flags_limit_days": 30
+    },
+    {
+      "id": 12,
+      "uuid": "b1b2c3d4-0000-4000-8000-000000000012",
+      "name": "Internal tools",
+      "organisation": 2,
+      "hide_disabled_flags": false,
+      "enable_dynamo_db": false,
+      "migration_status": "NOT_APPLICABLE",
+      "use_edge_identities": false,
+      "prevent_flag_defaults": false,
+      "enable_realtime_updates": false,
+      "only_allow_lower_case_feature_names": false,
+      "feature_name_regex": null,
+      "show_edge_identity_overrides_for_feature": false,
+      "stale_flags_limit_days": 30
+    }
+  ],
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/projects/",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": [
+      {
+        "id": 7,
+        "uuid": "b1b2c3d4-0000-4000-8000-000000000007",
+        "name": "Website",
+        "organisation": 1
+      },
+      {
+        "id": 9,
+        "uuid": "b1b2c3d4-0000-4000-8000-000000000009",
+        "name": "Mobile app",
+        "organisation": 1
+      },
+      {
+        "id": 12,
+        "uuid": "b1b2c3d4-0000-4000-8000-000000000012",
+        "name": "Internal tools",
+        "organisation": 2
+      }
+    ],
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "organisation": "1" }, "error": "\"organisation\" is no parameter of the call (it takes: none)" }
+  ]
+}

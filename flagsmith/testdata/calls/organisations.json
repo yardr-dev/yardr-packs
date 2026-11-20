@@ -1,0 +1,81 @@
+{
+  "call": "organisations",
+  "about": "The organisations the token sees, first page of three. Shaped after PaginatedOrganisationSerializerFullList: previous is null on page one and next names page two, the sign of more.",
+  "params": {},
+  "answer": {
+    "count": 3,
+    "next": "https://api.flagsmith.com/api/v1/organisations/?page=2",
+    "previous": null,
+    "results": [
+      {
+        "id": 1,
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+        "name": "Acme",
+        "created_date": "2024-03-01T09:00:00.000000Z",
+        "webhook_notification_email": null,
+        "num_seats": 5,
+        "persist_trait_data": true,
+        "block_access_to_admin": false,
+        "stop_serving_flags": false,
+        "restrict_project_create_to_admin": false,
+        "force_2fa": false
+      },
+      {
+        "id": 2,
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000002",
+        "name": "Side project",
+        "created_date": "2025-06-12T14:30:00.000000Z",
+        "webhook_notification_email": null,
+        "num_seats": 1,
+        "persist_trait_data": true,
+        "block_access_to_admin": false,
+        "stop_serving_flags": false,
+        "restrict_project_create_to_admin": false,
+        "force_2fa": false
+      }
+    ]
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://api.flagsmith.com/api/v1/organisations/",
+      "headers": { "Accept": "application/json", "Authorization": "Api-Key <token>", "User-Agent": "yardr" }
+    },
+    "kept": {
+      "count": 3,
+      "next": "https://api.flagsmith.com/api/v1/organisations/?page=2",
+      "results": [
+        {
+          "id": 1,
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "name": "Acme",
+          "created_date": "2024-03-01T09:00:00.000000Z",
+          "webhook_notification_email": null,
+          "num_seats": 5,
+          "persist_trait_data": true,
+          "block_access_to_admin": false,
+          "stop_serving_flags": false,
+          "restrict_project_create_to_admin": false,
+          "force_2fa": false
+        },
+        {
+          "id": 2,
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000002",
+          "name": "Side project",
+          "created_date": "2025-06-12T14:30:00.000000Z",
+          "webhook_notification_email": null,
+          "num_seats": 1,
+          "persist_trait_data": true,
+          "block_access_to_admin": false,
+          "stop_serving_flags": false,
+          "restrict_project_create_to_admin": false,
+          "force_2fa": false
+        }
+      ]
+    },
+    "bound": 65536
+  },
+  "refused": [
+    { "params": { "page": "2" }, "error": "\"page\" is no parameter of the call (it takes: none)" }
+  ]
+}

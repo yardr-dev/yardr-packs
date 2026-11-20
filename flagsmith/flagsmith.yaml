@@ -1,0 +1,129 @@
+# Flagsmith feature flags as a declared source: the organisation's
+# projects, a project's environments, a project's flags, and each flag's
+# state in an environment, all read through Flagsmith's Management API
+# with one organisation API token. An agent lists the organisations the
+# token sees, lists the projects, lists a project's environments, lists
+# a project's flags (searched, or narrowed to archived ones), and reads
+# an environment's flag states (for one flag or all). What it never does:
+# no write of any kind (switching a flag changes the live product at
+# once, so updates are a later bead); no paging past the first page; no
+# segments, identities, edge, audit or anything else of the API; no OIDC
+# trust tokens, the organisation token alone.
+#
+# Checked against Flagsmith's docs and the live Management API swagger
+# on 20 November 2026, not against a Flagsmith organisation:
+#   auth: an organisation API token from Organisation Settings, API
+#     Access, Create API Key, sent as "Authorization: Api-Key <token>".
+#     The docs' Management API, Authentication and Code Examples pages
+#     say this word for word, and the swagger names the Master API Key
+#     in the Authorization header for Management API endpoints. SaaS
+#     base https://api.flagsmith.com/, the API under /api/v1/;
+#     self-hosted uses its own URL.
+#   organisations: GET /organisations/ takes page alone and answers a
+#     paginated {count, next, previous, results} of organisations.
+#   projects: GET /projects/ answers a bare array of projects and takes
+#     no parameter; each item carries its organisation id. There is a
+#     nested GET /organisations/{id}/projects/, but the swagger answers
+#     it with an organisation object, so its shape stays unclear and the
+#     bare list is used instead.
+#   environments: GET /environments/ takes project, the project's id,
+#     and answers a paginated list; each item carries id, uuid, name,
+#     api_key and project. The nested GET
+#     /projects/{id}/environments/ answers a project in the swagger, so
+#     the filtered list is used. The api_key is a string of at most 100
+#     characters; the swagger gives no pattern or example for it, so the
+#     call holds it to that alone.
+#   features: GET /projects/{project_pk}/features/ answers a paginated
+#     list of flags; search and is_archived are among its filters.
+#   featurestates: GET
+#     /environments/{environment_api_key}/featurestates/ is addressed by
+#     the environment's api_key, not its integer id, and answers a
+#     paginated list of states; feature (a flag id) and feature_name
+#     filter it.
+#   paging: DRF ?page= (page_size on some lists). Every call reads the
+#     first page alone and keeps next as the sign of more, following
+#     none; previous is always null on page one and is dropped.
+#   answers: select keeps top-level keys only and cannot reach into
+#     results[], so a paginated answer keeps its items whole within the
+#     call's bound, 64 KB unless raised. The lists keep the default: the
+#     kept fixtures are a few kilobytes, and the swagger names no page
+#     size to count against. An answer over the bound is refused, not
+#     cut: narrow with search, is_archived, feature or feature_name.
+#   limits: the Management API takes 500 requests a minute by default
+#     (USER_THROTTLE_RATE on a self-hosted one), and the yard lets one
+#     caller make 60 calls of the source an hour.
+#
+# Not tried: no request was made to api.flagsmith.com, because there is
+# no Flagsmith organisation in the yard yet. The first call against a
+# live organisation is the real check (README.md, "What was checked").
+name: flagsmith
+about: Flagsmith feature flags through the Management API, read with one organisation API token; organisations, projects, environments, flags and each flag's state in an environment.
+
+# The name of the variable, never the value. An organisation API token
+# made in Flagsmith's Organisation Settings, on the API Access tab, sent
+# with the Api-Key prefix and typed unseen at setup.
+credential:
+  env: FLAGSMITH_API_KEY
+  header: "Authorization: Api-Key {credential}"
+
+# base is the cloud's API. A yard on a self-hosted Flagsmith sets the
+# host instead (SETUP.md, step 2), and the calls go to the base_template
+# with it filled in: the credential is then given again, for the new
+# host.
+base: https://api.flagsmith.com/api/v1
+base_template: https://{host}/api/v1
+# organisations needs no argument and shows at once that the token is
+# taken.
+check: organisations
+calls:
+  organisations:
+    kind: read
+    about: List the organisations the token sees; answers each organisation's id. The source's check call.
+    request:
+      method: GET
+      path: /organisations/
+    answer: { select: [count, next, results] }
+  projects:
+    kind: read
+    about: List every project; answers each project's id, which environments and features take, and its organisation, which matches the id organisations gave.
+    request:
+      method: GET
+      path: /projects/
+    # The answer is a bare array; the select keeps these keys of each
+    # entry. Flagsmith answers no per-organisation project list whose
+    # shape the swagger pins, so the match is by this field.
+    answer: { select: [id, uuid, name, organisation] }
+  environments:
+    kind: read
+    about: List a project's environments; answers each environment's api_key, which featurestates takes.
+    params:
+      project: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # a project's id as projects gives it
+    request:
+      method: GET
+      path: /environments/
+      query: { project: "{project}" }
+    answer: { select: [count, next, results] }
+  features:
+    kind: read
+    about: List a project's flags, one page, all of them or searched or narrowed to archived ones; answers each flag's id, which featurestates takes as feature.
+    params:
+      project: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # a project's id as projects gives it
+      search: { type: string, max: 200, optional: true }   # free text: its value is in no event
+      is_archived: { type: bool, optional: true }   # true for archived flags alone, false for live ones alone
+    request:
+      method: GET
+      path: /projects/{project}/features/
+      query: { search: "{search}", is_archived: "{is_archived}" }
+    answer: { select: [count, next, results] }
+  featurestates:
+    kind: read
+    about: Read an environment's flag states, one page, for every flag or for one; answers each state's enabled, feature_state_value, feature and identity.
+    params:
+      environment: { type: string, max: 100, log: true }   # an environment's api_key as environments gives it, not its integer id
+      feature: { type: string, pattern: "^[0-9]+$", max: 20, optional: true, log: true }   # one flag's id as features gives it
+      feature_name: { type: string, max: 2000, optional: true }   # one flag's name; free text, its value is in no event
+    request:
+      method: GET
+      path: /environments/{environment}/featurestates/
+      query: { feature: "{feature}", feature_name: "{feature_name}" }
+    answer: { select: [count, next, results] }
