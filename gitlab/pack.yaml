@@ -5,7 +5,7 @@
 # issue or a merge request), how it reads a merge request and its CI back,
 # and the reads an agent may ask for through `yardr call`.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/gitlab
+#   yardr pack apply <pack dir>
 #
 # The source is named gitlab: a pack is named after the service it
 # talks to.

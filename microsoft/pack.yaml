@@ -8,7 +8,7 @@
 # declaration. Read only; it downloads no file bytes, though search hits
 # may carry short text excerpts from Graph.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/microsoft
+#   yardr pack apply <pack dir>
 #
 # The source is named microsoft: a pack is named after the service it
 # talks to. A pack of kind source asks no grants at import, so what a

@@ -6,7 +6,7 @@
 # the hook's secret. Inbound only: the yard never answers from the
 # address.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/cloudflare-email
+#   yardr pack apply <pack dir>
 #
 # The source is named cloudflare-email: a pack is named after the
 # service it talks to.

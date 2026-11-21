@@ -20,8 +20,10 @@ alternative.
 1. **Apply the pack.** From main of the yardr-packs repository, as an
    operator. The source is named `cloudflare-email`: a pack is named
    after the service it talks to.
+   Commands below call the pack's directory (the
+   `cloudflare-email` directory of the yardr-packs checkout) `<pack dir>`.
    ```sh
-   yardr pack apply /Users/mckean/projects/repos/yardr-packs/cloudflare-email
+   yardr pack apply <pack dir>
    ```
 2. **The secret and the hook.** The Worker signs each message with this
    secret, and the hook verifies it. The secret lives in a file, mode
@@ -83,7 +85,7 @@ alternative.
    upload from the pack's dist file, in the checkout the pack was
    applied from:
    ```sh
-   yardr bead ask <bead> "Upload the yardr-email Worker?" --run "call cloudflare worker_upload account=<account id> name=yardr-email script=/Users/mckean/projects/repos/yardr-packs/cloudflare-email/worker/dist/worker.js"
+   yardr bead ask <bead> "Upload the yardr-email Worker?" --run "call cloudflare worker_upload account=<account id> name=yardr-email script=<pack dir>/worker/dist/worker.js"
    ```
    The card shows the request it makes and, for the file, its path,
    SHA-256 digest and size: those bytes are what is sent, and a

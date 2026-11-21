@@ -4,7 +4,7 @@
 # speaks in an issue (a comment, resolve and unresolve), and a bead's link
 # to an issue.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/sentry
+#   yardr pack apply <pack dir>
 #
 # The source is named sentry: a pack is named after the service it
 # talks to.

@@ -8,8 +8,11 @@ by words. Calls are read-only. Search hits can include short excerpts
 from matching documents in Graph's `summary` field; no call downloads
 full file bytes. Nothing here is compiled into yardr; apply it with:
 
+Commands below call the pack's directory (the `microsoft` directory of
+the yardr-packs checkout) `<pack dir>`.
+
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/microsoft
+yardr pack apply <pack dir>
 ```
 
 from main of this repository. SETUP.md is the operator's steps, written

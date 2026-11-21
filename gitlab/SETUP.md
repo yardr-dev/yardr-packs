@@ -15,8 +15,10 @@ instance changes.
 1. **Apply the pack.** From main of the yardr-packs repository, as an
    operator. The pack runs two programs of its own as you, `gitlab/normalize`
    and `gitlab/thread`, and they need `jq`, `curl` and `bash`.
+   Commands below call the pack's directory (the `gitlab` directory of
+   the yardr-packs checkout) `<pack dir>`.
    ```sh
-   yardr pack apply /Users/mckean/projects/repos/yardr-packs/gitlab
+   yardr pack apply <pack dir>
    ```
 2. **The hook and its secret.** GitLab sends the secret back in the
    `X-Gitlab-Token` header of every delivery, and the hook compares it as

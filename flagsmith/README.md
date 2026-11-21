@@ -9,8 +9,11 @@ one flag on or off in one environment, and creates a flag in a project.
 The two updates change the live product at once, so each is granted
 by its name alone. Nothing here is compiled into yardr; apply it with:
 
+Commands below call the pack's directory (the `flagsmith` directory of
+the yardr-packs checkout) `<pack dir>`.
+
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/flagsmith
+yardr pack apply <pack dir>
 ```
 
 from main of this repository. SETUP.md is the operator's steps, written

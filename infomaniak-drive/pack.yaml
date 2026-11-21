@@ -7,7 +7,7 @@
 # drive-file, sends the upload and answers the download, which no
 # declaration says; every other call is the declaration's own request.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-drive
+#   yardr pack apply <pack dir>
 #
 # The source is named infomaniak-drive: a pack is named after the
 # service it talks to. A pack of kind source asks no grants at import,

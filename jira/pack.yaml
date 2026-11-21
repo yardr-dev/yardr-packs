@@ -5,7 +5,7 @@
 # Every agent granted a call, and every crew member given the account's
 # credential, acts as that one Atlassian account.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/jira
+#   yardr pack apply <pack dir>
 #
 # The source is named jira: a pack is named after the service it talks to.
 # Jira is per site, so the declaration ships a placeholder address that

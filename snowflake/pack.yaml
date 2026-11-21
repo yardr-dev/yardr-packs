@@ -7,7 +7,7 @@
 # minted from the user's key pair, by snowflake/mint, the mint command the
 # pack brings beside its declaration.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/snowflake
+#   yardr pack apply <pack dir>
 #
 # The source is named snowflake: a pack is named after the service it
 # talks to. Snowflake is per account, so the declaration ships a

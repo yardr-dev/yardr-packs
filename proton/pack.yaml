@@ -7,7 +7,7 @@
 # proton/proton-imap, which the yard runs (call.run) and which talks IMAP to
 # Bridge itself. It reads and changes nothing.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/proton
+#   yardr pack apply <pack dir>
 #
 # The source is named proton: a pack is named after the service it talks to.
 # A pack of kind source asks no grants at import, so what a crew member may

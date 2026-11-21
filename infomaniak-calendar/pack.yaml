@@ -7,7 +7,7 @@
 # with that pack's call names and arguments wherever the service allows;
 # README.md says where it does not.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-calendar
+#   yardr pack apply <pack dir>
 #
 # The source is named infomaniak-calendar: a pack is named after the service
 # it talks to. Its credential is a token made in Infomaniak's manager, typed

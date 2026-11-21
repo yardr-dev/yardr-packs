@@ -42,7 +42,7 @@ tmp=$(mktemp -d)
 # directory it owns: stop it first. core is empty until then.
 core=
 standin_pid=
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 cleanup() {
   [ -z "${standin_pid:-}" ] || kill "$standin_pid" 2>/dev/null
   if [ -n "${core:-}" ]; then

@@ -12,8 +12,10 @@ The file names sentry.io. Step 11 says what another Sentry changes.
 1. **Apply the pack.** From main of the yardr-packs repository, as an
    operator. The pack runs two programs of its own as you, `sentry/normalize`
    and `sentry/thread`, and they need `jq`, `curl` and `bash`.
+   Commands below call the pack's directory (the `sentry` directory of
+   the yardr-packs checkout) `<pack dir>`.
    ```sh
-   yardr pack apply /Users/mckean/projects/repos/yardr-packs/sentry
+   yardr pack apply <pack dir>
    ```
 2. **The integration, in Sentry.** The yard hears Sentry through an internal
    integration, which belongs to one organization. In sentry.io open

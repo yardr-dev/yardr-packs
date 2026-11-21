@@ -5,7 +5,7 @@
 # scheduled posts. It publishes nothing at once, and it deletes, edits,
 # threads, comments and analyses nothing.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/postiz
+#   yardr pack apply <pack dir>
 #
 # The source is named postiz: a pack is named after the service it talks to.
 # A pack of kind source asks no grants at import, so what a crew member may

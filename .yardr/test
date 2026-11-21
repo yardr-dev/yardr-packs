@@ -35,7 +35,7 @@ root=$(dirname "$0")/..
 set -- "$root"/*/pack.yaml
 [ -e "$1" ] || root=.
 cd "$root" || exit 2
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 rc=0 n=0
 
 # The scratch yard: one short directory (a unix socket's path is held to 100

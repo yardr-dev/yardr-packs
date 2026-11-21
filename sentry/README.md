@@ -6,8 +6,11 @@ yard answers in the issue: it comments on it, resolves it and unresolves it. A
 bead can name an issue, and the issue resolves when the bead lands. Nothing
 here is compiled into yardr; apply it with:
 
+Commands below call the pack's directory (the `sentry` directory of
+the yardr-packs checkout) `<pack dir>`.
+
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/sentry
+yardr pack apply <pack dir>
 ```
 
 from main of this repository. SETUP.md is the operator's steps.

@@ -4,7 +4,7 @@
 # outgoing webhook and answers in the thread with yardr reply, through a
 # bot account's token at https://<team>.kchat.infomaniak.com.
 #
-#   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-chat
+#   yardr pack apply <pack dir>
 #
 # The source is named infomaniak-chat: a pack is named after the service
 # it talks to. The pack is written for pack API 7, because the webhook's

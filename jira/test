@@ -183,7 +183,7 @@ rc=$?
 ok "thread without JIRA_AUTH says so and sends nothing" $? "exit $rc"
 
 # ---- core ------------------------------------------------------------------
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 if [ ! -x "$YARDR" ]; then
   echo "test: core skipped: no yardr ($YARDR)"
 elif ! command -v python3 >/dev/null 2>&1; then

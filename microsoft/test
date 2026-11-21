@@ -138,7 +138,7 @@ fi
 
 # The same file as yardr itself reads it: the source, its base, its calls
 # with their kinds and its mint command. As .yardr/test finds yardr.
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 if [ -x "$YARDR" ] && [ -s "$tmp/decl.json" ]; then
   "$YARDR" pack check . --json 2>/dev/null | jq -r '.declared[0] | (.source, .base, (.calls[]), (.commands[].program))' > "$tmp/yardr.txt"
   jq -r '.name, .base, (.calls | to_entries[] | "\(.key) (\(.value.kind))"), .credential.mint_command[0]' "$tmp/decl.json" > "$tmp/ours.txt"

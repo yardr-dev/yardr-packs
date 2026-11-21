@@ -7,8 +7,11 @@ or reopens an issue or a merge request. It also reads a merge request and its
 CI back, and an agent can ask GitLab questions through declared reads.
 Nothing here is compiled into yardr; apply it with:
 
+Commands below call the pack's directory (the `gitlab` directory of
+the yardr-packs checkout) `<pack dir>`.
+
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/gitlab
+yardr pack apply <pack dir>
 ```
 
 from main of this repository. SETUP.md is the operator's steps.

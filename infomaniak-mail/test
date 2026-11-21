@@ -35,7 +35,7 @@ fail=0
 for tool in jq python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "test: $tool is not on PATH: the pack needs it"; exit 1; }
 done
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 [ -x "$YARDR" ] || { echo "test: no yardr ($YARDR): the declaration and the calls are read through it"; exit 1; }
 
 tmp=$(mktemp -d)

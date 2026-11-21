@@ -30,8 +30,10 @@ yard grants: make it for a user whose calendars the yard may touch.
 2. **Apply the pack.** As the operator, in a terminal. It shows the plan, the
    digest and the one program the pack runs as you,
    `infomaniak-calendar/build-edit`, which needs `curl` and `jq`, and asks:
+   Commands below call the pack's directory (the `infomaniak-calendar`
+   directory of the yardr-packs checkout) `<pack dir>`.
    ```sh
-   yardr pack apply /Users/mckean/projects/repos/yardr-packs/infomaniak-calendar
+   yardr pack apply <pack dir>
    # applied pack infomaniak-calendar to the yard: 1 created, 0 changed, 0 unchanged
    # source infomaniak-calendar is declared: 5 calls under https://api.infomaniak.com (yardr source show infomaniak-calendar)
    ```

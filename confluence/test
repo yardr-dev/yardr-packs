@@ -35,7 +35,7 @@ fail=0
 for need in jq python3; do
   command -v "$need" >/dev/null 2>&1 || { echo "test: needs $need on PATH"; exit 1; }
 done
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 [ -x "$YARDR" ] || { echo "test: needs yardr ($YARDR)"; exit 1; }
 
 tmp=$(mktemp -d)

@@ -40,7 +40,7 @@ if ! command -v bash >/dev/null 2>&1; then
   exit 1
 fi
 
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 work=$(mktemp -d)
 # The core part's scratch yard and stand-in (below) are made when its turn
 # comes, and the yard's server, which its first command starts, would

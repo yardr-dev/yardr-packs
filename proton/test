@@ -96,7 +96,7 @@ for tool in ("openssl",):
     if not shutil.which(tool):
         print("test: %s is not on PATH: the pack needs it" % tool)
         sys.exit(1)
-YARDR = os.environ.get("YARDR") or shutil.which("yardr") or "/Users/mckean/go/bin/yardr"
+YARDR = os.environ.get("YARDR") or shutil.which("yardr") or "yardr"
 if not os.access(YARDR, os.X_OK):
     print("test: no yardr (%s): the declaration and the calls are read through it" % YARDR)
     sys.exit(1)

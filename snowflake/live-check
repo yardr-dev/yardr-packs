@@ -33,7 +33,7 @@ key=${3:-$HOME/.yardr/keys/snowflake_rsa_key.p8}
 host=$(printf '%s' "$account" | LC_ALL=C tr 'A-Z' 'a-z')
 base=${SNOWFLAKE_BASE:-https://$host.snowflakecomputing.com}
 wh=${SNOWFLAKE_WAREHOUSE:-}
-YARDR=${YARDR:-$(command -v yardr || echo /Users/mckean/go/bin/yardr)}
+YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 for tool in jq openssl; do
   command -v "$tool" >/dev/null 2>&1 || { echo "live-check: $tool is not on PATH"; exit 1; }
 done

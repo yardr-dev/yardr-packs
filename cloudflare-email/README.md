@@ -6,8 +6,11 @@ hook event and the yardmaster's inbox, as the declared source
 `cloudflare-email`. The yard never answers from the address. Nothing
 here is compiled into yardr; apply it with:
 
+Commands below call the pack's directory (the
+`cloudflare-email` directory of the yardr-packs checkout) `<pack dir>`.
+
 ```sh
-yardr pack apply /Users/mckean/projects/repos/yardr-packs/cloudflare-email
+yardr pack apply <pack dir>
 ```
 
 from main of this repository. SETUP.md is the operator's steps.
