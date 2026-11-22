@@ -19,6 +19,11 @@ else
     yrun source show jira --json | jq -S .declaration >"$core/declaration.json"
     check "declaration as the yard reads it (base, credential, hook, hear, thread, calls)" "$core/declaration.json" testdata/declaration.golden
 
+    # base_template is what lets SETUP.md step 2 give the host on a card, and
+    # a golden written again would pass without it, so it is checked here too.
+    jq -e '.base == "https://example.atlassian.net" and .base_template == "https://{host}" and ([.calls[] | .kind == "read"] | all) and (.calls | length) == 3' "$core/declaration.json" >/dev/null
+    ok "the shipped host is the placeholder with its template, and every call is a read" $?
+
     # Atlassian's own test vector for X-Hub-Signature: the declaration's
     # header, prefix and encoding, applied to their secret and payload, make
     # their signature.
@@ -91,6 +96,32 @@ else
     yrun source show jira >"$core/show.readded" 2>&1
     grep -qF "$site" "$core/show.readded" && grep -qF "$core/jira.env" "$core/show.readded"
     ok "adding the edited copy again restores the host, and the env file still stands" $?
+
+    # The host the template makes, which is how SETUP.md step 2 points a token
+    # without scopes at the site. It is a setting of the source and not part
+    # of the declaration, so it is shown as the address in use, stands across
+    # a pack applied again (step 10) and over a copy added after it (step 2
+    # clears it first), and gives the declaration's own address back when it
+    # is emptied. No call goes through it here: the template is https and the
+    # stand-in is plain http on loopback.
+    cloud=0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+    yrun source set jira host=mysite.atlassian.net >"$core/host.set.out" 2>&1
+    yrun source show jira >"$core/show.host" 2>&1
+    sed -n 1p "$core/show.host" | grep -qF 'https://mysite.atlassian.net'
+    ok "source set host= makes https://<host>, which source show names first" $? "$(tail -c 300 "$core/host.set.out")"
+    yrun pack apply "$here" --yes >/dev/null 2>&1
+    yrun source show jira >"$core/show.host.reapplied" 2>&1
+    sed -n 1p "$core/show.host.reapplied" | grep -qF 'https://mysite.atlassian.net' && grep -qF "$core/jira.env" "$core/show.host.reapplied"
+    ok "a host that was set stands across a pack applied again, so the placeholder does not come back for it" $?
+    sed "s|^base: .*|base: $site/ex/jira/$cloud|" "$here/jira.yaml" >"$core/mine/jira.local.yaml"
+    yrun source add "$core/mine/jira.local.yaml" >/dev/null 2>&1
+    yrun source show jira >"$core/show.host.copy" 2>&1
+    sed -n 1p "$core/show.host.copy" | grep -qF 'https://mysite.atlassian.net'
+    ok "a host that was set stands over the address of a copy added after it" $?
+    yrun source set jira host= >/dev/null 2>&1
+    yrun source show jira >"$core/show.host.cleared" 2>&1
+    sed -n 1p "$core/show.host.cleared" | grep -qF "$site/ex/jira/$cloud" && ! grep -qF 'mysite.atlassian.net' "$core/show.host.cleared"
+    ok "host= with nothing after it clears the host, and the copy's own address is in use" $?
 
     # -- links: none in the pack, and the optional key SETUP.md offers
     bead=$(yrun bead create "a bead to link" --json 2>/dev/null | jq -r .id)

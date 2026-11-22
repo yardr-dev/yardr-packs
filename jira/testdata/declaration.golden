@@ -1,6 +1,7 @@
 {
   "about": "Jira Cloud issues and comments. Hears an admin webhook and speaks in its issues.",
   "base": "https://example.atlassian.net",
+  "base_template": "https://{host}",
   "calls": [
     {
       "about": "Who the credential acts as.",

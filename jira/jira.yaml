@@ -119,14 +119,21 @@ thread:
 # Declared HTTPS requests, granted one by one. A command is never something
 # an agent calls.
 #
-# base is Jira's address, and Jira is per site, so this is a placeholder
-# that SETUP.md has the operator replace in the yard's copy of this file:
+# base is Jira's address, and Jira is per site, so this is a placeholder:
 # the credential goes to the hosts a file names and to no others. A token
 # with scopes is called at https://api.atlassian.com/ex/jira/<cloud id>,
-# and one without at https://<site>.atlassian.net. A pack applied again
-# replaces the yard's copy and puts this one back (SETUP.md, step 10), and
-# the commands refuse to send anything to it.
+# and one without at https://<site>.atlassian.net. For a token without
+# scopes, base_template lets the operator give the site's host on a card
+# or at a terminal (yardr source set jira host=<site>.atlassian.net) and
+# no copy of this file; that setting survives a pack applied again. The
+# gateway's address varies in a path segment, the cloud id, and not in
+# the host, which a template cannot make, so a token with scopes keeps
+# the copy until the templated-bases bead lands: SETUP.md has the operator
+# replace base in a copy of this file and add it. A pack applied again
+# replaces that copy and puts this one back (SETUP.md, step 10), and the
+# commands refuse to send anything to it.
 base: https://example.atlassian.net
+base_template: https://{host}
 check: viewer
 calls:
   viewer:

@@ -18,10 +18,12 @@
 #            the rest.
 #   core     the declaration as the yard reads it, its calls pinned to a
 #            golden; the check call made through the real yardr against a
-#            loopback stand-in, minted by jira/mint; and what a pack applied
-#            again does to a host the operator edited. These run in a
-#            scratch yard of their own and want yardr and python3; where one
-#            is missing the test says so and goes on.
+#            loopback stand-in, minted by jira/mint; what a pack applied
+#            again does to a host the operator edited; and the host the
+#            template makes (SETUP.md step 2): set, kept across a pack
+#            applied again, kept over a copy added after it, and given up.
+#            These run in a scratch yard of their own and want yardr and
+#            python3; where one is missing the test says so and goes on.
 #
 # UPDATE_GOLDEN=1 ./test writes the goldens again: read the diff before
 # committing it.

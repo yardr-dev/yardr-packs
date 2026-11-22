@@ -80,11 +80,18 @@ scopes is called at `https://api.atlassian.com/ex/jira/<cloud id>` and one
 without at the site. Both take Basic, so only the base differs.
 
 **The base.** Jira is per site, so the declaration ships the placeholder
-`https://example.atlassian.net` and SETUP.md has the operator write their own
-into the yard's copy. A pack applied again puts the placeholder back; the test
-pins that, and SETUP.md step 10 says what to do. `jira/thread` refuses to send
-anything to the placeholder. If a real user trips on this, a core `base_url`
-setting becomes its own bead.
+`https://example.atlassian.net` as its `base`, with `base_template: https://{host}`
+beside it. A token without scopes is called at `https://<site>.atlassian.net`,
+which the template makes: SETUP.md has the operator give the host, `yardr source
+set jira host=<site>.atlassian.net` on a card or in a terminal, and copy nothing;
+the setting survives a pack applied again. A token with scopes is called at
+`https://api.atlassian.com/ex/jira/<cloud id>`, which a template cannot make,
+since the cloud id is a path segment and not the host. That path writes its
+address into a copy of the file (`jira.local.yaml`, ignored by git) and adds it
+with `yardr source add`, in a terminal. A pack applied again puts the placeholder
+back; the test pins that, and SETUP.md step 10 says what to do. Until the copy is
+added again the thread commands refuse to send anything there. If a real user
+trips on this, a core `base_url` setting becomes its own bead.
 
 **No link key.** An issue's address starts with the site's host, which the shared
 file cannot name. Without the key a bead cannot track a Jira issue and a stage
@@ -130,10 +137,15 @@ in this directory, about five seconds, no network and no secret. The gate
   stdout and stderr. A changed request is a changed golden. The run fails if the
   token or the credential is in an argument, an output or the log.
 - the declaration as the yard reads it, calls included, against
-  `testdata/declaration.golden`; the signature the declaration describes against
-  Atlassian's published example; the check call made through the real yardr and
-  minted by `jira/mint`, against a stand-in on a loopback port; and a pack
-  applied again over an edited address.
+  `testdata/declaration.golden`, and that it has its `base_template`; the
+  signature the declaration describes against Atlassian's published example; the
+  check call made through the real yardr and minted by `jira/mint`, against a
+  stand-in on a loopback port; and a pack applied again over an edited address.
+- a host given with `yardr source set jira host=` (SETUP.md step 2): it
+  makes `https://<host>`, which `source show` names first; it stands across
+  a pack applied again, with the env file; it stands over a copy added after it,
+  so that `host=` clears it and the copy's address is the one in use. No call
+  goes through it here: the template is https and the stand-in is plain http.
 
 `UPDATE_GOLDEN=1 ./test` writes the goldens again. Read the diff before you
 commit it.
@@ -147,6 +159,14 @@ which tokens go where and with what scheme, and the scopes each call needs.
 Seen on public Atlassian sites without a login: the shapes of comments and
 issues, `tenant_info`, and `serverInfo` answering through the gateway with the
 site's address.
+
+Tried on 22 November 2026 for `base_template`, in a scratch yard with yardr build
+3ac9eb3b0403: `yardr source set jira host=<host>` makes `https://<host>`; a pack
+applied again keeps it; a host with a path or a scheme is refused; a copy with
+the gateway's base added over a host that is set still calls the host, until
+`host=` clears it; and a crew member's card for the same command is accepted and
+shows the address now and the one it sets. Approving a card needs a person at a
+terminal, so none was approved, and no call went through a host.
 
 Not checked against a site, because a person has to make one (a free Atlassian
 Cloud site serves this pack and the Confluence one). The live proof is a later
