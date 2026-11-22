@@ -290,11 +290,11 @@ written, so a screen may be named otherwise than here.
    If you use a copy and apply the pack, the plan lists the address as `base:
    <your address> -> https://example.atlassian.net/wiki`. That line is how you
    notice, and it is the edit being undone. Until you add your copy again, the
-   source calls the placeholder, a host that is not your site, with the account's
-   credential, and `yardr source check confluence` fails. The shorter way skips
-   the apply. Make the copy again from the new `confluence.yaml` with step 2's
-   `sed`, and add it with `yardr source add`. The source then never points at the
-   placeholder.
+   credential is held back from the placeholder, a host that is not your site: a
+   call is refused and nothing is sent, and `yardr source check confluence`
+   fails. The shorter way skips the apply. Make the copy again from the new
+   `confluence.yaml` with step 2's `sed`, and add it with `yardr source add`. The
+   source then never points at the placeholder.
 
    An update from a version that had only `spaces`, `page`, `children` and
    `search` adds `comments`, `replies`, `labels`, `attachments` and `user`, and

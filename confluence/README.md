@@ -174,10 +174,11 @@ address into a copy of the file (`confluence.local.yaml`, ignored by git) and ad
 it with `yardr source add`, in a terminal. Both take Basic, so only the base
 differs, and every path in the file starts at `/api` or `/rest`. A pack applied
 again replaces the yard's copy and puts the placeholder back; the test pins that,
-and SETUP.md step 6 says what to do. Until the copy is added again the source
-calls the placeholder with the account's credential. Unlike `jira`, this pack has
-no command to refuse to send there, since all its calls are declared. If a real
-user trips on this, a core `base_url` setting is its own bead.
+and SETUP.md step 6 says what to do. Until the copy is added again the yard holds
+the credential back from the placeholder, so a call is refused and nothing is
+sent. Unlike `jira`, this pack needs no command of its own to refuse to send
+there, since all its calls are declared and the yard holds them. If a real user
+trips on this, a core `base_url` setting is its own bead.
 
 ## Files
 
