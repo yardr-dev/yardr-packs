@@ -1,0 +1,12 @@
+=== args
+update
+id=98512
+version=3
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== answer
+{"errors":[{"status":409,"code":"CONFLICT","title":"Version must be incremented when updating a page. Current Version: [3]. Provided version: [3]","detail":null}]}
+=== status
+409
+=== note
+The body is the one in Atlassian's ticket CONFCLOUD-76640 and in a developer-community thread of January 2026 (Current Version: [1]. Provided version: [1], and [5] and [5]). The caller read version 2, asked for 3, and a person had saved 3 meanwhile, so the page is at 3 and the caller's next number is 4. The call fails and nothing is retried.

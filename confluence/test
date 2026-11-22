@@ -9,17 +9,27 @@
 #            is in no argument of anything it runs.
 #   core     the real yardr in a scratch yard of its own, with the pack
 #            applied: the declaration as the yard reads it, held to a golden
-#            and to reading nothing but with GET; then a copy of it aimed at
-#            a stand-in for Confluence on a loopback port (testdata/
-#            standin.py), the operator's way of SETUP.md step 2.
+#            and to its nine reads using GET and its two writes, create and
+#            update, being the only updates, by POST and PUT; then a copy of
+#            it aimed at a stand-in for Confluence on a loopback port
+#            (testdata/standin.py), the operator's way of SETUP.md step 2.
 #   calls    each testdata/calls/*.case is one `yardr call` of that source
 #            against the stand-in. The case's golden holds the requests the
 #            stand-in saw (method, path and query as sent, whether the
-#            credential was the right one), the exit status, what the call
-#            kept of the answer and what it said on stderr. A changed
-#            request, a changed select and a changed bound are each a
-#            changed golden, and a parameter the call should refuse shows
-#            as no request at all.
+#            credential was the right one, and for a write its body, as JSON
+#            with its keys sorted), the exit status, what the call kept of
+#            the answer and what it said on stderr. A changed request, a
+#            changed select and a changed bound are each a changed golden,
+#            and a parameter the call should refuse shows as no request at
+#            all. Beside the goldens, what a golden says badly: each write
+#            sends the keys it should and no others (an update names no
+#            parent, space or owner and no status but current, so it moves,
+#            hands over, unpublishes and deletes nothing), and a call's method
+#            is the one its kind is held to.
+#   writes   what the yard keeps of a write: a page's id, space, parent and
+#            version are in the record of the call, and its title and body,
+#            which are free text, are in no file of the yard's home; the body
+#            is in no output either, though Confluence answers with it.
 #   host     a pack applied again over the operator's edited host, which the
 #            shipped host replaces, and what stands; and the host the
 #            template makes (SETUP.md step 2): set, kept across a pack
@@ -125,11 +135,23 @@ yrun source show confluence --json | jq -S .declaration >"$core/declaration.json
 check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
 # base_template is what lets SETUP.md step 2 give the host on a card, and a
 # golden written again would pass without it, so it is checked here too.
-jq -e '.base == "https://example.atlassian.net/wiki" and .base_template == "https://{host}/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 9' "$core/declaration.json" >/dev/null
-ok "the shipped host is the placeholder with its template, and every call is a read by GET" $?
+jq -e '.base == "https://example.atlassian.net/wiki" and .base_template == "https://{host}/wiki" and ([.calls[] | select(.kind == "read") | .request.method == "GET"] | all) and ([.calls[] | select(.kind == "read")] | length) == 9' "$core/declaration.json" >/dev/null
+ok "the shipped host is the placeholder with its template, and the nine reads are each a GET" $?
+# The writes are the two this bead names and no more, by the one verb each,
+# on the paths that make a page and replace one. A delete or a move would be
+# a third call or another verb, and a golden written again would pass it.
+jq -e '[.calls[] | select(.kind == "update") | [.name, .request.method, .request.path]] == [["create", "POST", "/api/v2/pages"], ["update", "PUT", "/api/v2/pages/{id}"]]' "$core/declaration.json" >/dev/null
+ok "the only updates are create (POST /api/v2/pages) and update (PUT /api/v2/pages/{id})" $?
+# A body is free text and is bounded in characters, and the ids, the version
+# and nothing else are what an audit asks by (log: true, which a title or a
+# body must never carry: yardr's own rule for free text).
+jq -e '[.calls[] | select(.kind == "update") | .params[] | select(.name == "body" or .name == "title")] | map(.max) == [255, 60000, 255, 60000] and (map(.log) | all(. == null))' "$core/declaration.json" >/dev/null
+ok "a title is at most 255 characters and a body at most 60000, and neither is logged" $?
+jq -e '[.calls[] | select(.kind == "update") | .params[] | select(.log == true) | .name] == ["spaceId", "parentId", "id", "version"]' "$core/declaration.json" >/dev/null
+ok "the ids and the version are what a write's record keeps, and nothing else" $?
 yrun pack show confluence >"$core/packshow.out" 2>&1
-grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out"
-ok "pack show prints the one preset, read, as SETUP.md step 4 says" $?
+grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out" && grep -q '2\. create: ' "$core/packshow.out" && grep -q 'confluence: create' "$core/packshow.out" && grep -q '3\. update: ' "$core/packshow.out" && grep -q 'confluence: update' "$core/packshow.out"
+ok "pack show prints the three presets, read, create and update, as SETUP.md step 4 says" $?
 yrun source show confluence >"$core/show.shipped" 2>&1
 grep -qF 'https://example.atlassian.net/wiki' "$core/show.shipped"
 ok "source show names the host in use, the placeholder until the operator's copy is added" $?
@@ -157,7 +179,7 @@ sed "s|^base: .*|base: $site/wiki|" "$here/confluence.yaml" >"$core/mine/conflue
 # with the two lines on its standard input, which the server writes into the
 # source's env file.
 envfile=$core/y/sources/confluence.env
-yrun source add "$core/mine/confluence.local.yaml" >"$core/add.out" 2>&1 && printf 'CONFLUENCE_EMAIL=%s\nCONFLUENCE_API_TOKEN=%s\n' "$email" "$token" | yrun source key confluence >>"$core/add.out" 2>&1 && yrun source set confluence calls_per_hour=1000 >>"$core/add.out" 2>&1
+yrun source add "$core/mine/confluence.local.yaml" >"$core/add.out" 2>&1 && printf 'CONFLUENCE_EMAIL=%s\nCONFLUENCE_API_TOKEN=%s\n' "$email" "$token" | yrun source key confluence >>"$core/add.out" 2>&1 && yrun source set confluence calls_per_hour=1000 >>"$core/add.out" 2>&1 && yrun source set confluence updates_per_hour=1000 >>"$core/add.out" 2>&1
 ok "the operator's copy is added and its credential given by source key" $? "$(tail -c 300 "$core/add.out")"
 [ -f "$envfile" ] && [ "$(ls -l "$envfile" | cut -c1-10)" = "-rw-------" ]
 ok "the env file is where SETUP.md says, mode 0600" $?
@@ -173,7 +195,12 @@ check "the check call's request" "$core/requests" testdata/check.requests.golden
 # A case file is sections, each opened by a line "=== name": args (the call
 # and its parameters, one word to a line), answer (the stand-in's body) and
 # status (its HTTP status, 200 if left out). @FILL@ in an answer becomes
-# 300000 characters, for a body over the bound.
+# 300000 characters, for a body over the bound. @OVER@ in an argument becomes
+# 60001 characters, one more than a page's body may be. A section of any other
+# name, note by custom, is kept in the case and read by nothing: it says where
+# the case's answer comes from.
+over=$(awk 'BEGIN { s = "x"; while (length(s) < 60001) s = s s; printf "%s", substr(s, 1, 60001) }')
+strays=
 for c in testdata/calls/*.case; do
   n=$(basename "$c" .case)
   d="$core/case_$n"
@@ -187,8 +214,9 @@ for c in testdata/calls/*.case; do
   rm -f "$core/answer.json.status"
   [ ! -e "$d/status" ] || cp "$d/status" "$core/answer.json.status"
   : >"$core/requests"
+  awk -v over="$over" '{ gsub(/@OVER@/, over); print }' "$d/args" >"$d/argv"
   set --
-  while IFS= read -r word; do set -- "$@" "$word"; done <"$d/args"
+  while IFS= read -r word; do set -- "$@" "$word"; done <"$d/argv"
   yrun call confluence "$@" --json >"$d/stdout" 2>"$d/stderr"
   status=$?
   {
@@ -206,12 +234,20 @@ for c in testdata/calls/*.case; do
   # the source's env file under this run's scratch yard, so the golden holds
   # SANDBOX where that stands.)
   check "call $n" "$d/golden" "testdata/calls/$n.golden"
+  # A call's method is the one its kind is held to: a read is a GET, create a
+  # POST and update a PUT, so that no case sends the verb of a delete.
+  want=GET
+  case $(sed -n 1p "$d/args") in create) want=POST ;; update) want=PUT ;; esac
+  stray=$(awk -v want="$want" '/^--- requests/ { r = 1; next } /^--- status/ { r = 0 } r && /^[A-Z]/ && $1 != want { print $1 }' "$d/golden" | sort -u | tr '\n' ' ')
+  [ -z "$stray" ] || strays="$strays $n:$stray"
 done
 rm -f "$core/answer.json.status"
-# Reads only: of all the requests the cases made, the stand-in saw GETs.
-methods=$(awk '/^--- requests/ { r = 1; next } /^--- status/ { r = 0 } r && /^[A-Z]/ { print $1 }' "$core"/case_*/golden | sort -u)
-[ "$methods" = GET ]
-ok "no request of any case is anything but a GET" $? "methods seen: $methods"
+# Of all the requests the cases made, the stand-in saw GETs and the one POST
+# and the one PUT of the writes, which the loop held to their own cases, and
+# no other verb.
+methods=$(awk '/^--- requests/ { r = 1; next } /^--- status/ { r = 0 } r && /^[A-Z]/ { print $1 }' "$core"/case_*/golden | sort -u | tr '\n' ' ')
+[ "$methods" = "GET POST PUT " ] && [ -z "$strays" ]
+ok "the stand-in saw GET, and POST and PUT only from create and update, and no other verb" $? "methods seen: $methods, strays:$strays"
 # The select is all that keeps an account's email, avatar and time zone from
 # every agent granted read: the case's answer carries them and the call keeps
 # three keys. A golden written again after a wider select would pass, so the
@@ -220,6 +256,42 @@ jq -e 'keys == ["accountId", "accountType", "displayName"]' "$core/case_user/std
 ok "user keeps an account's id, name and type, and no email, avatar or time zone" $?
 grep -q '"email"' "$core/case_user/answer" && grep -q '"profilePicture"' "$core/case_user/answer" && grep -q '"timeZone"' "$core/case_user/answer"
 ok "(and the case's answer does carry them, so the check above looked at something)" $?
+
+
+# ---- writes ----------------------------------------------------------------
+# What each write sends, key by key. The golden holds the body, but a golden
+# written again would pass a body with a parent, a space or a draft status in
+# it, which would move a page, hand it over or unpublish it: so the keys are
+# held here as well, and the version must go as a number.
+wbody() { sed -n 's/^  body: //p' "$core/case_$1/golden"; }
+wbody create | jq -e '(keys == ["body", "parentId", "spaceId", "status", "title"]) and .status == "current" and ((.body | keys) == ["representation", "value"]) and .body.representation == "storage"' >/dev/null
+ok "create sends a space, a parent, a title and a body in storage format, published, and nothing else" $?
+wbody update | jq -e '(keys == ["body", "id", "status", "title", "version"]) and .status == "current" and ((.body | keys) == ["representation", "value"]) and .body.representation == "storage" and ((.version | keys) == ["number"]) and (.version.number | type) == "number"' >/dev/null
+ok "update sends the id, a title, a body, the version as a number and status current, and no parent, space or owner" $?
+grep -qxF 'POST /wiki/api/v2/pages' "$core/case_create/golden" && grep -qxF 'PUT /wiki/api/v2/pages/98512' "$core/case_update/golden"
+ok "neither write sends a query, so a page is never private, embedded or at the root of a space" $?
+# What the record of a write keeps: the ids and the version, which an audit
+# asks by, and the names of the title and the body and never their text.
+yrun events --kind source_call --json -n 500 >"$core/events.json" 2>&1
+jq -e '[.[] | select(.data.call == "create" and .data.status == 200) | .data | {kind, params, values}] == [{"kind": "update", "params": ["spaceId", "parentId", "title", "body"], "values": {"spaceId": "98304", "parentId": "98400"}}]' "$core/events.json" >/dev/null
+ok "the record of a create keeps the space and the parent, and names the title and the body without their text" $?
+jq -e '[.[] | select(.data.call == "update" and .data.status == 200) | .data | {kind, params, values}] == [{"kind": "update", "params": ["id", "version", "title", "body"], "values": {"id": "98512", "version": "3"}}]' "$core/events.json" >/dev/null
+ok "the record of an update keeps the page and the version, and names the title and the body without their text" $?
+# A page's body and title are free text. Confluence is sent them and keeps
+# them, and no file of the yard's home does, its events, store and log
+# included. Confluence's answers carry the body back and the select drops it,
+# so no output of any call has it either. (A title is in the answer's link, as
+# a page's address has it, so the outputs are not searched for the title.)
+bodymark=BODYMARK-5d1e8c
+titlemark=TITLEMARK-5d1e8c
+leaks=$(grep -rlF -e "$bodymark" -e "$titlemark" "$core/y" "$core/h" 2>/dev/null)
+[ -z "$leaks" ]
+ok "a page's body and title are in no file of the yard's home" $? "found in: $leaks"
+leaks=$(grep -lF "$bodymark" "$core"/case_*/stdout "$core"/case_*/stderr 2>/dev/null)
+[ -z "$leaks" ]
+ok "a page's body is in no output of any call, though Confluence's answers carry it" $? "found in: $leaks"
+grep -qF "$bodymark" "$core/case_create/answer" && grep -qF "$bodymark" "$core/case_create/golden" && grep -qF "$titlemark" "$core/case_create/golden" && grep -qF "$bodymark" "$core/case_update/answer" && grep -qF "$bodymark" "$core/case_update/golden"
+ok "(and the stand-in was sent the body and the title, and answered with the body, so the searches above looked at something)" $?
 
 # The same calls through the gateway a token with scopes is called at: the
 # base carries a path of its own, and the paths of the calls follow it.
@@ -239,6 +311,15 @@ yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
 yrun source show confluence >"$core/show.before-grant" 2>&1
 yrun source grant confluence read --crew yardmaster >"$core/grant.out" 2>&1
 ok "a crew member is granted every read call by name" $? "$(tail -c 300 "$core/grant.out")"
+# A write is granted by its own name and by nothing else (SETUP.md step 4):
+# read is the nine reads and neither write.
+yrun crew show yardmaster >"$core/crew.read" 2>&1
+grep -q 'may call confluence: read$' "$core/crew.read"
+ok "a grant of read is the reads and neither write" $? "$(grep 'may call' "$core/crew.read")"
+yrun source grant confluence create --crew yardmaster >"$core/grant.write.out" 2>&1 && yrun source grant confluence update --crew yardmaster >>"$core/grant.write.out" 2>&1
+yrun crew show yardmaster >"$core/crew.write" 2>&1
+grep -q 'may call confluence: create (update), read, update (update)$' "$core/crew.write"
+ok "create and update are each granted by their own name, and shown as updates" $? "$(tail -c 300 "$core/grant.write.out")"
 yrun source show confluence >"$core/show.edited" 2>&1
 yrun pack check "$here" >"$core/plan.out" 2>&1
 yrun pack apply "$here" --yes >"$core/reapply.out" 2>&1
@@ -253,6 +334,9 @@ grep -qF "$envfile" "$core/show.reapplied"
 ok "the env file stays set across the re-apply" $?
 ! grep -q yardmaster "$core/show.before-grant" && grep -q yardmaster "$core/show.edited" && grep -q yardmaster "$core/show.reapplied"
 ok "a grant of the source stands across the re-apply" $?
+yrun crew show yardmaster >"$core/crew.reapplied" 2>&1
+grep -q 'may call confluence: create (update), read, update (update)$' "$core/crew.reapplied"
+ok "the grants of the two writes stand across the re-apply too" $? "$(grep 'may call' "$core/crew.reapplied")"
 yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
 yrun source show confluence >"$core/show.readded" 2>&1
 grep -qF "$site/wiki" "$core/show.readded" && grep -qF "$envfile" "$core/show.readded"

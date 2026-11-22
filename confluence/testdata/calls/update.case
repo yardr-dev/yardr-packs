@@ -1,0 +1,10 @@
+=== args
+update
+id=98512
+version=3
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== answer
+{"parentType":"page","authorId":"5b10ac8d82e05b22cc7d4ef5","parentId":"98400","ownerId":"5b10ac8d82e05b22cc7d4ef5","lastOwnerId":null,"createdAt":"2026-11-22T20:15:03.221Z","position":7,"version":{"number":3,"message":"","minorEdit":false,"authorId":"5b10ac8d82e05b22cc7d4ef5","createdAt":"2026-11-22T21:02:44.870Z","ncsStepVersion":"3"},"id":"98512","spaceId":"98304","body":{"storage":{"representation":"storage","value":"<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>"}},"status":"current","title":"Program status TITLEMARK-5d1e8c","_links":{"editui":"/pages/resumedraft.action?draftId=98512","webui":"/spaces/ENG/pages/98512/Program+status+TITLEMARK-5d1e8c","edituiv2":"/spaces/ENG/pages/edit-v2/98512","tinyui":"/x/EIAB","base":"https://example.atlassian.net/wiki"}}
+=== note
+Made as create's is. The page was at version 2 when the caller read it (page's version.number), so the update asks for 3, the number the page becomes.

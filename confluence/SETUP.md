@@ -4,24 +4,29 @@ The pack wires Confluence Cloud into the yard as the declared source
 `confluence`. An agent lists the site's spaces, finds pages by CQL, reads one
 page, lists the children of a page, folder, whiteboard, database or embed, lists
 a page's comments, the replies to a comment, its labels and its attached files,
-and names an author from an account id. It only reads. A page and a comment come
-as Confluence's storage format, which is markup and not text: turning it into
-text is the reader's. An attached file comes as its metadata, and its contents
-are not read.
+and names an author from an account id. It reads, and it writes in two ways and
+no other: it creates a page under a parent page, and it updates one page's title
+and body at the next version. It deletes and moves nothing, and writes no comment,
+label or attachment. A page and a comment come as Confluence's storage format,
+which is markup and not text: turning it into text, and text into it, is the
+agent's. An attached file comes as its metadata, and its contents are not read.
 
-**The yard reads as one Atlassian account.** Every agent granted a call of this
-source reads what that account can read, in every space it can view, and the
-yard does not narrow it per agent. The grant is the permission. Make the account
-for the yard alone, and give it the spaces the yard should read and no others
-(step 1). If the yard also runs the jira pack, this is the same account: one
-login, two sources.
+**The yard acts as one Atlassian account.** Every agent granted a read call of
+this source reads what that account can read, in every space it can view, and an
+agent granted `create` or `update` writes wherever that account may write. The
+yard does not narrow either per agent. The grant is the permission: the reads
+are granted together, as `read`, and each write by its own name (step 4). Make
+the account for the yard alone, give it the spaces the yard should read and no
+others, and let it write in the one space the yard writes in (step 1). If the
+yard also runs the jira pack, this is the same account: one login, two sources.
 
 You need a Confluence Cloud site and an administrator of it for step 1. The
 pack's one program, `confluence/mint`, needs `jq` on the yard's machine. Commands
 below call the pack's directory (the `confluence` directory of the yardr-packs
 checkout) `<pack dir>`. The steps follow Atlassian's documentation as of 2
-November 2026, and none was run against a site of our own when the pack was
-written, so a screen may be named otherwise than here.
+November 2026 (for the two writes, 22 November), and none was run against a site
+of our own when the pack was written, so a screen may be named otherwise than
+here.
 
 1. **The account and its token, in Atlassian.** Use the account the jira pack
    uses, if there is one: make it as step 1 of the jira pack's SETUP.md says (a
@@ -32,10 +37,16 @@ written, so a screen may be named otherwise than here.
    Then give it Confluence, and only the spaces the yard should read. The
    account needs access to Confluence on the site. Then, in each such space,
    Space settings, Permissions: give the account (or a group that holds it
-   alone) View, and nothing more. Confluence decides what the account sees by its
-   space permissions and its groups. A space that lets every user of the site
-   view it, or a group the account belongs to, shows the account that space as
-   well, so step 5 has you compare what it sees with what you meant.
+   alone) View, and nothing more. In the one space where the yard is to write,
+   give it what creates and edits pages as well. In Atlassian's role-based spaces
+   that is the Collaborator role ("adds and edits content in the space"), or the
+   permissions Create content and Edit content given alone; in a space still on
+   the older permissions it is Add pages. Give it no Delete and no Administer:
+   whatever the account may do in a space, `create` and `update` may do there.
+   Confluence decides what the account sees, and writes, by its space permissions
+   and its groups. A space that lets every user of the site view it, or a group
+   the account belongs to, shows the account that space as well, so step 5 has
+   you compare what it sees with what you meant.
 
    Then make its API token. Atlassian recommends a token with scopes, and gives
    a service account no other kind. Its form for one has you choose the app and
@@ -47,20 +58,24 @@ written, so a screen may be named otherwise than here.
      https://id.atlassian.com/manage-profile/security/api-tokens and choose
      Create API token with scopes.
 
-   Choose Confluence and the seven scopes the calls need, which are the ones
+   Choose Confluence and the eight scopes the calls need, which are the ones
    Atlassian's API description lists for their requests: `read:space:confluence`
    (spaces), `read:page:confluence` (page and labels),
    `read:hierarchical-content:confluence` (children, of any kind),
    `search:confluence` (search), `read:comment:confluence` (comments and
-   replies), `read:attachment:confluence` (attachments) and
-   `read:confluence-user` (user). Atlassian shows the token once. A token lasts 1
-   to 365 days, a year unless you choose otherwise, so note the day it ends. Step
-   6 says what to do then.
+   replies), `read:attachment:confluence` (attachments), `read:confluence-user`
+   (user) and `write:page:confluence` (create and update: the description lists
+   this one scope for both). Leave the last out if the yard is only to read: the
+   token then reads as it did, and the writes answer 401 (step 3). Atlassian
+   shows the token once. A token lasts 1 to 365 days, a year unless you choose
+   otherwise, so note the day it ends. Step 6 says what to do then.
 
    A token made without scopes (Create API token, an ordinary account only) is
    the account's, serves Jira and Confluence alike, and can do everything the
-   account can. If the jira pack already has one, it is the same token, given to
-   this source as well. Step 2 says where each kind goes.
+   account can, writing included: with one, `create` and `update` write wherever
+   the account may, and its space permissions are the only limit on them. If the
+   jira pack already has one, it is the same token, given to this source as well.
+   Step 2 says where each kind goes.
 
 2. **The pack and the site's address.** Apply the pack as the operator:
    ```sh
@@ -145,16 +160,19 @@ written, so a screen may be named otherwise than here.
    a cloud id that is another site's, a token made without a scope the call needs
    (Atlassian answers that with a 401 as well, and a scope is fixed when the token
    is made, so a token without one is made again), or an account that has no
-   access to Confluence or to the space.
+   access to Confluence or to the space. The check is a read, so it does not try
+   a write: a token made without `write:page:confluence` passes it, and `create`
+   and `update` then answer 401 with the message `Unauthorized; scope does not
+   match`. Step 5 tries a write.
 
 4. **The grant.** A pack of kind source asks none at import, so what a crew
    member may call is granted afterwards. `yardr pack show confluence` prints
-   the pack's suggestion, one preset, `read`. yardr's `--preset` names the presets
-   of the packs inside its binary and not those of a pack applied from a
-   directory, so the grant is by name: `read` is every read call of the source,
-   one a later file adds included. The source reads as one account, so a grant of
-   `read` lets that crew member read everything the account may. Grant it to those
-   who need it:
+   the pack's three suggestions, the presets `read`, `create` and `update`.
+   yardr's `--preset` names the presets of the packs inside its binary and not
+   those of a pack applied from a directory, so the grant is by name: `read` is
+   every read call of the source, one a later file adds included, and neither
+   write. The source reads as one account, so a grant of `read` lets that crew
+   member read everything the account may. Grant it to those who need it:
    ```sh
    yardr source grant confluence read --crew yardmaster
    ```
@@ -163,6 +181,29 @@ written, so a screen may be named otherwise than here.
    ```sh
    yardr bead ask <bead> "Let the reviewers read Confluence" --run "source grant confluence read --group reviewers" --context "The reviewers read the team's pages to check a bead's work; the card names each call it covers."
    ```
+   The two writes change the wiki at once, so each is granted by its own name,
+   and `read` covers neither. Grant each to the one crew member that keeps the
+   page, and to no group:
+   ```sh
+   yardr source grant confluence create --crew yardmaster
+   ```
+   ```sh
+   yardr source grant confluence update --crew yardmaster
+   ```
+   A crew member who needs a write asks on a card instead, one card for each call.
+   The card names the call with its method and path, and says that it changes
+   something outside the yard:
+   ```sh
+   yardr bead ask <bead> - <<'ASK'
+   Q: Let the yardmaster keep the program's status page in Confluence?
+   C: update replaces one page's title and body in Confluence at once, as the yard's Atlassian account, wherever that account may write.
+   C: It is sent at the version after the one the caller read, so a page that a person saved meanwhile is refused with a 409, and nothing is retried or merged.
+   R: source grant confluence update --crew yardmaster
+   ASK
+   ```
+   The grant says who may call. Where a write lands is the account's space
+   permissions and the token's scopes (step 1), which the grant does not widen.
+
    One caller may make 60 calls of a source in an hour, and an agent that walks
    a page tree, reads the replies of each comment on a page, or names each
    author of a thread with `user` (one call for an account), uses them quickly.
@@ -170,6 +211,15 @@ written, so a screen may be named otherwise than here.
    ```sh
    yardr source set confluence calls_per_hour=300
    ```
+   A write counts as an update too, and a caller may make 10 updates in an hour. A
+   yard that keeps a status page current more often than that raises this limit
+   as well. A crew member may ask for it on a card, whose `R:` line is the same
+   command:
+   ```sh
+   yardr source set confluence updates_per_hour=30
+   ```
+   To take a grant back, run `yardr source revoke confluence update --crew
+   yardmaster`, and the same for `create` and `read`.
 
 5. **Try it, and look at what the account sees.** As the operator, who may make
    any call:
@@ -271,11 +321,69 @@ written, so a screen may be named otherwise than here.
    markup and not text, and the answer is at most 256 KiB, refused and not cut
    when a page is longer. A comment is the same markup in the same place, and
    `comments`, `replies` and `attachments` answer at most 256 KiB too. A failed
-   call tells the agent the status alone: a 404 is a page that is not there, or
+   read tells the agent the status alone: a 404 is a page that is not there, or
    one the account may not view (Confluence answers both so), and a 400 from
    `search` is a CQL it cannot parse. A 400 from `comments` or `replies` can also
    be an id that is not there: Atlassian's pages say 404, and the public site
    that was tried answered 400.
+
+   A write changes the wiki, so try it where nobody reads: under a page of the
+   yard's own, in the one space it writes in. `create` takes the space's `id`
+   (`spaces` answers it, and it is not the key an address shows), the parent
+   page's id, a title and the body in storage format:
+   ```sh
+   yardr call confluence create spaceId=98304 parentId=98400 title='Program status' body='<p>Nothing to report yet.</p>'
+   ```
+   It answers the new page's `id`, its `status` (`current`: it is published), its
+   `version` and `_links`, and never the body; `_links.base` and the `webui` path
+   together are the link a person opens. The page lands under its parent and
+   never at the root of a space, and a call with no parent is refused. A title is
+   one line of at most 255 characters, and a body at most 60000. Plain
+   paragraphs, headings and tables serve a status page. Confluence judges the
+   markup: what it cannot take is a 400, whose reason comes back with the
+   refusal, as `errors`. The call builds no macro and checks none, and sends the
+   body as it was given.
+
+   To replace a page's body, read the page, for its version and its title, and
+   give the next number:
+   ```sh
+   yardr call confluence page id=98512
+   ```
+   ```sh
+   yardr call confluence update id=98512 version=2 title='Program status' body='<p>One bead in review.</p>'
+   ```
+   `version` is the number the page becomes: the `version.number` that `page`
+   answered, plus one. `title` is required by Confluence: the page's own title
+   keeps it, and another renames the page. The body is the whole new body, so
+   what it leaves out is gone from that version, and the earlier version stays in
+   the page's history. The answer has the new `version`, so the next update asks
+   for its `number` plus one.
+
+   A person who saves the page between the read and the write makes the number
+   stale, and Confluence refuses with a 409. The call fails, and what Confluence
+   said comes with it, as `errors`. Its title reads like this:
+   ```text
+   Version must be incremented when updating a page. Current Version: [3]. Provided version: [3]
+   ```
+   Read the page again, make the change on what is there now, and call again with
+   that number plus one. Nothing here retries or merges, so that a person's edit
+   is not written over by an agent that has not read it. Atlassian lists one more
+   409 for `update`: a site with content approvals on, whose space requires
+   approval before a page is published. The change then has to be saved as a draft
+   and approved, which this call does not do, since it publishes.
+
+   Two things the number does not guard. A person's unsaved draft of the page is
+   not under it, and Atlassian says an update of the current version may override
+   that draft entirely. And a call tried again after a lost answer is sent with
+   the same number, which the first made if it landed, so the second is refused:
+   read the page to see. A `create` tried again may make a second page, or be
+   refused for a title already in the space, since Confluence takes no key to run
+   a request once.
+
+   A 401 on a write while the reads work is a token made without
+   `write:page:confluence` (step 1). A 404 is a space, a parent or a page that is
+   not there, or one the account may not view or may not write in: Atlassian's
+   description lists all of these as one 404.
 
 6. **Updating the pack, and when the token ends.** A pack applied again replaces
    the source's declaration whole. Your env file and the grants stay, and so does
@@ -304,9 +412,17 @@ written, so a screen may be named otherwise than here.
    grant back. A token with scopes made before a call was added lacks its scope:
    `read:comment:confluence` and `read:attachment:confluence` for `comments`,
    `replies` and `attachments`, and `read:confluence-user` for `user`. Atlassian
-   answers those calls with a 401 until a token with all seven scopes is made
-   (step 1) and given again with `yardr source key confluence`. A token made
-   without scopes needs nothing.
+   answers those calls with a 401 until a token with every scope of step 1 is made
+   and given again with `yardr source key confluence`. A token made without scopes
+   needs nothing.
+
+   An update from a version that had no writes adds `create` and `update`. A grant
+   of `read` covers neither, so nobody can call them until each is granted by its
+   name (step 4). They need `write:page:confluence` as well: a token made with the
+   seven read scopes only reads, and its writes answer 401 until a token with all
+   eight is made (step 1) and given again with `yardr source key confluence`. A
+   token made without scopes needs nothing, and the account's space permissions
+   say where it may write.
 
    When the token ends, make a new one as in step 1 and give it again with
    `yardr source key confluence`. A token that expired or was revoked shows as a
@@ -318,13 +434,19 @@ written, so a screen may be named otherwise than here.
    ```
    Revoke the token at id.atlassian.com, or delete the service account's
    credential in Atlassian Administration, and take the account out of the spaces.
+   The pages the yard made stay in Confluence: nothing here deletes a page, so a
+   person removes them.
 
 What is not there, on purpose: an attachment's contents; blogposts, and the
 comments, labels and attachments of anything but a page; several account ids
 named in one call, and an account's email, picture or time zone (`user` names
 one account); reading a folder, whiteboard, database or embed itself (`children`
-lists them, with their titles, and `page` takes a page's id only); any write;
-turning storage format into text; and Confluence Data Center and Server, whose
-API and login are others.
+lists them, with their titles, and `page` takes a page's id only); any write but
+`create` and `update`, so no delete, no move of a page to another parent or space,
+no change of its owner, no draft, and no comment, label or attachment written; a
+page at the root of a space; building markup or macros for a body, which is sent
+as it is given and judged by Confluence; retrying or merging a stale version,
+which the agent does by reading the page again; turning storage format into text;
+and Confluence Data Center and Server, whose API and login are others.
 The yard's source format cannot express what is not listed, and the pack does not
 change yardr.

@@ -1,0 +1,7 @@
+=== args
+update
+id=98512
+version=3
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== note
+Confluence requires a title on an update (PageUpdateRequest requires id, status, title, body and version), so a call without one would be a 400 every time, and is refused here.

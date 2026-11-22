@@ -1,0 +1,8 @@
+=== args
+update
+id=98512/../../spaces
+version=3
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== note
+The id is a segment of the path, so its pattern is the only check on it.

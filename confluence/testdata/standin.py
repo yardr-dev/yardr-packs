@@ -3,8 +3,12 @@
 # the test has left in its answer files, read again for each request, so
 # one process serves every case in turn. It records each request in the log
 # it is given: the method, the path and query exactly as they arrived,
-# whether Authorization was the Basic value expected, and Accept. Any
-# method is recorded, so that a request that is not a GET shows in a
+# whether Authorization was the Basic value expected, and Accept. Where a
+# request carries a body, which a write does, it records the content type and
+# the body as JSON with its keys sorted and its text unescaped, so that a
+# golden shows what Confluence would have been sent and not how yardr ordered
+# it; a request with none adds no line, so the goldens of the reads stand.
+# Any method is recorded, so that a request that is not a GET shows in a
 # golden. It writes the port it bound, on 127.0.0.1, to the file it is
 # given once it listens. The Basic value it expects is the first line of its
 # standard input and not an argument, which anyone on the machine could read.
@@ -14,6 +18,7 @@
 # The status is the first line of <answer file>.status, 200 if there is no
 # such file.
 import http.server
+import json
 import os
 import sys
 
@@ -24,8 +29,17 @@ expected = sys.stdin.readline().strip()
 class Handler(http.server.BaseHTTPRequestHandler):
     def handle_any(self):
         auth = "ok" if self.headers.get("Authorization") == "Basic " + expected else "WRONG"
-        with open(log_file, "a") as f:
+        # The body is read whether it is logged or not: a client that sent one
+        # and finds the connection closed over it sees a reset.
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write("%s %s\n  auth: %s\n  accept: %s\n" % (self.command, self.path, auth, self.headers.get("Accept")))
+            if raw:
+                try:
+                    text = json.dumps(json.loads(raw), sort_keys=True, ensure_ascii=False)
+                except ValueError:
+                    text = "NOT JSON: " + raw.decode("utf-8", "replace")
+                f.write("  content-type: %s\n  body: %s\n" % (self.headers.get("Content-Type"), text))
         status = 200
         if os.path.exists(answer_file + ".status"):
             with open(answer_file + ".status") as f:

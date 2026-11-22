@@ -1,13 +1,16 @@
 # Confluence
 
-Confluence Cloud pages through its REST API, read as one Atlassian account. As
-the declared source `confluence`, an agent lists a site's spaces, finds pages by
+Confluence Cloud pages through its REST API, as one Atlassian account. As the
+declared source `confluence`, an agent lists a site's spaces, finds pages by
 CQL, reads one page, lists the children of a page, folder, whiteboard, database
 or embed, lists a page's comments, the replies to a comment, its labels and its
-attached files, and names an author from an account id. Calls are read-only. A
-page and a comment come back in Confluence's storage format, and the pack turns
-nothing into text. An attached file comes back as its metadata with a download
-link, and the pack fetches no file.
+attached files, and names an author from an account id. It writes in two ways
+and no other: `create` makes a page under a parent page, and `update` replaces
+one page's title and body at the version after the one the caller read. Nothing
+is deleted or moved. A page and a comment come back in Confluence's storage
+format, and the pack turns nothing into text and nothing into storage format. An
+attached file comes back as its metadata with a download link, and the pack
+fetches no file.
 Nothing here is compiled into yardr; apply it with:
 
 ```sh
@@ -20,16 +23,21 @@ Confluence differs.
 
 ## One identity for the yard
 
-The yard reads as an Atlassian account with no person signed in. Whatever that
-account can read, every agent granted a call of this source reads, and the yard
-does not narrow it per agent. SETUP.md says this before its first step, and has
-the operator give the account the spaces the yard should read and no others.
+The yard acts as an Atlassian account with no person signed in. Whatever that
+account can read, every agent granted a read call of this source reads, and
+wherever it may write, an agent granted `create` or `update` writes. The yard
+does not narrow either per agent. SETUP.md says this before its first step, and
+has the operator give the account the spaces the yard should read and no others,
+and the permission to create and edit pages in the one space it writes in.
 
 ## The calls
 
-All of kind read, and one preset, `read`, that suggests them. The scopes are the
-ones Atlassian's API descriptions list for each request, read on 2 November 2026
-(`spaces`, `page`, `children`, `search`) and 4 November (the other five).
+Nine of kind read and two of kind update, and three presets that suggest them:
+`read`, `create` and `update`. `read` covers every read call and neither update,
+and each update is granted by its name alone, as flagsmith's two are. The scopes
+are the ones Atlassian's API descriptions list for each request, read on 2
+November 2026 (`spaces`, `page`, `children`, `search`), 4 November (the other
+five) and 22 November (`create` and `update`).
 
 | call | request | parameters | scope |
 |---|---|---|---|
@@ -42,6 +50,8 @@ ones Atlassian's API descriptions list for each request, read on 2 November 2026
 | `labels` | `GET /wiki/api/v2/pages/{id}/labels` | `id`, `limit` (25), `cursor` | `read:page:confluence` |
 | `attachments` | `GET /wiki/api/v2/pages/{id}/attachments` | `id`, `limit` (25), `cursor` | `read:attachment:confluence` |
 | `user` | `GET /wiki/rest/api/user?accountId={accountId}` | `accountId` | `read:confluence-user` |
+| `create` (update) | `POST /wiki/api/v2/pages` | `spaceId`, `parentId`, `title`, `body` | `write:page:confluence` |
+| `update` (update) | `PUT /wiki/api/v2/pages/{id}` | `id`, `version`, `title`, `body` | `write:page:confluence` |
 
 What is behind the table:
 
@@ -130,14 +140,100 @@ What is behind the table:
   first (the cursor names CREATED_DATE, ascending).
 - The file names the check call `spaces`, which needs no parameter, so `yardr
   source check confluence` reaches the site with the minted credential.
-- yardr hands an agent the status of a failed call and not Atlassian's error body.
+- yardr hands an agent the status of a failed read and not Atlassian's error body.
   A 404 on `page` is a page that is not there or one the account may not view,
   which Confluence does not tell apart, and a 400 on `search` is a CQL it cannot
   parse. On the public site a page id that does not exist answered 404 on `labels`
   and `attachments` but 400 on `comments`, and a comment id that does not exist
   answered 400 on `replies`, though Atlassian's descriptions say 404 for all of
   them. A 400 from `comments` or `replies` can be an id that is not there, as well
-  as a `limit` over 250.
+  as a `limit` over 250. The two writes are the exception: see below.
+- `create` and `update` are declared update calls on the same login, with no
+  `update_env`, as `google-docs` shares one token between its reads and its
+  writes. Their bounds are google-docs' and flagsmith's. An id is digits
+  (`^[0-9]+$`, at most 20 characters), and is kept in the record of the call with
+  `version`, because an audit asks by them. A `title` and a `body` are free text
+  and are kept nowhere: yardr's own note on `log` says never for free text, and a
+  value logged cannot be taken back. A title is one line, not empty, of at most
+  255 characters, which is this file's bound: a community answer gives that
+  length for a title and Atlassian's description gives none. A body is at most
+  60000 characters, which the test pins with a body of 60001. The body of the request is a mapping in the declaration with
+  placeholders, as flagsmith's are, and no program builds it.
+- What a write sends is what Atlassian's description requires, and no more.
+  `create` sends `spaceId`, `parentId`, `status: current`, `title` and `body:
+  {representation: storage, value}`, and none of the three query parameters
+  (`embedded`, `private`, `root-level`): the page is published, and made under
+  the parent the caller names, never at the root of a space. The description
+  makes `parentId` optional and puts the page under the space's home page when it
+  is left out; here it is required. `update` sends `id`, `status: current`,
+  `title`, `body` and `version: {number}`, and no `parentId`, `spaceId` or
+  `ownerId`: the description lets an update move a page under another parent in
+  its space and hand it to another account, and this call does neither. The test
+  holds each body's keys beside its golden, so a golden written again does not
+  pass a parent or a draft status, and holds `version.number` to a number.
+- `update` takes a `title`, because Atlassian's PageUpdateRequest requires `id`,
+  `status`, `title`, `body` and `version`, and a call without a title is a 400
+  every time. The page's own title, from `page`, keeps it, and another renames the
+  page, which is the one thing beyond the body that the call can change. A page
+  that others link to by its title (`ri:content-title`, as `page`'s fixture shows)
+  is a reason to keep it; whether Confluence rewrites those links on a rename made
+  through the API was not tried.
+- The version is the guard. `version.number` is "the current version number plus
+  one", the description says, and Confluence refuses any other number with a 409.
+  So `version` is that number: the caller reads `page` and sends its
+  `version.number` plus one, and a person's edit between the read and the write
+  makes the number stale. A declared call substitutes and cannot add, and the
+  number is the API's own either way, so no program does the adding. The 409
+  comes back through `errors` and nothing retries or merges: the agent reads the
+  page again and calls again with the new number plus one. Developers report that
+  the version a read shows can lag a write by a moment (a developer-community
+  thread of April 2023), so a read straight after a write may still show the old
+  number and the next call may be refused.
+- A 409 has two meanings. The one the description lists for `update` is a site
+  with content approvals on, whose space requires approval before a page is
+  published. The one for a stale version is not in the description. Its body is in
+  Atlassian's ticket CONFCLOUD-76640 and in a developer-community thread of
+  January 2026: `{"errors": [{"status": 409, "code": "CONFLICT", "title": "Version
+  must be incremented when updating a page. Current Version: [5]. Provided
+  version: [5]", "detail": null}]}`. So a refusal of a write keeps `errors`, and
+  `message` for the gateway's own body (`{"code": 401, "message": "Unauthorized;
+  scope does not match"}`), and the agent tells the two 409s by what they say. The
+  stale one's title carries the current version, and no body of the approvals one
+  was seen. v2's error body is not documented, so the shape is what those two
+  sources show. The kept answer is bounded at 16 KiB, where a
+  success is about 430 bytes, so a refusal that repeated a long body in its words
+  is refused as too large and not shown. The same holds for a 400: Atlassian's ticket
+  CONFCLOUD-83933 shows `BAD_REQUEST` and "Content contains unsupported
+  extensions and cannot be edited in Fabric editor" for a body with an `ac:link`
+  that held an `ri:page`, a refusal of March 2026 that Atlassian fixed in June.
+  The call builds no macro and forbids none. Richer content is a later change.
+- A missing scope is a 401, as for the reads: Atlassian's support article on a
+  scoped token's 401s names it, and the gateway's body is `Unauthorized; scope does
+  not match`. An account that may not create or update a page in the space is a
+  404, which the description lists as one 404 with a space or page that is not
+  there, and it lists no 403 for either request. The test pins the 401 and the
+  404, and a 403 row beside them in case Confluence answers one.
+- Both writes answer with the page, body included, as Confluence does. The
+  `select` keeps `id`, `status`, `version` and `_links`, so the body is never
+  given back, and the test's answers carry it so that the select has a body to
+  drop. `_links.base` and `_links.webui` together are the link a person opens.
+- What the version does not guard. A person's unsaved draft of the page is not
+  under it: the description says an update of the current version "will be
+  attempted to be merged into the draft version through a content reconciliation
+  algorithm", and that "the latest provided content may entirely override what was
+  previously in the draft". A call tried again after a lost answer is sent with
+  the same number, which the first made if it landed, so the second is refused.
+  A `create` tried again sends the same request. Confluence takes no key to run a
+  request once, so the declaration names no idempotency header, and what a second
+  create does was not tried: Atlassian's v1 description refuses a page whose
+  title is already in the space for a blueprint page and for a move, and v2's
+  lists no such 400 for `createPage`. And `update` with `status: current` restores
+  a trashed page, which the description says it does, with no change to its
+  contents. That is no delete, and the only way these calls reach a page's
+  status.
+- A write counts as an update, and one caller may make 10 an hour unless the
+  operator raises it (SETUP.md step 4). The test raises both limits in its
+  scratch yard, since its write cases make about twenty.
 
 ## The credential and the address
 
@@ -152,14 +248,18 @@ two sources and one login. A token that is replaced is given to each.
 **Which token.** A service account has scoped tokens only, and the form for one
 has you choose the app and then its scopes. So where the account's token for
 `jira` was made for Jira, Confluence needs a second token for the same account,
-with the seven scopes above. A token without scopes, which an ordinary account
-can make, serves both apps and can do everything the account can. The pack's
-mint takes either, and SETUP.md says which goes where. A scope is fixed when a
-token is made and Atlassian answers a missing one with a 401, so a token made
-before a call was added is made again with that call's scope before the call
+with the scopes above: the seven read scopes, and `write:page:confluence` if the
+yard writes. A token without scopes, which an ordinary account can make, serves
+both apps and can do everything the account can, writing included, so with one
+the account's space permissions are the only limit on `create` and `update`. The
+pack's mint takes either, and SETUP.md says which goes where. A scope is fixed
+when a token is made and Atlassian answers a missing one with a 401, so a token
+made before a call was added is made again with that call's scope before the call
 works: `read:comment:confluence` and `read:attachment:confluence` for
-`comments`, `replies` and `attachments`, and `read:confluence-user` for `user`
-(SETUP.md step 6).
+`comments`, `replies` and `attachments`, `read:confluence-user` for `user`, and
+`write:page:confluence` for `create` and `update` (SETUP.md step 6). `yardr
+source check` is a read, so it does not show whether the token may write; the
+first `create` does.
 
 **The address.** Confluence is per site, so the declaration ships the placeholder
 `https://example.atlassian.net/wiki` as its `base`, with `base_template:
@@ -182,16 +282,17 @@ trips on this, a core `base_url` setting is its own bead.
 
 ## Files
 
-- `pack.yaml`, `confluence.yaml`: the pack, with the `read` preset, and the
-  declaration.
+- `pack.yaml`, `confluence.yaml`: the pack, with the `read`, `create` and
+  `update` presets, and the declaration.
 - `confluence/mint`: sh and jq, the Basic credential from the email and the
   token. It prints a fixed line on failure, since jq's own errors quote the value.
 - `SETUP.md`: the account, its token, the address, the grant, the first calls.
 - `.gitignore`: the operator's copy of the declaration.
 - `test`, `testdata/`: the tests. `calls/` holds a `.case` for each scenario
-  (the call, the stand-in's answer and status) and the `.golden` of what
-  happened; `standin.py` is the stand-in for Confluence; `declaration.golden`
-  and the two `*.requests.golden` pin the rest.
+  (the call, the stand-in's answer and status, and a `note` where the answer's
+  source matters) and the `.golden` of what happened; `standin.py` is the
+  stand-in for Confluence, which also logs the body of a write;
+  `declaration.golden` and the two `*.requests.golden` pin the rest.
 
 ## Runtimes
 
@@ -214,7 +315,9 @@ in this directory, about five seconds, no network and no secret. The gate
 - `mint`: the value, the expiry, what it says when an input is missing or empty,
   and that the token is in no argument of anything it runs.
 - the declaration as the yard reads it against `testdata/declaration.golden`, and
-  that it has its `base_template` and that every call is a read by GET.
+  that it has its `base_template`, that the nine reads are each a GET, that the
+  only updates are `create` (POST) and `update` (PUT), that no title or body is
+  logged, and that the ids and `version` are.
 - the real yardr in a scratch yard with its own home, the pack applied, and a copy
   of the declaration aimed at the stand-in on a loopback port, which the credential
   reaches as the right Basic value: the check call; a `.case` for each call, with
@@ -230,6 +333,27 @@ in this directory, about five seconds, no network and no secret. The gate
   bound, pattern or enum value is a changed golden. The case of `user` answers
   with an email, an avatar and a time zone, and the test checks beside its
   golden that the call keeps three keys and none of those.
+- the writes, in the same scratch yard. `create` and `update` each have a `.case`
+  whose answer carries the page's body back, as the schema allows; the stale
+  version's 409 with the title Atlassian's ticket shows, a 401 for a token without
+  the write scope, a 403 and a 404 (`update` has all three, `create` the 401 and
+  the 404), and a 400 for markup Confluence refuses. Each parameter the calls must
+  refuse has a case that sends no request: no parent, a space's key for its id, a
+  page's title for its id, an empty title, a title of 256 characters, a body of
+  60001, no version, a version that is no number, an id with a slash, and no
+  title on an update. The stand-in logs the body of a request as JSON with its
+  keys sorted, so a golden shows what Confluence would have been sent. Beside the
+  goldens, which a rewrite would pass, the test holds each body's keys (the five
+  of `create`, the five of `update`, no `parentId`, `spaceId` or `ownerId`, and
+  status `current`), that `version.number` goes as a number, that neither write
+  sends a query, what the record of each call keeps (the ids and the version, and
+  the names of the title and the body), that a page's body and title are in no
+  file of the yard's home and its body in no output though Confluence's answer
+  carries it, and that a grant of `read` gives a crew member neither write while
+  `create` and `update` are granted by their names and stand across a pack applied
+  again. Five mutations of the declaration (a title logged, the body selected into
+  the answer, a parent sent, a draft status sent, the version taken from the id)
+  were each caught when the test was written.
 - the calls again through the gateway's address, whose base carries a path.
 - a pack applied again over an edited address: the plan names the address it
   takes away, the shipped address returns, and the env file and a grant stand.
@@ -288,6 +412,25 @@ with the gateway's base added over a host that is set still calls the host, unti
 shows the address now and the one it sets. Approving a card needs a person at a
 terminal, so none was approved, and no call went through a host.
 
+Checked on 22 November 2026 for `create` and `update`, in the OpenAPI description of
+v2 (2.0.0): both requests, the one scope each lists (`write:page:confluence`,
+"Create and update pages and blog posts and their properties"; the description
+names no `write:confluence-content`), the fields each body requires (`spaceId`
+for `create`; `id`, `status`, `title`, `body` and `version` for `update`), the
+rule for `version.number` ("the current version number plus one"), the answers
+each lists (`create`: 200, 400, 401, 404 and 413; `update`: 200, 400, 401, 404
+and 409, which is content approvals), the statuses `current` and `draft`, the
+restoring of a trashed page by an update, and the merge into a draft. In
+Atlassian's own pages: that a scoped token without the scope an endpoint needs is
+a 401 (its support article on a service account's 401); the body of a stale
+version's 409 and of a 400 for markup (its tickets CONFCLOUD-76640 and
+CONFCLOUD-83933, the second also showing the request's shape, and a
+developer-community thread of January 2026 that says v2's error body is
+undocumented); and the names of Confluence's current space roles and permissions
+(Collaborator; Create content and Edit content). Neither write was called, with a
+login or without. The scope picker needs a login and was not opened, so the scope
+is the description's and not the picker's.
+
 Not checked with a credential against a site of our own, because a person has to
 make one (a free Atlassian Cloud site serves this pack and the Jira one). The
 live proof is a later bead. It should settle:
@@ -320,7 +463,23 @@ live proof is a later bead. It should settle:
   `displayName` is ever null (the description marks it nullable, and says
   `publicName` always has a value); and what an account that limits its profile
   visibility, a deactivated one and an app's bot user show. The `app` and the
-  empty `accountType` are the description's.
+  empty `accountType` are the description's;
+- that `write:page:confluence` alone is enough for both writes, as the description
+  says, and that a token with it is taken as Basic at the gateway for a POST and a
+  PUT as for a GET;
+- what a stale `update` answers from a site of our own: that its 409 and title
+  are as the ticket and the thread show, and what the other 409, the approvals
+  one, says in its body. Both were seen as text and not from a site;
+- what `create` answers: whether the page comes back with its body (the select
+  drops it either way), and what a title already in the space and a parent in
+  another space answer; and the longest title and body Confluence takes, the
+  bounds of 255 and 60000 characters being this file's;
+- whether Confluence takes a body with a link by title (an `ac:link` holding an
+  `ri:page`) now, which a ticket says it refused in March 2026 and fixed in June,
+  and what else the markup of a status page needs;
+- what an update does to a person's unsaved draft of the page (SETUP.md step 5),
+  whether a page a person restricted answers the account 404, and whether a rename
+  through `update` rewrites the links that name the page by its title.
 
 ## Left out
 
@@ -339,5 +498,11 @@ lists, the `prefix` filter of labels and the `mediaType` and `filename` filters
 of attachments; comment likes, versions and properties;
 reading a folder, whiteboard, database or embed itself (a walk lists one with
 its title, and `page` takes a page's id only); page history and versions; any
-write; turning storage format into text; and Confluence Data Center and Server,
-whose API and login are others. Each is a later bead.
+write but `create` and `update`, so no delete, no move to another parent or
+space, no change of a page's owner, no draft, no comment, label or attachment
+written, and no page at the root of a space; macros built by a call (a body is
+sent as it is given, and Confluence judges it); a retry or a merge of a stale
+version, which the agent does by reading the page again; a second credential
+for the writes (one login serves both, as `google-docs`' does); turning storage
+format into text, or text into it; and Confluence Data Center and Server, whose
+API and login are others. Each is a later bead.

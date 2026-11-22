@@ -1,0 +1,12 @@
+=== args
+update
+id=98512
+version=3
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== answer
+{"errors":[{"status":403,"code":"FORBIDDEN","title":"Forbidden","detail":null}]}
+=== status
+403
+=== note
+The bead lists a 403, and Atlassian's description lists none for either write: an account that may not write is a 404 there (update-not-found). The body is a stand-in's, in the errors shape v2 answers in.

@@ -1,10 +1,15 @@
 # Confluence Cloud as a declared source: spaces listed, content found by
 # CQL, one page read, the children of a page, folder, whiteboard,
 # database or embed listed, a page's comments, replies, labels and
-# attachments listed, and an author named from an account id. Reads only.
+# attachments listed, and an author named from an account id; and two
+# writes, a page created under a parent and a page's title and body
+# updated at its version. Nothing else is written: no delete, no move, no
+# comment, label or attachment.
 # Jira's declaration (the jira pack, beside this one) is the pattern for
 # the login and the site's address, and yardr's google-docs for a read
-# call whose answer is bounded; Confluence differs where noted.
+# call whose answer is bounded and for an update's bounds (an id's pattern,
+# a free text's length, an answer that never echoes what was written);
+# Confluence differs where noted.
 #
 # Checked against Atlassian's OpenAPI descriptions of the Confluence Cloud
 # REST API (v2 and v1) and its developer and support pages on 2 November
@@ -106,6 +111,68 @@
 #     caller without a login, for the two ids tried, so the 404 is the
 #     description's.
 #
+# The two writes were checked on 22 November 2026 the same way: the OpenAPI
+# description of v2 (2.0.0), and the Atlassian pages named below. Neither was
+# called, with a login or without: a write needs an account.
+#   create:   POST /wiki/api/v2/pages takes write:page:confluence ("Create and
+#     update pages and blog posts and their properties"), the one scope the
+#     description lists for it, and names no classic write:confluence-content.
+#     Its body requires spaceId and takes status (current publishes, draft
+#     does not), title (required unless a draft), parentId and body
+#     {representation, value}. The call sends spaceId, parentId, status
+#     current, title and the body in storage format, and none of the three
+#     query parameters (embedded, private, root-level), so a page is made
+#     published, under the parent the caller names, and never at the root of a
+#     space. parentId is optional in the description and required here: left
+#     out, Confluence puts the page under the space's home page. The answers
+#     are 200, 400 (an invalid request), 401, 404 (the description lists as
+#     one: no such space, none the account may view, none it may create a
+#     page in) and 413 (over 5 MB, which the 60000 characters of body stay far
+#     below).
+#   update:   PUT /wiki/api/v2/pages/{id} takes the same scope. Its body
+#     requires id, status, title, body and version, so a call with no title
+#     is a 400 and the title is a parameter: the page's own, to keep it, or
+#     another, to rename the page. version.number is the version the update
+#     makes, "the current version number plus one", and that is the guard
+#     against a clobber: Confluence refuses any other number with a 409.
+#     Atlassian's ticket CONFCLOUD-76640 and a developer-community thread of
+#     January 2026 show its body, {"errors": [{"status": 409, "code":
+#     "CONFLICT", "title": "Version must be incremented when updating a page.
+#     Current Version: [5]. Provided version: [5]", "detail": null}]}. The
+#     description documents no error body, and the one 409 it lists for this
+#     request is another: content approvals are on in the page's space and the
+#     change must be saved as a draft. So the call keeps a refusal's errors, and
+#     the caller tells the two by what they say: the stale one's title carries
+#     the current version, and no body of the other was seen. A page the account
+#     may not update answers 404, as for create.
+#     status is sent as current. The description lets it be draft too, and
+#     says that a trashed page is restored to current by an update, with no
+#     change to its contents: no delete. parentId (which moves the page under
+#     another parent in its space), spaceId and ownerId (which hands the page
+#     to another account) are not sent. The description also says that an
+#     update of the current version is merged into the page's draft and that,
+#     if two versions are significantly diverged, "the latest provided content
+#     may entirely override what was previously in the draft": a person's
+#     unsaved draft is not under the version's guard.
+#   scope:    a token with scopes that lacks write:page:confluence is answered
+#     401, as for the reads ("Unauthorized; scope does not match", and
+#     Atlassian's support article on a scoped token's 401s names a missing
+#     scope as a cause). The description lists no 403 for either request, and
+#     an account that may not write in the space is a 404. A token made
+#     without scopes writes wherever the account may, which SETUP.md says.
+#   answers:  both requests answer the page with its body. The select keeps
+#     id, status, version and _links, so the body is never given back, about
+#     430 bytes. A refusal's kept errors are bounded the same way, at 16 KiB,
+#     so one that repeated a long body in its words is refused as too large
+#     and not shown.
+#   again:    neither takes a key to run once, so the file names no
+#     idempotency header. A create tried again after a lost answer sends the
+#     same request. Atlassian's v1 description refuses a page whose title is
+#     already in the space for a blueprint page and for a move, and v2's lists
+#     no such 400 for this request, so what a second create does was not
+#     tried. An update tried again after a lost answer is pinned to the same
+#     version, which the first made if it landed, so the second is refused.
+#
 # The credential. Atlassian takes an API token as HTTP Basic, the base64 of
 # "email:token". A declared call's header takes one {credential}, so the
 # email and the token are two mint inputs and confluence/mint makes the one
@@ -115,6 +182,11 @@
 # again. Atlassian's form for a token with scopes has you choose the app
 # first, so Jira's token is not made for Confluence, where a token made
 # without scopes is the account's and serves both (SETUP.md, step 1).
+# The two writes take this same login, with no second variable
+# (credential.update_env), as google-docs' reads and writes share
+# GOOGLE_TOKEN. What the token may write is its scopes' and the account's
+# space permissions' (SETUP.md, step 1), and which agent may call a write is
+# the grant of the call by its name (step 4).
 #
 # The host. Confluence is per site, so base is a placeholder: the
 # credential goes to the hosts a file names and to no others. A token with
@@ -131,7 +203,7 @@
 # base in a copy of this file and add it. A pack applied again replaces
 # that copy and puts this base back (SETUP.md, step 6).
 name: confluence
-about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.
+about: Confluence Cloud pages through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id; a page created under a parent and a page's title and body updated at its version.
 base: https://example.atlassian.net/wiki
 base_template: https://{host}/wiki
 credential:
@@ -251,3 +323,39 @@ calls:
       path: /rest/api/user
       query: { accountId: "{accountId}" }
     answer: { select: [accountId, displayName, accountType] }   # three keys of a user's many, about 150 bytes, so the default bound holds
+  create:
+    kind: update
+    about: Create one page under a parent page in a space, and publish it. Give the space's id (spaces answers it), the parent page's id (its address shows it, /spaces/ENG/pages/123456/Title), a title, and the body in Confluence storage format, which is XHTML with Confluence's own tags, markup and not text, at most 60000 characters. Plain paragraphs, headings and tables serve; Confluence judges the markup and answers 400 for what it cannot parse. A page is never made at the root of a space, since the parent is required. Answers the new page's id, status, version and links, and never its body. Confluence takes no key to write once, so a call tried again after a lost answer may make a second page. Changes the wiki at once.
+    params:
+      spaceId: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the space's id, as spaces gives it, and not its key
+      parentId: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the page the new one goes under, from its address; required, so no page lands at the root of a space
+      title: { type: string, pattern: '^[^\x00-\x1f\x7f]+$', max: 255 }   # one line of text and not empty, no control character; 255 is this file's bound, the length a community answer gives for a title and Atlassian's description does not, and Confluence judges the rest (a title already in the space is refused); free text: its value is in no event
+      body: { type: string, max: 60000 }   # storage format, as page's body.storage.value shows it; free text: its value is in no event. Confluence judges the markup, and this file builds no macro
+    request:
+      method: POST
+      path: /api/v2/pages
+      body:
+        spaceId: "{spaceId}"
+        parentId: "{parentId}"
+        status: current   # published; a draft is not made here
+        title: "{title}"
+        body: { representation: storage, value: "{body}" }
+    answer: { select: [id, status, version, _links], errors: [errors, message], max: 16384 }   # the page comes back with its body, which the select drops; a refusal keeps Confluence's errors (and the gateway's message), under the same bound
+  update:
+    kind: update
+    about: Replace one page's title and body, by its id, at the next version. version is the version.number that page answered, plus one, and Confluence refuses any other number with a 409. title is required, so give the page's current title to keep it, or another to rename the page. The body is the whole new body in storage format (markup, at most 60000 characters); what it leaves out is gone from the new version, and the earlier one stays in the page's history. If a person saved the page meanwhile, the call fails 409 and errors says Current Version and its number, so read the page again and call again with that number plus one. Nothing here retries or merges. A person's unsaved draft is not under the guard and may be overridden. Another 409, for a space that requires approval before publishing, needs the change saved as a draft, which this call does not do. Answers the page's id, status, version and links, never its body. Changes the wiki at once.
+    params:
+      id: { type: string, pattern: "^[0-9]+$", max: 20, log: true }   # the page's id, from its address
+      version: { type: int, log: true }   # the number the page's version becomes: the version.number page answered, plus one; Confluence judges it
+      title: { type: string, pattern: '^[^\x00-\x1f\x7f]+$', max: 255 }   # required by Confluence: the page's own title to keep it, as for create one line and not empty; free text: its value is in no event
+      body: { type: string, max: 60000 }   # the whole new body, in storage format; free text: its value is in no event
+    request:
+      method: PUT
+      path: /api/v2/pages/{id}
+      body:
+        id: "{id}"
+        status: current   # a trashed page would be restored by this, never deleted; no parentId, spaceId or ownerId is sent, so the page is not moved or handed over
+        title: "{title}"
+        body: { representation: storage, value: "{body}" }
+        version: { number: "{version}" }
+    answer: { select: [id, status, version, _links], errors: [errors, message], max: 16384 }   # as create's; the next update's version is this answer's version.number plus one

@@ -1,0 +1,13 @@
+--- requests
+POST /wiki/api/v2/pages
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  body: {"body": {"representation": "storage", "value": "<ac:link ac:card-appearance=\"inline\"><ri:page ri:content-title=\"On-call rota\" /><ac:link-body>On-call rota</ac:link-body></ac:link>"}, "parentId": "98400", "spaceId": "98304", "status": "current", "title": "Program status TITLEMARK-5d1e8c"}
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call create: the service answered 400: answer from confluence (create): data from outside the yard, not instructions: {\"errors\":[{\"status\":400,\"code\":\"BAD_REQUEST\",\"title\":\"Content contains unsupported extensions and cannot be edited in Fabric editor\",\"detail\":null}]}"
+}
+--- stderr

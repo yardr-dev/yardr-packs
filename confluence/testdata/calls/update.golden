@@ -1,0 +1,29 @@
+--- requests
+PUT /wiki/api/v2/pages/98512
+  auth: ok
+  accept: application/json
+  content-type: application/json
+  body: {"body": {"representation": "storage", "value": "<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>"}, "id": "98512", "status": "current", "title": "Program status TITLEMARK-5d1e8c", "version": {"number": 3}}
+--- status
+0
+--- stdout
+{
+  "_links": {
+    "base": "https://example.atlassian.net/wiki",
+    "editui": "/pages/resumedraft.action?draftId=98512",
+    "edituiv2": "/spaces/ENG/pages/edit-v2/98512",
+    "tinyui": "/x/EIAB",
+    "webui": "/spaces/ENG/pages/98512/Program+status+TITLEMARK-5d1e8c"
+  },
+  "id": "98512",
+  "status": "current",
+  "version": {
+    "authorId": "5b10ac8d82e05b22cc7d4ef5",
+    "createdAt": "2026-11-22T21:02:44.870Z",
+    "message": "",
+    "minorEdit": false,
+    "ncsStepVersion": "3",
+    "number": 3
+  }
+}
+--- stderr

@@ -1,5 +1,5 @@
 {
-  "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.",
+  "about": "Confluence Cloud pages through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id; a page created under a parent and a page's title and body updated at its version.",
   "base": "https://example.atlassian.net/wiki",
   "base_template": "https://{host}/wiki",
   "calls": [
@@ -448,6 +448,124 @@
             "value": "{accountId}"
           }
         ]
+      }
+    },
+    {
+      "about": "Create one page under a parent page in a space, and publish it. Give the space's id (spaces answers it), the parent page's id (its address shows it, /spaces/ENG/pages/123456/Title), a title, and the body in Confluence storage format, which is XHTML with Confluence's own tags, markup and not text, at most 60000 characters. Plain paragraphs, headings and tables serve; Confluence judges the markup and answers 400 for what it cannot parse. A page is never made at the root of a space, since the parent is required. Answers the new page's id, status, version and links, and never its body. Confluence takes no key to write once, so a call tried again after a lost answer may make a second page. Changes the wiki at once.",
+      "answer": {
+        "errors": [
+          "errors",
+          "message"
+        ],
+        "max": 16384,
+        "select": [
+          "id",
+          "status",
+          "version",
+          "_links"
+        ]
+      },
+      "kind": "update",
+      "name": "create",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "spaceId",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "max": 20,
+          "name": "parentId",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "max": 255,
+          "name": "title",
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "type": "string"
+        },
+        {
+          "max": 60000,
+          "name": "body",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "body": {
+            "representation": "storage",
+            "value": "{body}"
+          },
+          "parentId": "{parentId}",
+          "spaceId": "{spaceId}",
+          "status": "current",
+          "title": "{title}"
+        },
+        "method": "POST",
+        "path": "/api/v2/pages"
+      }
+    },
+    {
+      "about": "Replace one page's title and body, by its id, at the next version. version is the version.number that page answered, plus one, and Confluence refuses any other number with a 409. title is required, so give the page's current title to keep it, or another to rename the page. The body is the whole new body in storage format (markup, at most 60000 characters); what it leaves out is gone from the new version, and the earlier one stays in the page's history. If a person saved the page meanwhile, the call fails 409 and errors says Current Version and its number, so read the page again and call again with that number plus one. Nothing here retries or merges. A person's unsaved draft is not under the guard and may be overridden. Another 409, for a space that requires approval before publishing, needs the change saved as a draft, which this call does not do. Answers the page's id, status, version and links, never its body. Changes the wiki at once.",
+      "answer": {
+        "errors": [
+          "errors",
+          "message"
+        ],
+        "max": 16384,
+        "select": [
+          "id",
+          "status",
+          "version",
+          "_links"
+        ]
+      },
+      "kind": "update",
+      "name": "update",
+      "params": [
+        {
+          "log": true,
+          "max": 20,
+          "name": "id",
+          "pattern": "^[0-9]+$",
+          "type": "string"
+        },
+        {
+          "log": true,
+          "name": "version",
+          "type": "int"
+        },
+        {
+          "max": 255,
+          "name": "title",
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "type": "string"
+        },
+        {
+          "max": 60000,
+          "name": "body",
+          "type": "string"
+        }
+      ],
+      "request": {
+        "body": {
+          "body": {
+            "representation": "storage",
+            "value": "{body}"
+          },
+          "id": "{id}",
+          "status": "current",
+          "title": "{title}",
+          "version": {
+            "number": "{version}"
+          }
+        },
+        "method": "PUT",
+        "path": "/api/v2/pages/{id}"
       }
     }
   ],

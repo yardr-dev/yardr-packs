@@ -1,0 +1,12 @@
+=== args
+create
+spaceId=98304
+parentId=98400
+title=Program status TITLEMARK-5d1e8c
+body=<ac:link ac:card-appearance="inline"><ri:page ri:content-title="On-call rota" /><ac:link-body>On-call rota</ac:link-body></ac:link>
+=== answer
+{"errors":[{"status":400,"code":"BAD_REQUEST","title":"Content contains unsupported extensions and cannot be edited in Fabric editor","detail":null}]}
+=== status
+400
+=== note
+The body is the one in Atlassian's ticket CONFCLOUD-83933 (opened 9 March 2026, fixed 11 June), which got it for this very markup on POST /wiki/api/v2/pages. Whatever the markup, Confluence judges it and its 400 comes back through errors; nothing here checks it.

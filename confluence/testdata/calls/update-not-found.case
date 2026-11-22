@@ -1,0 +1,12 @@
+=== args
+update
+id=98999
+version=2
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== answer
+{"errors":[{"status":404,"code":"NOT_FOUND","title":"Not Found","detail":null}]}
+=== status
+404
+=== note
+The body is page-not-found's, which the public site gave for a page that is not there. updatePage lists the same 404 for a page the account may not view and for one it may not update.

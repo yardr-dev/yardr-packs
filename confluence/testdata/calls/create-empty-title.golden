@@ -1,0 +1,8 @@
+--- requests
+--- status
+1
+--- stdout
+{
+  "error": "source confluence, call create: parameter title does not match its pattern ^[^\\x00-\\x1f\\x7f]+$"
+}
+--- stderr

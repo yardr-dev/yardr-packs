@@ -1,0 +1,12 @@
+=== args
+update
+id=98512
+version=3
+title=Program status TITLEMARK-5d1e8c
+body=<h1>Program overview</h1><p>Status at the last run: <strong>one bead in review</strong>. BODYMARK-5d1e8c</p><table><tbody><tr><th>Bead</th><th>Stage</th></tr><tr><td>yardr-1234</td><td>review-security</td></tr></tbody></table>
+=== answer
+{"code":401,"message":"Unauthorized; scope does not match"}
+=== status
+401
+=== note
+A scoped token made without write:page:confluence. The body is the one page-unauthorized has for a missing read scope; Atlassian's support article on a scoped token's 401s names a missing scope as a cause. The bead says 403 for this, and the description lists no 403 for the request (update-forbidden is that row).
