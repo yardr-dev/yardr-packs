@@ -1,6 +1,7 @@
 {
   "about": "Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.",
   "base": "https://example.atlassian.net/wiki",
+  "base_template": "https://{host}/wiki",
   "calls": [
     {
       "about": "List the spaces the account may see, 25 at a time. Answers each space's id, key, name, type and homepageId, the page children starts from. keys narrows it to spaces by key, as an address shows it (/spaces/ENG/...). When more than limit follow, _links.next is in the answer, and its cursor= value is the next call's cursor.",

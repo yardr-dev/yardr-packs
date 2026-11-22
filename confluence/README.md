@@ -162,17 +162,22 @@ works: `read:comment:confluence` and `read:attachment:confluence` for
 (SETUP.md step 6).
 
 **The address.** Confluence is per site, so the declaration ships the placeholder
-`https://example.atlassian.net/wiki` and SETUP.md has the operator write their
-own into a copy of the file (`confluence.local.yaml`, ignored by git) and add
-it. A token with scopes is called at
-`https://api.atlassian.com/ex/confluence/<cloud id>/wiki` and one without at
-`https://<site>.atlassian.net/wiki`. Both take Basic, so only the base differs,
-and every path in the file starts at `/api` or `/rest`. A pack applied again
-replaces the yard's copy and puts the placeholder back; the test pins that, and
-SETUP.md step 6 says what to do. Until the copy is added again the source calls
-the placeholder with the account's credential. Unlike `jira`, this pack has no
-command to refuse to send there, since all its calls are declared. If a real user
-trips on this, a core `base_url` setting is its own bead.
+`https://example.atlassian.net/wiki` as its `base`, with `base_template:
+https://{host}/wiki` beside it. A token without scopes is called at
+`https://<site>.atlassian.net/wiki`, which the template makes: SETUP.md has the
+operator give the host, `yardr source set confluence host=<site>.atlassian.net`
+on a card or in a terminal, and copy nothing; the setting survives a pack applied
+again. A token with scopes is called at
+`https://api.atlassian.com/ex/confluence/<cloud id>/wiki`, which a template cannot
+make, since the cloud id is a path segment and not the host. That path writes its
+address into a copy of the file (`confluence.local.yaml`, ignored by git) and adds
+it with `yardr source add`, in a terminal. Both take Basic, so only the base
+differs, and every path in the file starts at `/api` or `/rest`. A pack applied
+again replaces the yard's copy and puts the placeholder back; the test pins that,
+and SETUP.md step 6 says what to do. Until the copy is added again the source
+calls the placeholder with the account's credential. Unlike `jira`, this pack has
+no command to refuse to send there, since all its calls are declared. If a real
+user trips on this, a core `base_url` setting is its own bead.
 
 ## Files
 
@@ -208,7 +213,7 @@ in this directory, about five seconds, no network and no secret. The gate
 - `mint`: the value, the expiry, what it says when an input is missing or empty,
   and that the token is in no argument of anything it runs.
 - the declaration as the yard reads it against `testdata/declaration.golden`, and
-  that every call is a read by GET.
+  that it has its `base_template` and that every call is a read by GET.
 - the real yardr in a scratch yard with its own home, the pack applied, and a copy
   of the declaration aimed at the stand-in on a loopback port, which the credential
   reaches as the right Basic value: the check call; a `.case` for each call, with
@@ -227,6 +232,11 @@ in this directory, about five seconds, no network and no secret. The gate
 - the calls again through the gateway's address, whose base carries a path.
 - a pack applied again over an edited address: the plan names the address it
   takes away, the shipped address returns, and the env file and a grant stand.
+- a host given with `yardr source set confluence host=` (SETUP.md step 2): it
+  makes `https://<host>/wiki`, which `source show` names first; it stands across
+  a pack applied again, with the env file; it stands over a copy added after it,
+  so that `host=` clears it and the copy's address is the one in use. No call
+  goes through it here: the template is https and the stand-in is plain http.
 - the token and the credential made of it are in no file of the run but the env
   file: not an output, not the yard's store, events or log.
 
@@ -268,6 +278,14 @@ lookup by id is `POST /users-bulk`. Seen on the public site without a login: the
 endpoint answers 403 to an anonymous caller, for the two ids tried, which were no
 account, with `User not permitted to view user profiles`. So the 403 is seen, and
 the 404 and the shape of an answer are the description's.
+
+Tried on 22 November 2026 for `base_template`, in a scratch yard with yardr build
+6906121f7ad1: `yardr source set confluence host=<host>` makes `https://<host>/wiki`;
+a pack applied again keeps it; a host with a path or a scheme is refused; a copy
+with the gateway's base added over a host that is set still calls the host, until
+`host=` clears it; and a crew member's card for the same command is accepted and
+shows the address now and the one it sets. Approving a card needs a person at a
+terminal, so none was approved, and no call went through a host.
 
 Not checked with a credential against a site of our own, because a person has to
 make one (a free Atlassian Cloud site serves this pack and the Jira one). The

@@ -116,18 +116,24 @@
 # first, so Jira's token is not made for Confluence, where a token made
 # without scopes is the account's and serves both (SETUP.md, step 1).
 #
-# The host. Confluence is per site, so this is a placeholder that SETUP.md
-# has the operator replace in the yard's copy of this file: the credential
-# goes to the hosts a file names and to no others. A token with scopes is
-# called at https://api.atlassian.com/ex/confluence/<cloud id>/wiki and one
-# without at https://<site>.atlassian.net/wiki (Atlassian's support
+# The host. Confluence is per site, so base is a placeholder: the
+# credential goes to the hosts a file names and to no others. A token with
+# scopes is called at https://api.atlassian.com/ex/confluence/<cloud id>/wiki
+# and one without at https://<site>.atlassian.net/wiki (Atlassian's support
 # article on scoped tokens). Both take Basic, so only the base differs, and
-# the /wiki is the base's, so every path below starts at /api or /rest. A
-# pack applied again replaces the yard's copy and puts this one back
-# (SETUP.md, step 6).
+# the /wiki is the base's, so every path below starts at /api or /rest.
+# For a token without scopes, base_template lets the operator give the
+# site's host on a card or at a terminal (yardr source set confluence
+# host=<site>.atlassian.net) and no copy of this file; that setting
+# survives a pack applied again. The gateway's address varies in a path
+# segment, the cloud id, and not in the host, which a template cannot make,
+# so a token with scopes keeps the copy: SETUP.md has the operator replace
+# base in a copy of this file and add it. A pack applied again replaces
+# that copy and puts this base back (SETUP.md, step 6).
 name: confluence
 about: Confluence Cloud pages read through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id.
 base: https://example.atlassian.net/wiki
+base_template: https://{host}/wiki
 credential:
   env: CONFLUENCE_AUTH
   header: "Authorization: Basic {credential}"

@@ -21,7 +21,9 @@
 #            changed golden, and a parameter the call should refuse shows
 #            as no request at all.
 #   host     a pack applied again over the operator's edited host, which the
-#            shipped host replaces, and what stands.
+#            shipped host replaces, and what stands; and the host the
+#            template makes (SETUP.md step 2): set, kept across a pack
+#            applied again, kept over a copy added after it, and given up.
 #   secrets  the token and the credential made of it are in no file the
 #            run left but the env file, and in no output.
 #
@@ -121,8 +123,10 @@ fi
 # credential and every call's parameters, request and answer.
 yrun source show confluence --json | jq -S .declaration >"$core/declaration.json"
 check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
-jq -e '.base == "https://example.atlassian.net/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 9' "$core/declaration.json" >/dev/null
-ok "the shipped host is the placeholder, and every call is a read by GET" $?
+# base_template is what lets SETUP.md step 2 give the host on a card, and a
+# golden written again would pass without it, so it is checked here too.
+jq -e '.base == "https://example.atlassian.net/wiki" and .base_template == "https://{host}/wiki" and ([.calls[] | .kind == "read" and .request.method == "GET"] | all) and (.calls | length) == 9' "$core/declaration.json" >/dev/null
+ok "the shipped host is the placeholder with its template, and every call is a read by GET" $?
 yrun pack show confluence >"$core/packshow.out" 2>&1
 grep -q '1\. read: ' "$core/packshow.out" && grep -q 'confluence: read' "$core/packshow.out"
 ok "pack show prints the one preset, read, as SETUP.md step 4 says" $?
@@ -253,6 +257,32 @@ yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
 yrun source show confluence >"$core/show.readded" 2>&1
 grep -qF "$site/wiki" "$core/show.readded" && grep -qF "$envfile" "$core/show.readded"
 ok "adding the edited copy again restores the host, and the env file still stands" $?
+
+# The host the template makes, which is how SETUP.md step 2 points a token
+# without scopes at the site. It is a setting of the source and not part of
+# the declaration, so it is shown as the address in use, stands across a pack
+# applied again (step 6) and over a copy added after it (step 2 clears it
+# first), and gives the declaration's own address back when it is emptied.
+# No call goes through it here: the template is https and the stand-in is
+# plain http on loopback.
+first() { sed -n 1p "$1"; }
+yrun source set confluence host=mysite.atlassian.net >"$core/host.set.out" 2>&1
+yrun source show confluence >"$core/show.host" 2>&1
+first "$core/show.host" | grep -qF 'https://mysite.atlassian.net/wiki'
+ok "source set host= makes https://<host>/wiki, which source show names first" $? "$(tail -c 300 "$core/host.set.out")"
+yrun pack apply "$here" --yes >/dev/null 2>&1
+yrun source show confluence >"$core/show.host.reapplied" 2>&1
+first "$core/show.host.reapplied" | grep -qF 'https://mysite.atlassian.net/wiki' && grep -qF "$envfile" "$core/show.host.reapplied"
+ok "a host that was set stands across a pack applied again, so the placeholder does not come back for it" $?
+sed "s|^base: .*|base: $site/ex/confluence/$cloud/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
+yrun source show confluence >"$core/show.host.copy" 2>&1
+first "$core/show.host.copy" | grep -qF 'https://mysite.atlassian.net/wiki'
+ok "a host that was set stands over the address of a copy added after it" $?
+yrun source set confluence host= >/dev/null 2>&1
+yrun source show confluence >"$core/show.host.cleared" 2>&1
+first "$core/show.host.cleared" | grep -qF "$site/ex/confluence/$cloud/wiki" && ! grep -qF 'mysite.atlassian.net' "$core/show.host.cleared"
+ok "host= with nothing after it clears the host, and the copy's own address is in use" $?
 
 # ---- secrets ---------------------------------------------------------------
 # Every output of the run is a file under $core, and so is everything the

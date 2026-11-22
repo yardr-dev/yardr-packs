@@ -68,28 +68,48 @@ written, so a screen may be named otherwise than here.
    ```
    The declaration it installs gives the source a placeholder address,
    `https://example.atlassian.net/wiki`. A source's credential goes only to the
-   hosts its file names, so the yard's copy of the file must name yours, with
-   its `/wiki`. A token with scopes is called through Atlassian's gateway,
-   `https://api.atlassian.com/ex/confluence/<cloud id>/wiki`. The site gives
-   its cloud id without a login:
+   host its address names, so the yard must be given yours, with its `/wiki`.
+   Which way depends on the token of step 1.
+
+   A token without scopes is called at the site,
+   `https://<site>.atlassian.net/wiki`. The declaration has a template for that
+   address, so the yard is given the site's host and no copy of the file:
+   ```sh
+   yardr source set confluence host=<site>.atlassian.net
+   ```
+   A crew member who sets the yard up asks for it on a card instead, and the
+   operator approves the card, which shows the address now and the one it sets:
+   ```sh
+   yardr bead ask <bead> - <<'ASK'
+   Q: Point the yard's Confluence source at our site?
+   C: The source calls a placeholder address until it is given the site's host, so every call fails.
+   C: This sets it to <site>.atlassian.net, for a token made without scopes. The email and token are given afterwards, on their own card (step 3).
+   R: source set confluence host=<site>.atlassian.net
+   ASK
+   ```
+   A token with scopes is called through Atlassian's gateway,
+   `https://api.atlassian.com/ex/confluence/<cloud id>/wiki`. A template cannot
+   make that address: what varies is a path segment, the cloud id, and not the
+   host. So this path keeps a copy of the declaration, and `yardr source add`
+   stays in a terminal. The site gives its cloud id without a login:
    ```sh
    curl -s https://<site>.atlassian.net/_edge/tenant_info
    ```
-   A token without scopes is called at the site, `https://<site>.atlassian.net/wiki`.
-   Write the address you need into a copy of the declaration, beside the
-   original so that the program it names is found, and add the copy to the yard.
-   The copy is ignored by git. For a token with scopes:
+   Write the gateway's address into a copy of the declaration, beside the
+   original so that the program it names is found. The copy is ignored by git:
    ```sh
    sed 's|^base: .*|base: https://api.atlassian.com/ex/confluence/<cloud id>/wiki|' <pack dir>/confluence.yaml > <pack dir>/confluence.local.yaml
-   ```
-   And for a token without:
-   ```sh
-   sed 's|^base: .*|base: https://<site>.atlassian.net/wiki|' <pack dir>/confluence.yaml > <pack dir>/confluence.local.yaml
    ```
    Then add the copy:
    ```sh
    yardr source add <pack dir>/confluence.local.yaml
    ```
+   A host that was given stands over the address of a copy, so if you gave one
+   first, clear it:
+   ```sh
+   yardr source set confluence host=
+   ```
+   Either way, look at the address the source calls now:
    ```sh
    yardr source show confluence
    ```
@@ -258,19 +278,23 @@ written, so a screen may be named otherwise than here.
    that was tried answered 400.
 
 6. **Updating the pack, and when the token ends.** A pack applied again replaces
-   the source's declaration whole, and the placeholder address comes back with
-   it. Your env file and the grants stay. After pulling the checkout, read what
-   would change:
+   the source's declaration whole. Your env file and the grants stay, and so does
+   a host given with `yardr source set confluence host=` (step 2): it is a
+   setting of the source and not part of the declaration, so the placeholder
+   address does not come back for it and nothing is done after the apply. A copy
+   added with `yardr source add` is the declaration, and the placeholder comes
+   back with it. After pulling the checkout, read what would change:
    ```sh
    yardr pack check <pack dir>
    ```
-   If you apply the pack, the plan lists the address as `base: <your address> ->
-   https://example.atlassian.net/wiki`. That line is how you notice, and it is the
-   edit being undone. Until you add your copy again, the source calls the
-   placeholder, a host that is not your site, with the account's credential, and
-   `yardr source check confluence` fails. The shorter way skips the apply. Make
-   the copy again from the new `confluence.yaml` with step 2's `sed`, and add it
-   with `yardr source add`. The source then never points at the placeholder.
+   If you use a copy and apply the pack, the plan lists the address as `base:
+   <your address> -> https://example.atlassian.net/wiki`. That line is how you
+   notice, and it is the edit being undone. Until you add your copy again, the
+   source calls the placeholder, a host that is not your site, with the account's
+   credential, and `yardr source check confluence` fails. The shorter way skips
+   the apply. Make the copy again from the new `confluence.yaml` with step 2's
+   `sed`, and add it with `yardr source add`. The source then never points at the
+   placeholder.
 
    An update from a version that had only `spaces`, `page`, `children` and
    `search` adds `comments`, `replies`, `labels`, `attachments` and `user`, and
