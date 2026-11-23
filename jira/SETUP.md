@@ -300,12 +300,13 @@ directory of the yardr-packs checkout) `<pack dir>`.
     ```
     If you use a copy and apply the pack, the plan lists the address as `base:
     <your address> -> https://example.atlassian.net`. That line is how you
-    notice, and it is the edit being undone. Until you add your copy again,
-    `yardr source check jira` calls the placeholder, a host no yard owns, and the
-    thread commands refuse to run. The shorter way skips the apply. Make the copy
-    again from the new `jira.yaml` with step 2's `sed`, add it with `yardr source
-    add`, and repeat step 9 if you use the key. The source then never points at
-    the placeholder.
+    notice, and it is the edit being undone. Until you add your copy again, the
+    credential is held back from the placeholder, a host no yard owns: a call is
+    refused and nothing is sent, `yardr source check jira` fails, and the thread
+    commands refuse to run. The shorter way skips the apply. Make the copy again
+    from the new `jira.yaml` with step 2's `sed`, add it with `yardr source add`,
+    and repeat step 9 if you use the key. The source then never points at the
+    placeholder.
 
     When the token ends, make a new one as in step 1 and give it again: `yardr
     source key jira` for the source, and each crew member's card or file from
