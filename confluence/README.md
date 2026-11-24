@@ -261,24 +261,35 @@ works: `read:comment:confluence` and `read:attachment:confluence` for
 source check` is a read, so it does not show whether the token may write; the
 first `create` does.
 
-**The address.** Confluence is per site, so the declaration ships the placeholder
-`https://example.atlassian.net/wiki` as its `base`, with `base_template:
-https://{host}/wiki` beside it. A token without scopes is called at
-`https://<site>.atlassian.net/wiki`, which the template makes: SETUP.md has the
-operator give the host, `yardr source set confluence host=<site>.atlassian.net`
-on a card or in a terminal, and copy nothing; the setting survives a pack applied
-again. A token with scopes is called at
-`https://api.atlassian.com/ex/confluence/<cloud id>/wiki`, which a template cannot
-make, since the cloud id is a path segment and not the host. That path writes its
-address into a copy of the file (`confluence.local.yaml`, ignored by git) and adds
-it with `yardr source add`, in a terminal. Both take Basic, so only the base
-differs, and every path in the file starts at `/api` or `/rest`. A pack applied
-again replaces the yard's copy and puts the placeholder back; the test pins that,
-and SETUP.md step 6 says what to do. Until the copy is added again the yard holds
-the credential back from the placeholder, so a call is refused and nothing is
-sent. Unlike `jira`, this pack needs no command of its own to refuse to send
-there, since all its calls are declared and the yard holds them. If a real user
-trips on this, a core `base_url` setting is its own bead.
+**The address.** Confluence is per site, so the declaration ships a placeholder
+as its `base`, with a template beside it for each of the two addresses Atlassian
+calls. SETUP.md has the operator give one on a card or in a terminal and copy
+nothing, and what is given is a setting of the source, so it survives a pack
+applied again. The three, each replacing the other two:
+
+- `base`, the default: `https://example.atlassian.net/wiki`, a placeholder. The
+  credential is held back from it, so a call is refused and nothing is sent.
+- `host=`, from `base_template: https://{host}/wiki`: a token without scopes is
+  called at `https://<site>.atlassian.net/wiki`, so
+  `yardr source set confluence host=<site>.atlassian.net`.
+- `site=`, from `path_template:
+  https://api.atlassian.com/ex/confluence/{site}/wiki`: a token with scopes is
+  called through Atlassian's gateway, `https://api.atlassian.com/ex/confluence/<cloud id>/wiki`,
+  so `yardr source set confluence site=<cloud id>`. The gateway is one host for
+  every site and the cloud id is a path segment, which a `base_template` cannot
+  make. The product segment, `confluence`, is the file's, so the operator says the
+  cloud id and nothing of the path.
+
+Both take Basic, so only the base differs, and every path in the file starts at
+`/api` or `/rest`. The yard keys a credential to the host, and to the cloud id
+after it for a site, so a key given for another site (or for a host) is held back
+until it is given again: SETUP.md puts the address before the key. That holding
+back is yardr's, and its own tests prove it; the test here pins the addresses and
+the flow. A copy of the declaration added with `yardr source add`, which an earlier
+SETUP.md had a token with scopes make, is replaced by a pack applied again and the
+placeholder comes back; the test pins that, and SETUP.md step 6 says how to move
+over. Unlike `jira`, this pack needs no command of its own to refuse to send
+there, since all its calls are declared and the yard holds them.
 
 ## Files
 
@@ -315,9 +326,9 @@ in this directory, about five seconds, no network and no secret. The gate
 - `mint`: the value, the expiry, what it says when an input is missing or empty,
   and that the token is in no argument of anything it runs.
 - the declaration as the yard reads it against `testdata/declaration.golden`, and
-  that it has its `base_template`, that the nine reads are each a GET, that the
-  only updates are `create` (POST) and `update` (PUT), that no title or body is
-  logged, and that the ids and `version` are.
+  that it has its `base_template` and its `path_template`, that the nine reads are
+  each a GET, that the only updates are `create` (POST) and `update` (PUT), that no
+  title or body is logged, and that the ids and `version` are.
 - the real yardr in a scratch yard with its own home, the pack applied, and a copy
   of the declaration aimed at the stand-in on a loopback port, which the credential
   reaches as the right Basic value: the check call; a `.case` for each call, with
@@ -354,7 +365,12 @@ in this directory, about five seconds, no network and no secret. The gate
   again. Five mutations of the declaration (a title logged, the body selected into
   the answer, a parent sent, a draft status sent, the version taken from the id)
   were each caught when the test was written.
-- the calls again through the gateway's address, whose base carries a path.
+- the calls again through the gateway's address, which `yardr source set
+  confluence site=<cloud id>` makes from the path template, with the key given
+  after it as SETUP.md has it. The file's template is https at Atlassian's, so the
+  copy has its scheme and host replaced by the stand-in's and keeps its path, and
+  `testdata/gateway.requests.golden` holds the requests with the cloud id in the
+  path. A template that made another path, or none, is a changed golden.
 - a pack applied again over an edited address: the plan names the address it
   takes away, the shipped address returns, and the env file and a grant stand.
 - a host given with `yardr source set confluence host=` (SETUP.md step 2): it
@@ -362,6 +378,13 @@ in this directory, about five seconds, no network and no secret. The gate
   a pack applied again, with the env file; it stands over a copy added after it,
   so that `host=` clears it and the copy's address is the one in use. No call
   goes through it here: the template is https and the stand-in is plain http.
+- a site given with `site=` (SETUP.md step 2), the same ways: it makes the
+  gateway's address with the cloud id in it, using the cloud id that SETUP.md
+  gives as its example, so that the example is held to what the template makes;
+  it stands across a pack applied again and over a copy added after it; a host
+  given after it takes its place and a site after a host takes it back; and
+  `site=` with nothing after it gives the copy's address back. That a key given
+  for one site is held back from another is the core's, and is not run here.
 - the token and the credential made of it are in no file of the run but the env
   file: not an output, not the yard's store, events or log.
 
@@ -411,6 +434,29 @@ with the gateway's base added over a host that is set still calls the host, unti
 `host=` clears it; and a crew member's card for the same command is accepted and
 shows the address now and the one it sets. Approving a card needs a person at a
 terminal, so none was approved, and no call went through a host.
+
+Tried on 24 November 2026 for `path_template`, in scratch yards with yardr build
+80fc32ad6228: `yardr source set confluence site=<cloud id>` makes
+`https://api.atlassian.com/ex/confluence/<cloud id>/wiki`, which `source show`
+names first with `(site <cloud id>)`; a pack applied again keeps it; `host=` and
+`site=` replace each other, and `site=` with nothing after it is the placeholder;
+a site with a slash, a space, `..`, a scheme, a `?` or a `#` is refused in the
+words of the check; on the version of this pack before the template `site=` was
+refused, since the declaration named none; a pack applied over a copy made as
+SETUP.md step 2 used to say plans `base: <the copy's address> ->
+https://example.atlassian.net/wiki` and `path_template: (none) ->
+https://api.atlassian.com/ex/confluence/{site}/wiki`; and a user's card for the
+same command is accepted and shows the address now, the one it sets with the site
+named, and `yardr source set confluence site=` as the way back; with a key
+standing, the card that moves the source to another site says the key is held
+back from the new one until it is given again, and names the site it was given
+for. No card was approved, which is a person's at a terminal, and no call went
+through a site: that a key given for the gateway's host alone is held back from a
+site on it is the core's own account of it (`yardr docs integrations`), and was
+not run here, since a call would have gone to Atlassian.
+`curl https://yardr.atlassian.net/_edge/tenant_info`
+answered `{"cloudId":"f84cdad3-1764-4e23-a125-a6259e2fcb7a"}` without a login, the
+id SETUP.md step 2 uses as its example.
 
 Checked on 22 November 2026 for `create` and `update`, in the OpenAPI description of
 v2 (2.0.0): both requests, the one scope each lists (`write:page:confluence`,

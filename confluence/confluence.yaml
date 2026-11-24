@@ -194,18 +194,23 @@
 # and one without at https://<site>.atlassian.net/wiki (Atlassian's support
 # article on scoped tokens). Both take Basic, so only the base differs, and
 # the /wiki is the base's, so every path below starts at /api or /rest.
-# For a token without scopes, base_template lets the operator give the
-# site's host on a card or at a terminal (yardr source set confluence
-# host=<site>.atlassian.net) and no copy of this file; that setting
-# survives a pack applied again. The gateway's address varies in a path
-# segment, the cloud id, and not in the host, which a template cannot make,
-# so a token with scopes keeps the copy: SETUP.md has the operator replace
-# base in a copy of this file and add it. A pack applied again replaces
-# that copy and puts this base back (SETUP.md, step 6).
+# Each address has a template, so the operator gives it on a card or at a
+# terminal and no copy of this file, and the setting survives a pack
+# applied again (SETUP.md, steps 2 and 6). For a token without scopes,
+# base_template takes the site's host (yardr source set confluence
+# host=<site>.atlassian.net). The gateway is one host for every site and
+# varies in a path segment, the cloud id, which path_template takes: {site}
+# stands once, as that one segment, and the product segment, confluence, is
+# fixed here, so the operator says the cloud id and nothing of the path
+# (yardr source set confluence site=<cloud id>). base, host and site
+# replace each other. A key is given for the host and the cloud id
+# together, so a key given for one site is held back from another site on
+# the same host until it is given again (SETUP.md, step 2).
 name: confluence
 about: Confluence Cloud pages through its REST API; spaces listed, content found by CQL, one page read, the children of a page, folder, whiteboard, database or embed listed, a page's comments, replies, labels and attached files listed, and an author named from an account id; a page created under a parent and a page's title and body updated at its version.
 base: https://example.atlassian.net/wiki
 base_template: https://{host}/wiki
+path_template: https://api.atlassian.com/ex/confluence/{site}/wiki
 credential:
   env: CONFLUENCE_AUTH
   header: "Authorization: Basic {credential}"

@@ -14,8 +14,9 @@
 #
 # The source is named confluence: a pack is named after the service it
 # talks to. Confluence is per site, so the declaration ships a placeholder
-# address and a base_template: SETUP.md has the operator give the site's
-# host, or, for a token with scopes, replace the address in the yard's copy.
+# address with a base_template and a path_template: SETUP.md has the
+# operator give the site's host, or, for a token with scopes, the site's
+# cloud id, on a card or at a terminal, and copy nothing.
 # The login is the Atlassian account the jira pack uses, given to this
 # source in its own env file. The pack is written for pack API 3, because
 # children's kind has a default and is in a path, which API 3 added. A

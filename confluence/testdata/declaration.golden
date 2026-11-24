@@ -584,5 +584,6 @@
       "CONFLUENCE_EMAIL"
     ]
   },
-  "name": "confluence"
+  "name": "confluence",
+  "path_template": "https://api.atlassian.com/ex/confluence/{site}/wiki"
 }

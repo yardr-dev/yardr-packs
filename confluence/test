@@ -11,8 +11,10 @@
 #            applied: the declaration as the yard reads it, held to a golden
 #            and to its nine reads using GET and its two writes, create and
 #            update, being the only updates, by POST and PUT; then a copy of
-#            it aimed at a stand-in for Confluence on a loopback port
-#            (testdata/standin.py), the operator's way of SETUP.md step 2.
+#            it with its address aimed at a stand-in for Confluence on a
+#            loopback port (testdata/standin.py): the addresses the file
+#            ships are https at hosts of Atlassian's, and the stand-in is
+#            plain http.
 #   calls    each testdata/calls/*.case is one `yardr call` of that source
 #            against the stand-in. The case's golden holds the requests the
 #            stand-in saw (method, path and query as sent, whether the
@@ -30,10 +32,14 @@
 #            version are in the record of the call, and its title and body,
 #            which are free text, are in no file of the yard's home; the body
 #            is in no output either, though Confluence answers with it.
+#   gateway  the same requests through the gateway's address, which
+#            `source set confluence site=<cloud id>` makes from the path
+#            template (SETUP.md step 2), the key given after it.
 #   host     a pack applied again over the operator's edited host, which the
-#            shipped host replaces, and what stands; and the host the
-#            template makes (SETUP.md step 2): set, kept across a pack
-#            applied again, kept over a copy added after it, and given up.
+#            shipped host replaces, and what stands; and the host and the
+#            site the templates make (SETUP.md step 2): set, kept across a
+#            pack applied again, kept over a copy added after it, one
+#            replacing the other, and given up.
 #   secrets  the token and the credential made of it are in no file the
 #            run left but the env file, and in no output.
 #
@@ -133,10 +139,12 @@ fi
 # credential and every call's parameters, request and answer.
 yrun source show confluence --json | jq -S .declaration >"$core/declaration.json"
 check "declaration as the yard reads it (base, credential, check, calls)" "$core/declaration.json" testdata/declaration.golden
-# base_template is what lets SETUP.md step 2 give the host on a card, and a
-# golden written again would pass without it, so it is checked here too.
-jq -e '.base == "https://example.atlassian.net/wiki" and .base_template == "https://{host}/wiki" and ([.calls[] | select(.kind == "read") | .request.method == "GET"] | all) and ([.calls[] | select(.kind == "read")] | length) == 9' "$core/declaration.json" >/dev/null
-ok "the shipped host is the placeholder with its template, and the nine reads are each a GET" $?
+# base_template and path_template are what let SETUP.md step 2 give the host
+# or the cloud id on a card, and a golden written again would pass without
+# them, so they are checked here too. The gateway's product segment is the
+# file's, and {site} is the one segment after it.
+jq -e '.base == "https://example.atlassian.net/wiki" and .base_template == "https://{host}/wiki" and .path_template == "https://api.atlassian.com/ex/confluence/{site}/wiki" and ([.calls[] | select(.kind == "read") | .request.method == "GET"] | all) and ([.calls[] | select(.kind == "read")] | length) == 9' "$core/declaration.json" >/dev/null
+ok "the shipped host is the placeholder with its two templates, and the nine reads are each a GET" $?
 # The writes are the two this bead names and no more, by the one verb each,
 # on the paths that make a page and replace one. A delete or a move would be
 # a third call or another verb, and a golden written again would pass it.
@@ -156,8 +164,10 @@ yrun source show confluence >"$core/show.shipped" 2>&1
 grep -qF 'https://example.atlassian.net/wiki' "$core/show.shipped"
 ok "source show names the host in use, the placeholder until the operator's copy is added" $?
 
-# The operator's copy: the declaration with its base replaced, and the
-# program beside it, as SETUP.md step 2 makes it. Here the site is the
+# A copy of the declaration with its base replaced, and the program beside
+# it, so that a source added from it finds the program. The test makes it,
+# and SETUP.md does not: the addresses the file ships are https at hosts of
+# Atlassian's, which the test never calls, and here the site is the
 # stand-in.
 mkdir -p "$core/mine"
 cp -R "$here/confluence" "$core/mine/"
@@ -293,17 +303,27 @@ ok "a page's body is in no output of any call, though Confluence's answers carry
 grep -qF "$bodymark" "$core/case_create/answer" && grep -qF "$bodymark" "$core/case_create/golden" && grep -qF "$titlemark" "$core/case_create/golden" && grep -qF "$bodymark" "$core/case_update/answer" && grep -qF "$bodymark" "$core/case_update/golden"
 ok "(and the stand-in was sent the body and the title, and answered with the body, so the searches above looked at something)" $?
 
-# The same calls through the gateway a token with scopes is called at: the
-# base carries a path of its own, and the paths of the calls follow it.
+# The same calls through the gateway a token with scopes is called at, which
+# SETUP.md step 2 reaches with `source set confluence site=<cloud id>`: the
+# path template with the cloud id in its one segment, and the paths of the
+# calls after it. The template the file ships is https at api.atlassian.com
+# and the stand-in is plain http, so the copy has the scheme and host of its
+# template replaced by the stand-in's and keeps the path as the file has it;
+# the setting does the rest. The address is given before the key, as SETUP.md
+# has it, and the key is given for it (step 3).
 cloud=0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
-sed "s|^base: .*|base: $site/ex/confluence/$cloud/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
-yrun source add "$core/mine/confluence.local.yaml" >"$core/add.gateway.out" 2>&1
-ok "a copy with the gateway's address is added" $? "$(tail -c 300 "$core/add.gateway.out")"
+sed -e "s|^base: .*|base: $site/wiki|" -e "s|^path_template: https://[^/]*|path_template: $site|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+grep -q "^path_template: $site/" "$core/mine/confluence.local.yaml"
+ok "the copy's path template is the file's, aimed at the stand-in" $?
+yrun source add "$core/mine/confluence.local.yaml" >"$core/add.gateway.out" 2>&1 && yrun source set confluence site=$cloud >>"$core/add.gateway.out" 2>&1 && printf 'CONFLUENCE_EMAIL=%s\nCONFLUENCE_API_TOKEN=%s\n' "$email" "$token" | yrun source key confluence >>"$core/add.gateway.out" 2>&1
+ok "the copy is added, its site set to a cloud id, and the key given for it" $? "$(tail -c 300 "$core/add.gateway.out")"
 printf '{"id":"98404","title":"Runbook","body":{"storage":{"representation":"storage","value":"<p>x</p>"}}}\n' >"$core/answer.json"
 : >"$core/requests"
 yrun source check confluence >"$core/check.gateway.out" 2>&1
 yrun call confluence page id=98404 --json >"$core/page.gateway.out" 2>&1
 check "the requests through the gateway's address" "$core/requests" testdata/gateway.requests.golden
+# What follows is about the copy's own base, so the site is given up.
+yrun source set confluence site= >/dev/null 2>&1
 
 # ---- host: a pack applied again over an edited address ---------------------
 sed "s|^base: .*|base: $site/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
@@ -345,10 +365,9 @@ ok "adding the edited copy again restores the host, and the env file still stand
 # The host the template makes, which is how SETUP.md step 2 points a token
 # without scopes at the site. It is a setting of the source and not part of
 # the declaration, so it is shown as the address in use, stands across a pack
-# applied again (step 6) and over a copy added after it (step 2 clears it
-# first), and gives the declaration's own address back when it is emptied.
-# No call goes through it here: the template is https and the stand-in is
-# plain http on loopback.
+# applied again (step 6) and over a copy added after it, and gives the
+# declaration's own address back when it is emptied. No call goes through it
+# here: the template is https and the stand-in is plain http on loopback.
 first() { sed -n 1p "$1"; }
 yrun source set confluence host=mysite.atlassian.net >"$core/host.set.out" 2>&1
 yrun source show confluence >"$core/show.host" 2>&1
@@ -367,6 +386,44 @@ yrun source set confluence host= >/dev/null 2>&1
 yrun source show confluence >"$core/show.host.cleared" 2>&1
 first "$core/show.host.cleared" | grep -qF "$site/ex/confluence/$cloud/wiki" && ! grep -qF 'mysite.atlassian.net' "$core/show.host.cleared"
 ok "host= with nothing after it clears the host, and the copy's own address is in use" $?
+
+# The site the path template makes, which is how SETUP.md step 2 points a
+# token with scopes at the gateway: a setting of the source as the host is,
+# and shown, kept and given up as the host is. The cloud id is the one
+# SETUP.md gives as its example, so that the example is held to what the
+# template makes of it. No call goes through it here either: the calls of the
+# gateway are the ones above, through a copy aimed at the stand-in.
+yardcloud=f84cdad3-1764-4e23-a125-a6259e2fcb7a
+gateway=https://api.atlassian.com/ex/confluence/$yardcloud/wiki
+yrun source set confluence site=$yardcloud >"$core/site.set.out" 2>&1
+yrun source show confluence >"$core/show.site" 2>&1
+first "$core/show.site" | grep -qF "$gateway (site $yardcloud)"
+ok "source set site= makes the gateway's address with the cloud id in it, which source show names first" $? "$(tail -c 300 "$core/site.set.out")"
+grep -qF "yardr source set confluence site=$yardcloud" SETUP.md && grep -qF "$gateway" SETUP.md
+ok "SETUP.md's example is that cloud id and the address the template makes of it" $?
+yrun pack apply "$here" --yes >/dev/null 2>&1
+yrun source show confluence >"$core/show.site.reapplied" 2>&1
+first "$core/show.site.reapplied" | grep -qF "$gateway (site $yardcloud)" && grep -qF "$envfile" "$core/show.site.reapplied"
+ok "a site that was set stands across a pack applied again, so the placeholder does not come back for it" $?
+sed "s|^base: .*|base: $site/ex/confluence/$cloud/wiki|" "$here/confluence.yaml" >"$core/mine/confluence.local.yaml"
+yrun source add "$core/mine/confluence.local.yaml" >/dev/null 2>&1
+yrun source show confluence >"$core/show.site.copy" 2>&1
+first "$core/show.site.copy" | grep -qF "$gateway (site $yardcloud)"
+ok "a site that was set stands over the address of a copy added after it" $?
+# One address is in use (SETUP.md step 2): a host given after a site takes its
+# place, and a site given after a host takes it back.
+yrun source set confluence host=mysite.atlassian.net >/dev/null 2>&1
+yrun source show confluence >"$core/show.site.host" 2>&1
+first "$core/show.site.host" | grep -qF 'https://mysite.atlassian.net/wiki' && ! grep -qF "$gateway" "$core/show.site.host"
+ok "a host given after a site takes its place" $?
+yrun source set confluence site=$yardcloud >/dev/null 2>&1
+yrun source show confluence >"$core/show.site.again" 2>&1
+first "$core/show.site.again" | grep -qF "$gateway (site $yardcloud)" && ! grep -qF 'mysite.atlassian.net' "$core/show.site.again"
+ok "a site given after a host takes its place" $?
+yrun source set confluence site= >/dev/null 2>&1
+yrun source show confluence >"$core/show.site.cleared" 2>&1
+first "$core/show.site.cleared" | grep -qF "$site/ex/confluence/$cloud/wiki" && ! grep -qF "$gateway" "$core/show.site.cleared"
+ok "site= with nothing after it clears the site, and the copy's own address is in use" $?
 
 # ---- secrets ---------------------------------------------------------------
 # Every output of the run is a file under $core, and so is everything the
