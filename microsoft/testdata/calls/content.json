@@ -1,0 +1,32 @@
+{
+  "call": "content",
+  "about": "One item's file. Microsoft's page on downloading a driveItem's content has GET /drives/{drive-id}/items/{item-id}/content answer 302 Found, redirecting to a preauthenticated download URL that is the one @microsoft.graph.downloadUrl carries, and the application follows its Location header to the file. The recorded answer is that pair of responses, the last of them a spreadsheet and no JSON. The call keeps nothing of it as JSON: its answer is the file, which yardr writes in the caller's working directory, so the request is all the fixture pins besides that. The request has no query, since the route takes no $select.",
+  "params": { "drive": "b!-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd", "item": "01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX" },
+  "answer": {
+    "first": {
+      "status": 302,
+      "location": "https://contoso.sharepoint.com/sites/siteA/_layouts/15/download.aspx?UniqueId=e320afeb-ad73-46a2-83d7-985faa4b206d&Translate=false&tempauth=eyJ0eXAiOiJKV1QifQ.eyJhdWQiOiIwMDAwMDAwMy0wMDAwLTBmZjEtY2UwMC0wMDAwMDAwMDAwMDAvY29udG9zby5zaGFyZXBvaW50LmNvbUA3NGM2ZmY2ZC0w.c2ln&ApiVersion=2.0"
+    },
+    "last": {
+      "status": 200,
+      "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "bytes": 197
+    }
+  },
+  "want": {
+    "request": {
+      "method": "GET",
+      "url": "https://graph.microsoft.com/v1.0/drives/b%21-RIj2DuyvEyV1T4NlOaMHk8XkS_I8MdFlUCq1BlcjgmhRfAj3-Z8RY2VpuvV_tpd/items/01BYE5RZ4DMGLBB4GZPRFYKBQ5A6SVYSKX/content",
+      "headers": { "Accept": "application/json", "Authorization": "Bearer <token>", "User-Agent": "yardr" }
+    },
+    "answer": "file"
+  },
+  "refused": [
+    { "params": { "drive": "b!abc" }, "error": "parameter item is missing" },
+    { "params": { "item": "01BY" }, "error": "parameter drive is missing" },
+    { "params": { "drive": "b!abc", "item": "x y" }, "error": "parameter item does not match its pattern ^[A-Za-z0-9!_-]+$" },
+    { "params": { "drive": "b!abc", "item": "01BY/../x" }, "error": "parameter item does not match its pattern ^[A-Za-z0-9!_-]+$" },
+    { "params": { "drive": "b!abc?format=pdf", "item": "01BY" }, "error": "parameter drive does not match its pattern ^[A-Za-z0-9!_-]+$" },
+    { "params": { "drive": "b!abc", "item": "01BY", "format": "pdf" }, "error": "\"format\" is no parameter of the call (it takes: drive, item)" }
+  ]
+}

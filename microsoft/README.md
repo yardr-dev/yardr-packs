@@ -3,10 +3,12 @@
 SharePoint and OneDrive documents through Microsoft Graph, read as one
 Entra app. As the declared source `microsoft`, an agent lists a tenant's
 sites, a site's document libraries, and the folders and files of a
-library, reads one item's metadata and its link, and searches documents
-by words. Calls are read-only. Search hits can include short excerpts
-from matching documents in Graph's `summary` field; no call downloads
-full file bytes. Nothing here is compiled into yardr; apply it with:
+library, reads one item's metadata and its link, downloads one item's
+file, and searches documents by words. No call changes anything in
+Microsoft 365. The download, `content`, writes a file in the working
+directory of whoever calls it, and is granted by its name. Search hits
+can include short excerpts from matching documents in Graph's `summary`
+field. Nothing here is compiled into yardr; apply it with:
 
 Commands below call the pack's directory (the `microsoft` directory of
 the yardr-packs checkout) `<pack dir>`.
@@ -28,9 +30,11 @@ step and again at the grant, and sets the narrow permission
 
 ## The calls
 
-All of kind read, and one preset, `read`, grants them. The permissions
-are the application permissions Microsoft's pages list for each request,
-read on 2 November 2026.
+All of kind read, and `content` is a file call, which the word `read`
+does not cover: the one preset, `read`, grants the word and names
+`content`. The permissions are the application permissions Microsoft's
+pages list for each request, read on 2 November 2026 (24 November 2026
+for `content`).
 
 | call | Graph request | parameters | permission |
 |---|---|---|---|
@@ -39,6 +43,7 @@ read on 2 November 2026.
 | `root` | `GET /drives/{drive}/root/children` | `drive`, `top` (50) | as `drives` |
 | `children` | `GET /drives/{drive}/items/{item}/children` | `drive`, `item`, `top` (50) | as `drives` |
 | `item` | `GET /drives/{drive}/items/{item}` | `drive`, `item` | as `drives` |
+| `content` | `GET /drives/{drive}/items/{item}/content`, answered by a file | `drive`, `item` | as `drives`; Microsoft marks Files.Read.All least privileged for it |
 | `search` | `POST /search/query`, entityTypes `driveItem` | `query`, `region`, `size` (10), `from` (0) | Files.Read.All or Sites.Read.All. Sites.Selected is not listed |
 
 What is behind the table:
@@ -56,7 +61,8 @@ What is behind the table:
   find it. App-only search covers shared content only. The request names
   no `sharePointOneDriveOptions`, because private content needs an
   index Microsoft builds over days.
-- Every driveItem request sends `$select` with its own fields.
+- Every request that answers with a driveItem's metadata sends `$select`
+  with its own fields.
   A driveItem has `@microsoft.graph.downloadUrl`, a link Microsoft calls
   preauthenticated, which needs no sign-in and lives an hour, so it would
   give an agent a file's bytes outside any grant. Microsoft's page on
@@ -65,6 +71,26 @@ What is behind the table:
   only, so for `root` and `children` the `$select` is all that keeps the
   link out, and `item` drops it a second time. The pages read do not say
   what a request with no `$select` returns.
+- `content` is a file call (pack API 8): its answer is the file's bytes
+  and no JSON. Graph answers `GET .../content` with `302 Found` to a
+  preauthenticated download URL, the link `@microsoft.graph.downloadUrl`
+  carries. yardr follows it itself, with no credential on the second
+  request and to a public address alone, keeps the bytes under the yard's
+  `blob_max_bytes` (8 MiB unless the operator raised it), and `yardr call`
+  writes the file in its own working directory and prints its name and
+  size. The link is in no answer, note or event, and the request has no
+  `$select`, since the route takes none: the test greps that no `$select`
+  of the declaration names the link. Graph downloads only an item with a
+  `file` property, so a folder's id is refused. `read` covers no file
+  call, as it covers no update, so a standing grant of `read` does not
+  widen to writing files, and the preset names `content` beside it.
+- Graph also converts while it downloads (`?format=pdf`), and the plain
+  download is all this pack declares. Microsoft marks Files.ReadWrite.All
+  least privileged for the conversion, against Files.Read.All for the
+  download, limits it to a source file of 2 MB, and writes its routes
+  under `/me/drive` and `/drive`, where an app with no signed-in person
+  has no `/me`. A conversion would be a later call of the pack, if a
+  tenant's documents ask for it.
 - The `Sites.Selected` column rests on Microsoft's overview of the
   Selected permissions, which says the granted resource decides access
   whichever Graph path reaches it. The pages for these requests do not
@@ -121,7 +147,9 @@ roots where Node adds to them, so a company CA belongs in
   grants and the first call.
 - `test`, `testdata/`: the tests. `calls/` holds a fixture for each
   call (parameters, the request it must make, a recorded Graph answer,
-  what the call keeps, and parameters it must refuse); `render.jq`
+  what the call keeps, and parameters it must refuse; for a file call,
+  Graph's redirect and the file that ends it, and that its answer is a
+  file); `render.jq`
   builds the request from the declaration; `mint/` holds the mint's
   cases and its golden stdin, curl arguments and form; `bin/` holds the
   stand-in curl and the jq that logs its arguments.
@@ -135,6 +163,10 @@ roots where Node adds to them, so a company CA belongs in
   to read `microsoft.yaml` as data. With none of them it fails and says
   so, since a skip would leave the requests unpinned. It wants no
   network and no secret, and runs in a few seconds.
+- The pack is written for pack API 8, because `content` answers with a
+  file. A yardr that reads less refuses it and says to upgrade. The test
+  compares the declaration with `yardr pack check` and runs the grants
+  against the yardr on PATH, so it wants one that reads API 8.
 
 ## Testing
 
@@ -148,7 +180,17 @@ way yardr's `internal/source/call.go` builds it, and what the call keeps
 of the recorded answer, and the test compares both with the fixture,
 which was written from Microsoft's examples and not from the
 declaration. It then compares the call names, kinds, base and mint
-command with what `yardr pack check` reads of the same file.
+command with what `yardr pack check` reads of the same file, where a
+file call is named `file`, as yardr names it.
+
+For the file call, `content`, the fixture records Graph's redirect and
+the file that ends it, which is no JSON, and pins the request and that
+the answer is a file: `render.jq` says so only of a declaration that
+names `answer.file` and no `select`. The test also reads each call's
+`$select` as data and fails where one names the download link or where
+it finds none to read, checks that `pack.yaml` says `api: 8` while a file
+call is declared, since yardr does not make it so, and that a preset
+names each file call, since the word `read` covers none.
 
 For the mint, each of 39 cases runs the script itself under a bare
 environment, with a stand-in curl that records its arguments, stdin and
@@ -163,23 +205,24 @@ angle brackets, quotes, a backslash, a plus, a slash, a percent sign, a
 space and non-ASCII characters in it.
 
 For the grant, the test reads the `source grant` commands SETUP.md
-teaches (step 8's, and the `--run` of its card) and runs each as written
+teaches (step 8's, and the `--run` of its cards) and runs each as written
 against the yardr on PATH, in a scratch yard of its own with the pack
 applied from its directory, as step 6 says. Each must be accepted. yardr
 takes `--preset` only for a pack inside its own binary, so a SETUP that
 teaches it fails there, with yardr's reason. Without a yardr the test
 says so and goes on.
 
-`render.jq` follows `call.go` as read, not a capture from a running
-yard, so its fidelity is the reading's. The first live run is the check
-on it.
+`render.jq` follows `call.go`, and `download.go` for the file call, as
+read, not a capture from a running yard, so its fidelity is the reading's.
+The first live run is the check on it.
 
 ## Left out
 
-Downloading full file contents (the next bead; search hits may still
-include Graph's short text excerpts); any write; Outlook and Teams;
-reading as each person (yardr's B11 is not built); delta sync; paging;
-private OneDrive content in search; the national clouds, whose login
-and Graph hosts differ; a certificate or federated credential in place
-of the client secret.
-Each is a later bead, on mckean's word.
+Converting a file as it downloads (Graph's `?format=pdf`, which asks for
+a wider permission and takes a source file of 2 MB at most; a later call
+if a tenant's documents need it); any write to Microsoft 365; Outlook
+and Teams; reading as each person (yardr's B11 is not built); delta
+sync; paging; private OneDrive content in search; the national clouds,
+whose login and Graph hosts differ; a certificate or federated
+credential in place of the client secret. Each is a later bead, on
+mckean's word.

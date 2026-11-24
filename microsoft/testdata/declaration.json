@@ -18,6 +18,7 @@
     "root": "read",
     "children": "read",
     "item": "read",
+    "content": "read",
     "search": "read"
   }
 }

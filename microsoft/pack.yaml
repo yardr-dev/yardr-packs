@@ -2,20 +2,25 @@
 # imported into the yard and into no depot. What Microsoft is here: the
 # declared source microsoft, which lists SharePoint sites, a site's
 # libraries and a library's folders, reads an item's metadata and link,
-# and searches documents, all through Microsoft Graph as one Entra app.
-# Its credential mints from the app's tenant, id and secret, by
-# microsoft-mint, the mint command the pack brings beside its
-# declaration. Read only; it downloads no file bytes, though search hits
-# may carry short text excerpts from Graph.
+# downloads one item's file, and searches documents, all through
+# Microsoft Graph as one Entra app. Its credential mints from the app's
+# tenant, id and secret, by microsoft-mint, the mint command the pack
+# brings beside its declaration. It changes nothing in Microsoft 365. The
+# one call that writes anything, content, writes a file in the working
+# directory of whoever calls it; search hits may carry short text excerpts
+# from Graph.
 #
 #   yardr pack apply <pack dir>
 #
 # The source is named microsoft: a pack is named after the service it
-# talks to. A pack of kind source asks no grants at import, so what a
+# talks to. The pack is written for pack API 8, because content answers
+# with a file and API 8 added answer.file; a yardr that reads less is told
+# to upgrade. A pack of kind source asks no grants at import, so what a
 # crew member may call is granted afterwards, by the setup notes. The
 # app reads whatever it was consented to, one identity for the yard, so
 # every agent granted a call reads all of it.
 name: microsoft
+api: 8
 kind: source
 setup: SETUP.md
 
@@ -25,9 +30,11 @@ sources:
 
 # Suggested grants: named sets of the source's calls, printed numbered by
 # pack show. Suggesting grants nothing: the operator grants them, and
-# terminal pack apply ignores them.
+# terminal pack apply ignores them. read covers every read call but a file
+# call, and content is one, granted by its name alone, so the preset names
+# it beside read.
 presets:
   read:
-    about: List sites, libraries and folders, search documents and read an item's metadata and link; change nothing
+    about: List sites, libraries and folders, search documents, read an item's metadata and link, and download one item's file, which writes a file in the working directory of whoever calls it; change nothing in Microsoft 365
     grants:
-      microsoft: [read]
+      microsoft: [read, content]

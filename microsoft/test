@@ -13,7 +13,25 @@
 # the declaration, so a changed path, query, body, parameter pattern or
 # select fails here. The fixture's refusals are parameters the call must
 # turn away before sending. The declaration's call names and kinds are
-# also compared with what yardr pack check reads of the same file.
+# also compared with what yardr pack check reads of the same file, where
+# a call whose answer is a file is named file, as yardr names it.
+#
+# A call whose answer is a file (content) keeps no JSON of Graph's answer.
+# Its fixture records Graph's redirect and the file that ends it, and pins
+# the request and that the answer is a file: render.jq says so only of a
+# declaration that names answer.file and no select beside it.
+#
+# The download link. No $select of microsoft.yaml may name
+# @microsoft.graph.downloadUrl, the link that hands an agent a file's bytes
+# outside any grant. Each call's $select is read as data, and the test
+# fails where one names the link and where it finds none, since a search
+# of nothing passes.
+#
+# The pack. A pack that declares a file call says api 8 or later in
+# pack.yaml: yardr does not make it so, and a pack without the number is
+# read by an older yardr as one with a key it does not know, and not as one
+# to upgrade for. And a preset names each file call, since the word read
+# covers none.
 #
 # The mint. Each case in testdata/mint/cases.json runs microsoft-mint
 # itself, as the core does: stdin of {inputs, scope}, a bare environment,
@@ -134,14 +152,55 @@ else
     done
     if [ "$bad" = 0 ]; then echo "test: call $label ok ($nref refusals)"; else fail=1; fi
   done
+
+  # No $select names the download link. A key spelled select counts with or
+  # without its $, in any case.
+  jq -r '.calls | to_entries[] | .key as $c | (.value.request.query // {}) | to_entries[] | select(.key | test("^\\$?select$"; "i")) | "\($c): \(.value)"' "$tmp/decl.json" > "$tmp/selects.txt"
+  if [ ! -s "$tmp/selects.txt" ]; then
+    echo "test: no \$select was found in microsoft.yaml, so the check that none names the download link looked at nothing"
+    fail=1
+  elif grep -i -q 'downloadUrl' "$tmp/selects.txt"; then
+    echo "test: a \$select of microsoft.yaml names the download link, which hands out a file's bytes outside any grant:"
+    grep -i 'downloadUrl' "$tmp/selects.txt" | sed 's/^/  /'
+    fail=1
+  else
+    echo "test: no \$select names the download link ($(wc -l < "$tmp/selects.txt" | tr -d ' ') read)"
+  fi
+
+  # A file call needs api 8 in pack.yaml and a name in a preset.
+  jq -r '.calls | to_entries[] | select(.value.answer.file == true) | .key' "$tmp/decl.json" > "$tmp/filecalls.txt"
+  if ! yaml2json pack.yaml > "$tmp/pack.json" 2> "$tmp/yaml.err"; then
+    echo "test: pack.yaml cannot be read as data: $(cat "$tmp/yaml.err")"
+    fail=1
+  elif [ ! -s "$tmp/filecalls.txt" ]; then
+    echo "test: microsoft.yaml declares no file call (answer.file), so the check of the pack's api and preset looked at nothing"
+    fail=1
+  else
+    if jq -e '(.api // 1) >= 8' "$tmp/pack.json" > /dev/null; then
+      echo "test: pack.yaml says api $(jq -r .api "$tmp/pack.json"), for the file call"
+    else
+      echo "test: pack.yaml says api $(jq -r '.api // 1' "$tmp/pack.json"), and a file call needs 8 (answer.file): an older yardr would not be told to upgrade"
+      fail=1
+    fi
+    while IFS= read -r c; do
+      if jq -e --arg c "$c" '[(.presets // {}) | .[] | (.grants // {}) | .[] | .[]] | index($c)' "$tmp/pack.json" > /dev/null; then
+        echo "test: a preset names the file call $c"
+      else
+        echo "test: no preset names the file call $c, which the word read does not cover"
+        fail=1
+      fi
+    done < "$tmp/filecalls.txt"
+  fi
 fi
 
 # The same file as yardr itself reads it: the source, its base, its calls
-# with their kinds and its mint command. As .yardr/test finds yardr.
+# with their kinds and its mint command. As .yardr/test finds yardr. yardr
+# names a call by its answer where that is a file and by its kind
+# otherwise (callWord in internal/pack/plan_sources.go of yardr).
 YARDR=${YARDR:-$(command -v yardr || echo yardr)}
 if [ -x "$YARDR" ] && [ -s "$tmp/decl.json" ]; then
   "$YARDR" pack check . --json 2>/dev/null | jq -r '.declared[0] | (.source, .base, (.calls[]), (.commands[].program))' > "$tmp/yardr.txt"
-  jq -r '.name, .base, (.calls | to_entries[] | "\(.key) (\(.value.kind))"), .credential.mint_command[0]' "$tmp/decl.json" > "$tmp/ours.txt"
+  jq -r '.name, .base, (.calls | to_entries[] | "\(.key) (\(if .value.answer.file == true then "file" else .value.kind end))"), .credential.mint_command[0]' "$tmp/decl.json" > "$tmp/ours.txt"
   if cmp -s "$tmp/ours.txt" "$tmp/yardr.txt"; then
     echo "test: yardr pack check reads the same calls and mint"
   else
