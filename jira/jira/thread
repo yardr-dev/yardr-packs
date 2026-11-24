@@ -17,13 +17,13 @@ arg() { jq -r --arg k "$1" '.[$k] // ""' <<<"$in"; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# The shipped base is no site, and nothing is sent to it: the operator
-# writes their own into the yard's copy of the declaration, and a pack
-# applied again puts this one back. (${VAR:?} is not used for what follows:
-# bash 3.2 exits 0 after it prints.)
+# The shipped base is no site, and nothing is sent to it: the operator gives
+# the site's host, or the cloud id for a token with scopes, on a card or at
+# a terminal (SETUP.md, step 2), and it is kept as a setting of the source.
+# (${VAR:?} is not used for what follows: bash 3.2 exits 0 after it prints.)
 case ${YARDR_SOURCE_BASE:-} in
 https://example.atlassian.net | https://example.atlassian.net/)
-  echo "the jira source's base is still the pack's placeholder, https://example.atlassian.net: put your site's address in the yard's copy of jira.yaml (SETUP.md, step 2)" >&2
+  echo "the jira source's base is still the pack's placeholder, https://example.atlassian.net: point it at the site (yardr source set jira host=<site>.atlassian.net, or site=<cloud id> for a token with scopes; SETUP.md, step 2)" >&2
   exit 1 ;;
 esac
 [ -n "${YARDR_SOURCE_BASE:-}" ] || { echo "YARDR_SOURCE_BASE is not set" >&2; exit 1; }
