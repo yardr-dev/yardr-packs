@@ -8,9 +8,10 @@
 #   yardr pack apply <pack dir>
 #
 # The source is named jira: a pack is named after the service it talks to.
-# Jira is per site, so the declaration ships a placeholder address and a
-# base_template: SETUP.md has the operator give the site's host, or, for a
-# token with scopes, replace the address in the yard's copy.
+# Jira is per site, so the declaration ships a placeholder address with a
+# base_template and a path_template: SETUP.md has the operator give the
+# site's host, or, for a token with scopes, the site's cloud id, on a card
+# or at a terminal, and copy nothing.
 name: jira
 kind: source
 setup: SETUP.md

@@ -98,7 +98,7 @@ here.
    ```sh
    yardr bead ask <bead> - <<'ASK'
    Q: Point the yard's Confluence source at our site?
-   C: The source calls a placeholder address until it is given the site's host, so every call fails.
+   C: Until the credential is given (step 3), every call fails without sending anything.
    C: This sets it to <site>.atlassian.net, for a token made without scopes. The email and token are given afterwards, on their own card (step 3).
    R: source set confluence host=<site>.atlassian.net
    ASK
@@ -125,7 +125,7 @@ here.
    ```sh
    yardr bead ask <bead> - <<'ASK'
    Q: Point the yard's Confluence source at our site's gateway?
-   C: The source calls a placeholder address until it is given the site's cloud id, so every call fails.
+   C: Until the credential is given (step 3), every call fails without sending anything.
    C: This sets it to https://api.atlassian.com/ex/confluence/<cloud id>/wiki, for a token made with scopes. The email and token are given afterwards, on their own card (step 3).
    R: source set confluence site=<cloud id>
    ASK
@@ -140,9 +140,10 @@ here.
    yardr source show confluence
    ```
    The first line of `source show` is the address in use. Until it is yours,
-   `yardr source check confluence` calls the placeholder and fails. Do step 3
-   after this one and not before, so that the credential is never one the yard
-   could send to the placeholder.
+   `yardr source check confluence` fails. The credential (step 3) is not set up
+   yet, so nothing is sent. Once the credential is given, the check calls the
+   address `source show` names. Do step 3 after this one and not before, so that
+   the credential is never one the yard could send to the placeholder.
 
 3. **The account's email and token, in the yard.** The credential is two names:
    `CONFLUENCE_EMAIL`, the account's email, and `CONFLUENCE_API_TOKEN`. The

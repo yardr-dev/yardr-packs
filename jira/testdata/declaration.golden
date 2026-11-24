@@ -155,6 +155,7 @@
     }
   },
   "name": "jira",
+  "path_template": "https://api.atlassian.com/ex/jira/{site}",
   "thread": {
     "assignee": "id",
     "open": [

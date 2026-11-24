@@ -47,11 +47,12 @@ directory of the yardr-packs checkout) `<pack dir>`.
    The declaration it installs gives the source a placeholder address,
    `https://example.atlassian.net`. A source's credential goes only to the
    host its address names, so the yard must be given yours. Which way
-   depends on the token of step 1.
+   depends on the token of step 1. Each is one setting of the source, made on
+   a card or in a terminal, and neither copies the file.
 
    A token without scopes is called at the site,
    `https://<site>.atlassian.net`. The declaration has a template for that
-   address, so the yard is given the site's host and no copy of the file:
+   address, so the yard is given the site's host:
    ```sh
    yardr source set jira host=<site>.atlassian.net
    ```
@@ -60,41 +61,53 @@ directory of the yardr-packs checkout) `<pack dir>`.
    ```sh
    yardr bead ask <bead> - <<'ASK'
    Q: Point the yard's Jira source at our site?
-   C: The source calls a placeholder address until it is given the site's host, so every call fails and the thread commands refuse to run.
+   C: Until the credential is given (step 3), every call fails without sending anything, and the thread commands refuse to run.
    C: This sets it to <site>.atlassian.net, for a token made without scopes. The email and token are given afterwards, on their own card (step 3).
    R: source set jira host=<site>.atlassian.net
    ASK
    ```
    A token with scopes is called through Atlassian's gateway,
-   `https://api.atlassian.com/ex/jira/<cloud id>`. A template cannot
-   make that address: what varies is a path segment, the cloud id, and not the
-   host. So this path keeps a copy of the declaration, and `yardr source add`
-   stays in a terminal. Your cloud id is the string after `/s/` in the address
-   of admin.atlassian.com, and the site gives it without a login:
+   `https://api.atlassian.com/ex/jira/<cloud id>`. That is one host for every
+   site, and what differs is a path segment, the cloud id. The declaration has
+   a template for that too, so the yard is given the site's cloud id and
+   nothing else of the address. Your cloud id is the string after `/s/` in the
+   address of admin.atlassian.com, and the site gives it without a login:
    ```sh
    curl -s https://<site>.atlassian.net/_edge/tenant_info
    ```
-   Write the gateway's address into a copy of the declaration, beside the
-   original so that the programs it names are found. The copy is ignored by git:
+   It answers `{"cloudId":"<cloud id>"}`. As an example, yardr.atlassian.net
+   answers `f84cdad3-1764-4e23-a125-a6259e2fcb7a`, an id that anyone can read
+   from that address, so it is no secret. Give the yard yours, as here with that
+   one:
    ```sh
-   sed 's|^base: .*|base: https://api.atlassian.com/ex/jira/<cloud id>|' <pack dir>/jira.yaml > <pack dir>/jira.local.yaml
+   yardr source set jira site=f84cdad3-1764-4e23-a125-a6259e2fcb7a
    ```
-   Then add the copy:
+   That makes the address
+   `https://api.atlassian.com/ex/jira/f84cdad3-1764-4e23-a125-a6259e2fcb7a`.
+   A crew member asks for it on a card instead, which the operator approves:
    ```sh
-   yardr source add <pack dir>/jira.local.yaml
+   yardr bead ask <bead> - <<'ASK'
+   Q: Point the yard's Jira source at our site's gateway?
+   C: Until the credential is given (step 3), every call fails without sending anything, and the thread commands refuse to run.
+   C: This sets it to https://api.atlassian.com/ex/jira/<cloud id>, for a token made with scopes. The email and token are given afterwards, on their own card (step 3).
+   R: source set jira site=<cloud id>
+   ASK
    ```
-   A host that was given stands over the address of a copy, so if you gave one
-   first, clear it:
-   ```sh
-   yardr source set jira host=
-   ```
-   Either way, look at the address the source calls now:
+   The yard keeps a key for the host and the cloud id together, so a key given
+   for one site is held back from another until it is given again, and the card
+   names the address it was given for. `site=`, `host=` and the placeholder
+   replace each other: one address is in use, and `yardr source set jira
+   site=` with nothing after it is the placeholder again. Look at the address
+   the source calls now:
    ```sh
    yardr source show jira
    ```
    The first line of `source show` is the address in use. Until it is yours,
-   `yardr source check jira` calls the placeholder and fails, and the thread
-   commands refuse to run and say why.
+   `yardr source check jira` fails. The credential (step 3) is not set up yet,
+   so nothing is sent. The thread commands refuse to run and say why. Once the
+   credential is given, the check calls the address `source show` names. Do
+   step 3 after this one and not before, so that the credential is never one
+   the yard could send to the placeholder.
 
 3. **The account's credentials, in the yard.** The credential is two names:
    `JIRA_EMAIL`, the account's email, and `JIRA_API_TOKEN`. The pack's `jira/mint`
@@ -268,9 +281,8 @@ directory of the yardr-packs checkout) `<pack dir>`.
 
    To have it, add the key to a copy of the declaration from `link.example.yaml`,
    with your site's own host. Start from a fresh copy so the key is added once:
-   copy `<pack dir>/jira.yaml` to `<pack dir>/jira.local.yaml` (your `host=`
-   setting stands over its placeholder), or run step 2's `sed` again for a token
-   with scopes, then
+   copy `<pack dir>/jira.yaml` to `<pack dir>/jira.local.yaml` (your `host=` or
+   `site=` setting stands over its placeholder), then
    ```sh
    sed 's|<site host>|<site>.atlassian.net|g' <pack dir>/link.example.yaml >> <pack dir>/jira.local.yaml
    ```
@@ -290,23 +302,32 @@ directory of the yardr-packs checkout) `<pack dir>`.
 
 10. **Updating the pack, and when the token ends.** A pack applied again replaces
     the source's declaration whole. Your env file, the grants and the hook stay,
-    and so does a host given with `yardr source set jira host=` (step 2): it is a
-    setting of the source and not part of the declaration, so the placeholder
-    address does not come back for it and nothing is done after the apply. A copy
-    added with `yardr source add` is the declaration, and the placeholder comes
-    back with it. After pulling the checkout, read what would change:
+    and so does an address given with `yardr source set jira host=` or `site=`
+    (step 2): it is a setting of the source and not part of the declaration, so
+    the placeholder address does not come back for it and nothing is done after
+    the apply. After pulling the checkout, read what would change:
     ```sh
     yardr pack check <pack dir>
     ```
-    If you use a copy and apply the pack, the plan lists the address as `base:
-    <your address> -> https://example.atlassian.net`. That line is how you
-    notice, and it is the edit being undone. Until you add your copy again, the
-    credential is held back from the placeholder, a host no yard owns: a call is
-    refused and nothing is sent, `yardr source check jira` fails, and the thread
-    commands refuse to run. The shorter way skips the apply. Make the copy again
-    from the new `jira.yaml` with step 2's `sed`, add it with `yardr source add`,
-    and repeat step 9 if you use the key. The source then never points at the
-    placeholder.
+    A copy added with `yardr source add` is the declaration, and a pack applied
+    again replaces it. The copy of step 9 is there for the link key, and the
+    address comes from your setting, so after the apply the link key is gone and
+    the address stays. If you use the key, make the copy again from the new
+    `jira.yaml` and add it, as step 9 says.
+
+    An earlier version of step 2 had a token with scopes give its address in a
+    copy too (`jira.local.yaml`, made with a `sed`), because the declaration had
+    no template for the gateway. If you made one, the plan lists the address as
+    `base: <your address> -> https://example.atlassian.net`, and the new template
+    as `path_template: (none) -> https://api.atlassian.com/ex/jira/{site}`. The
+    first is the copy being undone, which is what you want now. Apply the pack.
+    Until you give the cloud id (step 2) the credential is held back from the
+    placeholder, a host no yard owns: a call is refused and nothing is sent,
+    `yardr source check jira` fails, and the thread commands refuse to run. Then
+    give the key again (step 3): it was given for the gateway's host alone, and a
+    key is held back from a site on that host until it is given for it. Nothing
+    reads the copy after the apply, and you may delete it. If you use the link
+    key, step 9 makes a new copy.
 
     When the token ends, make a new one as in step 1 and give it again: `yardr
     source key jira` for the source, and each crew member's card or file from

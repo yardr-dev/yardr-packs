@@ -79,19 +79,35 @@ mint inputs and `jira/mint` makes the base64 both use (`JIRA_AUTH`). A token wit
 scopes is called at `https://api.atlassian.com/ex/jira/<cloud id>` and one
 without at the site. Both take Basic, so only the base differs.
 
-**The base.** Jira is per site, so the declaration ships the placeholder
-`https://example.atlassian.net` as its `base`, with `base_template: https://{host}`
-beside it. A token without scopes is called at `https://<site>.atlassian.net`,
-which the template makes: SETUP.md has the operator give the host, `yardr source
-set jira host=<site>.atlassian.net` on a card or in a terminal, and copy nothing;
-the setting survives a pack applied again. A token with scopes is called at
-`https://api.atlassian.com/ex/jira/<cloud id>`, which a template cannot make,
-since the cloud id is a path segment and not the host. That path writes its
-address into a copy of the file (`jira.local.yaml`, ignored by git) and adds it
-with `yardr source add`, in a terminal. A pack applied again puts the placeholder
-back; the test pins that, and SETUP.md step 10 says what to do. Until the copy is
-added again the thread commands refuse to send anything there. If a real user
-trips on this, a core `base_url` setting becomes its own bead.
+**The base.** Jira is per site, so the declaration ships a placeholder as its
+`base`, with a template beside it for each of the two addresses Atlassian calls.
+SETUP.md has the operator give one on a card or in a terminal and copy nothing,
+and what is given is a setting of the source, so it survives a pack applied
+again. The three, each replacing the other two:
+
+- `base`, the default: `https://example.atlassian.net`, a placeholder. With no
+  credential given a call fails as not set up and sends nothing, and a credential
+  given for another address is held back from it. The thread commands refuse to
+  run.
+- `host=`, from `base_template: https://{host}`: a token without scopes is called
+  at `https://<site>.atlassian.net`, so `yardr source set jira
+  host=<site>.atlassian.net`.
+- `site=`, from `path_template: https://api.atlassian.com/ex/jira/{site}`: a token
+  with scopes is called through Atlassian's gateway,
+  `https://api.atlassian.com/ex/jira/<cloud id>`, so `yardr source set jira
+  site=<cloud id>`. The gateway is one host for every site and the cloud id is a
+  path segment, which a `base_template` cannot make. The product segment, `jira`,
+  is the file's, so the operator says the cloud id and nothing of the path.
+
+The yard keys a credential to the host, and to the cloud id after it for a site,
+so a key given for another site (or for a host) is held back until it is given
+again: SETUP.md puts the address before the key. That holding back is yardr's,
+and its own tests prove it; the test here pins the addresses and the flow. A copy
+of the declaration added with `yardr source add`, which an earlier SETUP.md had a
+token with scopes make, is replaced by a pack applied again and the placeholder
+comes back; the test pins that, and SETUP.md step 10 says how to move over. The
+one copy SETUP.md still has is step 9's, for the link key, and the setting
+stands over its placeholder.
 
 **No link key.** An issue's address starts with the site's host, which the shared
 file cannot name. Without the key a bead cannot track a Jira issue and a stage
@@ -137,15 +153,32 @@ in this directory, about five seconds, no network and no secret. The gate
   stdout and stderr. A changed request is a changed golden. The run fails if the
   token or the credential is in an argument, an output or the log.
 - the declaration as the yard reads it, calls included, against
-  `testdata/declaration.golden`, and that it has its `base_template`; the
-  signature the declaration describes against Atlassian's published example; the
-  check call made through the real yardr and minted by `jira/mint`, against a
-  stand-in on a loopback port; and a pack applied again over an edited address.
+  `testdata/declaration.golden`, and that it has its `base_template` and its
+  `path_template`; the signature the declaration describes against Atlassian's
+  published example; the check call made through the real yardr and minted by
+  `jira/mint`, against a stand-in on a loopback port; and a pack applied again
+  over an edited address.
+- the check call again through the gateway's address, which `yardr source set
+  jira site=<cloud id>` makes from the path template, with the key given after it
+  as SETUP.md has it. The file's template is https at Atlassian's and the
+  stand-in is plain http, so the copy has its scheme and host replaced by the
+  stand-in's and keeps its path, and `testdata/gateway.requests.golden` holds the
+  request with the cloud id in the path. A template that made another path, or
+  none, is a changed golden.
 - a host given with `yardr source set jira host=` (SETUP.md step 2): it
   makes `https://<host>`, which `source show` names first; it stands across
   a pack applied again, with the env file; it stands over a copy added after it,
   so that `host=` clears it and the copy's address is the one in use. No call
   goes through it here: the template is https and the stand-in is plain http.
+- a site given with `site=` (SETUP.md step 2), the same ways: it makes the
+  gateway's address with the cloud id in it, using the cloud id that SETUP.md
+  gives as its example, so that the example is held to what the template makes;
+  it stands across a pack applied again and over a copy added after it, the plain
+  copy of the declaration that step 9 starts from, with its placeholder as the
+  base; a host given after it takes its place and a site after a host takes it
+  back; and `site=` with nothing after it gives the copy's own address back. That
+  a key given for one site is held back from another is the core's, and is not
+  pinned here.
 
 `UPDATE_GOLDEN=1 ./test` writes the goldens again. Read the diff before you
 commit it.
@@ -167,6 +200,30 @@ the gateway's base added over a host that is set still calls the host, until
 `host=` clears it; and a crew member's card for the same command is accepted and
 shows the address now and the one it sets. Approving a card needs a person at a
 terminal, so none was approved, and no call went through a host.
+
+Tried on 24 November 2026 for `path_template`, in scratch yards with yardr build
+ad8d5521f9a9: `yardr source set jira site=<cloud id>` makes
+`https://api.atlassian.com/ex/jira/<cloud id>`, which `source show` names first
+with `(site <cloud id>)`; a pack applied again keeps it; `host=` and `site=`
+replace each other, and `site=` with nothing after it is the placeholder; a site
+with a slash, a space, `..`, a scheme, a `?` or a `#` is refused in the words of
+the check; on the version of this pack before the template `site=` was refused,
+since the declaration named none; a pack applied over a copy made as SETUP.md
+step 2 used to say plans `base: <the copy's address> ->
+https://example.atlassian.net` and `path_template: (none) ->
+https://api.atlassian.com/ex/jira/{site}`; and a user's card for the same
+command is accepted and shows the address now, the one it sets with the site
+named, and `yardr source set jira site=` as the way back. With a key standing, the
+card that moves the source to another site says the key is held back from the new
+one until it is given again, and names the address it was given for. On a
+loopback stand-in, a key given for the host with no site was held back from a
+site on that host and nothing was sent, a key given again for the site was sent
+there, a second site was held back from it, and going back to the first needed no
+new key. No card was approved, which is a person's at a terminal, and no call
+went through the gateway itself, which needs a site's credential.
+`curl https://yardr.atlassian.net/_edge/tenant_info` answered
+`{"cloudId":"f84cdad3-1764-4e23-a125-a6259e2fcb7a"}` without a login, the id
+SETUP.md step 2 uses as its example.
 
 Not checked against a site, because a person has to make one (a free Atlassian
 Cloud site serves this pack and the Confluence one). The live proof is a later

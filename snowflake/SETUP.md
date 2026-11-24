@@ -127,7 +127,10 @@ pack's directory (the `snowflake` directory of the yardr-packs checkout)
    yardr source show snowflake
    ```
    The first line of `source show` is the address in use. Until it is yours,
-   `yardr source check snowflake` calls the placeholder and fails.
+   `yardr source check snowflake` fails. The credential (step 4) is not set up
+   yet, so nothing is sent. Once the credential is given, the check calls the
+   address `source show` names. Do step 4 after this one and not before, so
+   that the credential is never one the yard could send to the placeholder.
 
 4. **The three names, in the yard.** The credential is three names, none of them
    a secret: `SNOWFLAKE_ACCOUNT`, the account identifier of step 3, written the
